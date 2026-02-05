@@ -21,8 +21,42 @@
             },
             {
               "fieldLabel": "Genre",
+              "fieldType": "dropdown",
               "fieldName": "genre",
-              "placeholder": "e.g., House, Techno, Ambient",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Ambient"
+                  },
+                  {
+                    "option": "Deep House"
+                  },
+                  {
+                    "option": "House"
+                  },
+                  {
+                    "option": "Indie Dance"
+                  },
+                  {
+                    "option": "Melodic House and Techno"
+                  },
+                  {
+                    "option": "Progressive House"
+                  },
+                  {
+                    "option": "Tech House"
+                  },
+                  {
+                    "option": "Techno"
+                  },
+                  {
+                    "option": "Trance"
+                  },
+                  {
+                    "option": "Other"
+                  }
+                ]
+              },
               "requiredField": true
             },
             {
@@ -86,48 +120,12 @@
       "type": "n8n-nodes-base.form",
       "typeVersion": 2.5,
       "position": [
-        928,
-        -16
+        1536,
+        0
       ],
       "id": "d3d7a6b5-94cb-4964-bfbc-fab08af2c025",
       "name": "Upload Successful! 🎉🎵",
       "webhookId": "57f29ae2-db60-4102-9426-f4496684eec5"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "3414ad64-0269-4f8b-97e2-3b27ac2aeb0a",
-              "name": "releaseId",
-              "value": "={{ $now.format('yyyy-MM-dd') }}_{{ $json.artist.replace(/[^a-zA-Z0-9]/g, '_') }}_{{ $json.title.replace(/[^a-zA-Z0-9]/g, '_') }}",
-              "type": "string"
-            },
-            {
-              "id": "6fbff3b1-d0c8-445c-ada2-aefddbd9b330",
-              "name": "timestamp",
-              "value": "={{ $now.toISO() }}",
-              "type": "string"
-            },
-            {
-              "id": "1ad6345e-ff50-4fbe-a360-816cd69898fa",
-              "name": "status",
-              "value": "pending_upload",
-              "type": "string"
-            }
-          ]
-        },
-        "includeOtherFields": true,
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        208,
-        0
-      ],
-      "id": "72d4ca0a-0349-45c2-bc4b-a772ebadebcd",
-      "name": "Set Node: Creates releaseID and timestamp"
     },
     {
       "parameters": {
@@ -157,7 +155,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        416,
+        624,
         0
       ],
       "id": "b06a611c-007c-4e4c-b42d-e4387add6e26",
@@ -167,6 +165,23 @@
       "parameters": {
         "method": "POST",
         "url": "=http://host.docker.internal:3001/upload?releaseId={{$json.releaseId}}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "artist",
+              "value": "={{ $json.artist }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "genre",
+              "value": "={{ $json.genre }}"
+            }
+          ]
+        },
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
@@ -191,7 +206,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        672,
+        880,
         96
       ],
       "id": "40a9b58d-6da8-428b-b23d-04095cd2e09b",
@@ -201,6 +216,23 @@
       "parameters": {
         "method": "POST",
         "url": "=http://host.docker.internal:3001/upload?releaseId={{$json.releaseId}}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "artist",
+              "value": "={{ $json.artist }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "genre",
+              "value": "={{ $json.genre }}"
+            }
+          ]
+        },
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
@@ -230,11 +262,142 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        672,
+        880,
         -128
       ],
       "id": "14087515-551a-446b-b96a-490ab787d72b",
       "name": "HTTP Request - Call File-Handler1 - With Video"
+    },
+    {
+      "parameters": {
+        "jsCode": "const artist = $input.first().json.artist?.trim();\nconst title = $input.first().json.title?.trim();\nconst genre = $input.first().json.genre;\nconst releaseType = $input.first().json.releaseType;\n\nconst errors = [];\n\nif (!artist || artist.length < 1 || artist.length > 100) {\n  errors.push(\"Artist name required (1-100 characters)\");\n}\n\nif (artist && !/^[a-zA-Z0-9\\s\\-_]+$/.test(artist)) {\n  errors.push(\"Artist name can only contain letters, numbers, spaces, hyphens, and underscores\");\n}\n\nif (!title || title.length < 1 || title.length > 200) {\n  errors.push(\"Title required (1-200 characters)\");\n}\n\nconst validGenres = [\n  \"Ambient\",\n  \"Deep House\",\n  \"House\",\n  \"Indie Dance\",\n  \"Melodic House and Techno\",\n  \"Progressive House\",\n  \"Tech House\",\n  \"Techno\",\n  \"Trance\",\n  \"Other\"\n];\n\nif (!genre || !validGenres.includes(genre)) {\n  errors.push(`Genre must be one of: ${validGenres.join(\", \")}`);\n}\n\nif (releaseType !== \"Single\") {\n  errors.push(\"Only Singles supported in MVP (EPs coming in V2)\");\n}\n\nif (errors.length > 0) {\n  throw new Error(`Validation failed:\\n${errors.join(\"\\n\")}`);\n}\n\nreturn $input.all();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "a2bd0bd4-bf51-4487-8a9a-d596659a08db",
+      "name": "Validate Inputs"
+    },
+    {
+      "parameters": {
+        "jsCode": "const uploadResponse = $input.first().json;\n\nconst releaseId = uploadResponse.filesUploaded && uploadResponse.filesUploaded[0] \n  ? uploadResponse.filesUploaded[0].savedTo.split('/').find(part => part.includes('_'))\n  : 'unknown';\n\nlet artist = 'Unknown Artist';\nlet title = 'Unknown Title';\nlet genre = 'Unknown';\n\nif (releaseId && releaseId !== 'unknown') {\n  const parts = releaseId.split('_');\n  if (parts.length >= 3) {\n    artist = parts[1];\n    title = parts.slice(2).join('_');\n  }\n}\n\nif (uploadResponse.artist) artist = uploadResponse.artist;\nif (uploadResponse.title) title = uploadResponse.title;\nif (uploadResponse.genre) genre = uploadResponse.genre;\n\nconst metadata = {\n  releaseId: releaseId,\n  artist: artist,\n  title: title,\n  genre: genre,\n  releaseType: 'Single',\n  releaseDate: new Date().toISOString().split('T')[0],\n  createdAt: new Date().toISOString(),\n  files: {\n    audio: [],\n    artwork: [],\n    video: []\n  }\n};\n\nif (uploadResponse.filesUploaded) {\n  uploadResponse.filesUploaded.forEach(file => {\n    const category = file.savedTo.includes('/audio/') ? 'audio' : \n                     file.savedTo.includes('/artwork/') ? 'artwork' : \n                     file.savedTo.includes('/video/') ? 'video' : 'other';\n    \n    metadata.files[category].push({\n      filename: file.originalName,\n      size: file.size,\n      mimetype: file.mimetype\n    });\n  });\n}\n\nreturn [{\n  json: {\n    releaseId: releaseId,\n    metadata: metadata\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -80
+      ],
+      "id": "460e84ed-646f-41a2-84c0-e4953b5bc75d",
+      "name": "Add Metadata with Video"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/metadata",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "releaseId",
+              "value": "={{ $json.releaseId }}"
+            },
+            {
+              "name": "metadata",
+              "value": "={{ $json.metadata }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1360,
+        -128
+      ],
+      "id": "3d182d5b-038d-4fa6-88e7-97774337e976",
+      "name": "Save Metadata with video"
+    },
+    {
+      "parameters": {
+        "jsCode": "const uploadResponse = $input.first().json;\n\nconst releaseId = uploadResponse.filesUploaded && uploadResponse.filesUploaded[0] \n  ? uploadResponse.filesUploaded[0].savedTo.split('/').find(part => part.includes('_'))\n  : 'unknown';\n\nlet artist = 'Unknown Artist';\nlet title = 'Unknown Title';\nlet genre = 'Unknown';\n\nif (releaseId && releaseId !== 'unknown') {\n  const parts = releaseId.split('_');\n  if (parts.length >= 3) {\n    artist = parts[1];\n    title = parts.slice(2).join('_');\n  }\n}\n\nif (uploadResponse.artist) artist = uploadResponse.artist;\nif (uploadResponse.title) title = uploadResponse.title;\nif (uploadResponse.genre) genre = uploadResponse.genre;\n\nconst metadata = {\n  releaseId: releaseId,\n  artist: artist,\n  title: title,\n  genre: genre,\n  releaseType: 'Single',\n  releaseDate: new Date().toISOString().split('T')[0],\n  createdAt: new Date().toISOString(),\n  files: {\n    audio: [],\n    artwork: [],\n    video: []\n  }\n};\n\nif (uploadResponse.filesUploaded) {\n  uploadResponse.filesUploaded.forEach(file => {\n    const category = file.savedTo.includes('/audio/') ? 'audio' : \n                     file.savedTo.includes('/artwork/') ? 'artwork' : \n                     file.savedTo.includes('/video/') ? 'video' : 'other';\n    \n    metadata.files[category].push({\n      filename: file.originalName,\n      size: file.size,\n      mimetype: file.mimetype\n    });\n  });\n}\n\nreturn [{\n  json: {\n    releaseId: releaseId,\n    metadata: metadata\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        112
+      ],
+      "id": "5e073991-9d70-4c53-9d63-ea2755a3e9e7",
+      "name": "Create Metadata no video"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/metadata",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "releaseId",
+              "value": "={{ $json.releaseId }}"
+            },
+            {
+              "name": "metadata",
+              "value": "={{ $json.metadata }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1360,
+        144
+      ],
+      "id": "50e7da8f-293f-4a25-8080-c2f24f13ee7d",
+      "name": "Save Metadata with no video"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3414ad64-0269-4f8b-97e2-3b27ac2aeb0a",
+              "name": "releaseId",
+              "value": "={{ new Date().toISOString().split('T')[0] }}_{{ $json.artist.replace(/\\s+/g, '') }}_{{ $json.title.replace(/\\s+/g, '') }}\n",
+              "type": "string"
+            },
+            {
+              "id": "6fbff3b1-d0c8-445c-ada2-aefddbd9b330",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "1ad6345e-ff50-4fbe-a360-816cd69898fa",
+              "name": "status",
+              "value": "pending_upload",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "72d4ca0a-0349-45c2-bc4b-a772ebadebcd",
+      "name": "Set Node that creates releaseID and timestamp"
     }
   ],
   "pinData": {},
@@ -243,18 +406,7 @@
       "main": [
         [
           {
-            "node": "Set Node: Creates releaseID and timestamp",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Set Node: Creates releaseID and timestamp": {
-      "main": [
-        [
-          {
-            "node": "If",
+            "node": "Validate Inputs",
             "type": "main",
             "index": 0
           }
@@ -283,7 +435,7 @@
       "main": [
         [
           {
-            "node": "Upload Successful! 🎉🎵",
+            "node": "Create Metadata no video",
             "type": "main",
             "index": 0
           }
@@ -294,7 +446,73 @@
       "main": [
         [
           {
+            "node": "Add Metadata with Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Inputs": {
+      "main": [
+        [
+          {
+            "node": "Set Node that creates releaseID and timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Metadata with Video": {
+      "main": [
+        [
+          {
+            "node": "Save Metadata with video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Metadata with video": {
+      "main": [
+        [
+          {
             "node": "Upload Successful! 🎉🎵",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Metadata no video": {
+      "main": [
+        [
+          {
+            "node": "Save Metadata with no video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Metadata with no video": {
+      "main": [
+        [
+          {
+            "node": "Upload Successful! 🎉🎵",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Node that creates releaseID and timestamp": {
+      "main": [
+        [
+          {
+            "node": "If",
             "type": "main",
             "index": 0
           }
@@ -307,7 +525,7 @@
     "executionOrder": "v1",
     "availableInMCP": false
   },
-  "versionId": "feecbb99-b33b-4e08-a54f-b0ad32c8528f",
+  "versionId": "4b17d5bb-aa33-4bbe-b766-02f88c2b296d",
   "meta": {
     "instanceId": "ce830cf2f2ee2b33b4bae446a894dd9052281718242ca6d8d1e48a518c6ee82d"
   },
