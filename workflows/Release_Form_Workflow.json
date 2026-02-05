@@ -1,0 +1,316 @@
+{
+  "name": "MVP: Release Upload Form",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Release Upload Form",
+        "formDescription": "Upload your music release files and metadata",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Artist Name",
+              "fieldName": "artist",
+              "placeholder": "Enter artist name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Track Title",
+              "fieldName": "title",
+              "placeholder": "Enter track title",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Genre",
+              "fieldName": "genre",
+              "placeholder": "e.g., House, Techno, Ambient",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Release Type",
+              "fieldType": "dropdown",
+              "fieldName": "releaseType",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Single"
+                  },
+                  {
+                    "option": "EP"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Audio File (WAV)",
+              "fieldType": "file",
+              "fieldName": "audioFile",
+              "multipleFiles": false,
+              "acceptFileTypes": ".wav,.mp3,.flac,.aiff",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Artwork",
+              "fieldType": "file",
+              "fieldName": "artworkFile",
+              "acceptFileTypes": ".jpg,.jpeg,.png",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Videos",
+              "fieldType": "file",
+              "fieldName": "videoFile",
+              "acceptFileTypes": ".mp4,.mov,.avi,.mkv,.webm"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1c034139-2a90-491c-b441-bebe8211a768",
+      "name": "Upload your Release",
+      "webhookId": "602577e4-102d-42a8-90bd-cc2f43da11a9"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Upload Successful! 🎵 ",
+        "completionMessage": "=✅ Upload successful!🎵\n\nRelease ID: {{$json.releaseId}}\n\nYour files have been saved and will be processed shortly.\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        928,
+        -16
+      ],
+      "id": "d3d7a6b5-94cb-4964-bfbc-fab08af2c025",
+      "name": "Upload Successful! 🎉🎵",
+      "webhookId": "57f29ae2-db60-4102-9426-f4496684eec5"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3414ad64-0269-4f8b-97e2-3b27ac2aeb0a",
+              "name": "releaseId",
+              "value": "={{ $now.format('yyyy-MM-dd') }}_{{ $json.artist.replace(/[^a-zA-Z0-9]/g, '_') }}_{{ $json.title.replace(/[^a-zA-Z0-9]/g, '_') }}",
+              "type": "string"
+            },
+            {
+              "id": "6fbff3b1-d0c8-445c-ada2-aefddbd9b330",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "1ad6345e-ff50-4fbe-a360-816cd69898fa",
+              "name": "status",
+              "value": "pending_upload",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "72d4ca0a-0349-45c2-bc4b-a772ebadebcd",
+      "name": "Set Node: Creates releaseID and timestamp"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a90d9947-7bc6-4759-b40f-72e00cf828e9",
+              "leftValue": "={{ Object.keys($binary).includes('videoFile') }}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "b06a611c-007c-4e4c-b42d-e4387add6e26",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://host.docker.internal:3001/upload?releaseId={{$json.releaseId}}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "audioFile",
+              "inputDataFieldName": "audioFile"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "artworkFile",
+              "inputDataFieldName": "artworkFile"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": false,
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        672,
+        96
+      ],
+      "id": "40a9b58d-6da8-428b-b23d-04095cd2e09b",
+      "name": "HTTP Request - Call File-Handler - No Video"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://host.docker.internal:3001/upload?releaseId={{$json.releaseId}}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "audioFile",
+              "inputDataFieldName": "audioFile"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "artworkFile",
+              "inputDataFieldName": "artworkFile"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "videoFile",
+              "inputDataFieldName": "videoFile"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": false,
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        672,
+        -128
+      ],
+      "id": "14087515-551a-446b-b96a-490ab787d72b",
+      "name": "HTTP Request - Call File-Handler1 - With Video"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Upload your Release": {
+      "main": [
+        [
+          {
+            "node": "Set Node: Creates releaseID and timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Node: Creates releaseID and timestamp": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Call File-Handler1 - With Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request - Call File-Handler - No Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Call File-Handler - No Video": {
+      "main": [
+        [
+          {
+            "node": "Upload Successful! 🎉🎵",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Call File-Handler1 - With Video": {
+      "main": [
+        [
+          {
+            "node": "Upload Successful! 🎉🎵",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "feecbb99-b33b-4e08-a54f-b0ad32c8528f",
+  "meta": {
+    "instanceId": "ce830cf2f2ee2b33b4bae446a894dd9052281718242ca6d8d1e48a518c6ee82d"
+  },
+  "id": "FtCyU_OaBW39QwiBdseVd",
+  "tags": []
+}
