@@ -8,6 +8,8 @@ const app = express();
 const PORT = 3001;
 
 app.use(cors());
+app.use(express.json());
+
 
 const RELEASES_BASE = '/Users/Mathias2/Documents/Music Agent/Releases';
 
@@ -61,8 +63,10 @@ app.get('/health', (req, res) => {
 
 app.post('/upload', upload.any(), (req, res) => {
   const releaseId = req.query.releaseId;
+  const artist = req.query.artist;
+  const title = req.query.title;
+  const genre = req.query.genre;
   
-  // Add this logging
   console.log(`📥 Upload received: ${req.files?.length || 0} files for ${releaseId}`);
   req.files?.forEach(f => {
     console.log(`   → ${f.originalname} saved to ${path.basename(path.dirname(f.path))}/ folder`);
@@ -71,6 +75,9 @@ app.post('/upload', upload.any(), (req, res) => {
   res.json({
     success: true,
     releaseId,
+    artist,
+    title,
+    genre,
     filesUploaded: (req.files || []).map(f => ({
       originalName: f.originalname,
       savedTo: f.path,
@@ -80,7 +87,6 @@ app.post('/upload', upload.any(), (req, res) => {
   });
 });
 
-
 app.use((err, req, res, next) => {
   res.status(err.statusCode || 500).json({
     success: false,
@@ -88,6 +94,38 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(3001, '0.0.0.0', () => {
-  console.log('✅ File-handler server running on port 3001');
+app.post('/metadata', (req, res) => {
+  const { releaseId, metadata } = req.body;
+  
+  if (!releaseId || !metadata) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Missing releaseId or metadata' 
+    });
+  }
+  
+  const releasePath = path.join(RELEASES_BASE, releaseId);
+  const metadataPath = path.join(releasePath, 'metadata.json');
+  
+  try {
+    if (!fs.existsSync(releasePath)) {
+      fs.mkdirSync(releasePath, { recursive: true });
+    }
+    
+    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    
+    res.json({ 
+      success: true, 
+      message: 'Metadata saved successfully',
+      path: metadataPath 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+app.listen(PORT, () => {
+  console.log(`✅ File-handler server running on port ${PORT}`);
 });
