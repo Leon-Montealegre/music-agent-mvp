@@ -418,8 +418,188 @@ app.get('/releases', async (req, res) => {
 //   POST /distribute/labelradar            → Step 4: LabelRadar submission
 //   POST /distribute/youtube               → Step 5: YouTube API upload
 // =============================================================================
+// --- 6f: Get Single Release ---
+// Returns the full metadata for one specific release.
+// Uses a URL parameter (:releaseId) instead of a query string (?releaseId=...).
+// Example: GET /releases/2026-02-05_SophieJoe_TellMe
+//
+// How URL params work:
+//   Route definition:  /releases/:releaseId
+//   Actual request:    /releases/2026-02-05_SophieJoe_TellMe
+//   req.params.releaseId = "2026-02-05_SophieJoe_TellMe"
+//
+// This is different from query params (req.query) that use ?key=value format.
+// URL params are part of the path itself — cleaner for "get this specific thing" requests.
 
+app.get('/releases/:releaseId', async (req, res) => {
+  try {
+    const releaseId = req.params.releaseId;
+    const releasePath = path.join(RELEASES_BASE, releaseId);
+    const metadataPath = path.join(releasePath, 'metadata.json');
 
+    // Check if the release folder exists
+    try {
+      await fs.access(releasePath);
+    } catch {
+      console.log(`🔍 Release not found: ${releaseId}`);
+      return res.status(404).json({  // 404 = Not Found
+        success: false,
+        error: 'Release not found',
+        message: `No release found with ID "${releaseId}"`
+      });
+    }
+
+    // Read and return the metadata
+    const metadataContent = await fs.readFile(metadataPath, 'utf8');
+    const metadata = JSON.parse(metadataContent);
+
+    console.log(`🔍 Found release: ${releaseId}`);
+
+    res.json({
+      success: true,
+      release: metadata
+    });
+
+  } catch (error) {
+    console.error(`❌ Error fetching release ${req.params.releaseId}:`, error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch release details'
+    });
+  }
+});
+
+// --- 6g: Update Distribution Tracking ---
+// Adds or updates a distribution entry in a release's metadata.json.
+// This is how the system tracks "where has this track been sent?"
+//
+// Uses PATCH because we're updating PART of an existing resource (not creating new).
+// URL format: PATCH /releases/:releaseId/distribution
+//
+// Expected body example (adding a YouTube publish entry):
+// {
+//   "path": "publish",
+//   "entry": {
+//     "platform": "YouTube",
+//     "status": "published",
+//     "privacy": "unlisted",
+//     "videoId": "abc123",
+//     "url": "https://youtube.com/watch?v=abc123"
+//   }
+// }
+//
+// Distribution paths: "publish", "labels", "streaming", "marketing"
+// Each path holds an array of entries (one per platform action).
+
+app.patch('/releases/:releaseId/distribution', async (req, res) => {
+  try {
+    const releaseId = req.params.releaseId;
+    const { path: distPath, entry } = req.body;
+
+    // --- Validation ---
+
+    // Check that the request body has the required fields
+    if (!distPath || !entry) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'Request body must include "path" (publish/labels/streaming/marketing) and "entry" (object with platform details)'
+      });
+    }
+
+    // Only allow the 4 valid distribution paths
+    const validPaths = ['publish', 'labels', 'streaming', 'marketing'];
+    if (!validPaths.includes(distPath)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid distribution path',
+        message: `"${distPath}" is not valid. Use one of: ${validPaths.join(', ')}`
+      });
+    }
+
+    // Every entry must specify which platform it's for
+    if (!entry.platform) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing platform',
+        message: 'The entry object must include a "platform" field (e.g., "YouTube", "SoundCloud", "DistroKid")'
+      });
+    }
+
+    // --- Read existing metadata ---
+    const releasePath = path.join(RELEASES_BASE, releaseId);
+    const metadataPath = path.join(releasePath, 'metadata.json');
+
+    // Check if the release exists
+    try {
+      await fs.access(releasePath);
+    } catch {
+      return res.status(404).json({
+        success: false,
+        error: 'Release not found',
+        message: `No release found with ID "${releaseId}"`
+      });
+    }
+
+    // Read the current metadata.json
+    const metadataContent = await fs.readFile(metadataPath, 'utf8');
+    const metadata = JSON.parse(metadataContent);
+
+    // --- Update the distribution section ---
+
+    // Create the distribution object if it doesn't exist yet
+    // (old releases from before Milestone 5 won't have it)
+    if (!metadata.distribution) {
+      metadata.distribution = {};
+    }
+
+    // Create the specific path array if it doesn't exist yet
+    // e.g., metadata.distribution.publish = []
+    if (!metadata.distribution[distPath]) {
+      metadata.distribution[distPath] = [];
+    }
+
+    // Add a timestamp to the entry automatically
+    entry.updatedAt = new Date().toISOString();
+
+    // Check for duplicate: same platform + same path already exists?
+    // This prevents accidentally adding "YouTube" to "publish" twice.
+    const existingIndex = metadata.distribution[distPath].findIndex(
+      e => e.platform === entry.platform
+    );
+
+    if (existingIndex >= 0) {
+      // Update the existing entry (merge new data on top of old)
+      metadata.distribution[distPath][existingIndex] = {
+        ...metadata.distribution[distPath][existingIndex],  // Keep existing fields
+        ...entry                                             // Overwrite with new fields
+      };
+      console.log(`📦 Updated ${entry.platform} in ${distPath} for ${releaseId}`);
+    } else {
+      // Add as a new entry
+      metadata.distribution[distPath].push(entry);
+      console.log(`📦 Added ${entry.platform} to ${distPath} for ${releaseId}`);
+    }
+
+    // --- Save the updated metadata ---
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+
+    res.json({
+      success: true,
+      message: existingIndex >= 0
+        ? `Updated ${entry.platform} in ${distPath}`
+        : `Added ${entry.platform} to ${distPath}`,
+      distribution: metadata.distribution
+    });
+
+  } catch (error) {
+    console.error(`❌ Error updating distribution for ${req.params.releaseId}:`, error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update distribution tracking'
+    });
+  }
+});
 // --- 6e: Storage Status ---
 // Reports disk space usage for the Releases drive.
 // Warns if less than 10GB free (important with large WAV files ~50-100MB each).
