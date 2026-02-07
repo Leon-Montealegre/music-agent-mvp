@@ -1,9 +1,9 @@
-# Music Agent - Master Project Context v2.6
+# Music Agent - Master Project Context v2.7
 
 **Document Info**  
-Last Updated: February 7, 2026, 11:00 AM CET  
-Status: Milestones 1-4 Complete | Milestone 5 (Distribution Orchestrator) IN PROGRESS  
-Version: 2.6 (Version management + SoundCloud package generator built, SoundCloud form analysis complete)
+Last Updated: February 8, 2026, 3:00 PM CET  
+Status: Milestones 1-4 Complete | Mini-MVP 1 (SoundCloud) IN PROGRESS  
+Version: 2.7 (Restructured to mini-MVP approach — vertical slices by platform)
 
 ---
 
@@ -13,7 +13,7 @@ I'm learning to code through hands-on building ("vibe coding"). I'm a beginner b
 
 **Current Skill Level:**
 - Comfortable with: Terminal basics, file system navigation, Git via GitHub Desktop, copying/pasting code
-- Learning: Node.js/Express, n8n workflows, API design, async/await, error handling, file I/O
+- Learning: Node.js/Express, n8n workflows, API design, async/await, error handling, file I/O, Next.js
 - Goal: Understand how systems work together (not just copy-paste, but comprehend WHY)
 
 ---
@@ -24,7 +24,8 @@ I'm learning to code through hands-on building ("vibe coding"). I'm a beginner b
 - **Workflow Engine:** n8n (Docker container on localhost:5678)
 - **Storage:** Local folders: ~/Documents/Music Agent/Releases/
 - **Development:** macOS, Cursor IDE, GitHub Desktop for version control
-- **Future Frontend:** Next.js (Milestone 7)
+- **Frontend:** Next.js (starting with Mini-MVP 1)
+- **Browser Automation:** Playwright MCP (for semi-automated platform uploads)
 
 ---
 
@@ -78,7 +79,8 @@ Expected: `{"status":"ok","message":"File handler is running"}`
 │       ├── MASTER_PROMPT_2026-02-05_23-33.md
 │       ├── MASTER_PROMPT_2026-02-06_01-09.md
 │       ├── MASTER_PROMPT_2026-02-06_02-36.md
-│       └── MASTER_PROMPT_2026-02-07_03-27.md
+│       ├── MASTER_PROMPT_2026-02-07_03-27.md
+│       └── MASTER_PROMPT_2026-02-08_11-00.md
 ├── MILESTONE_1_COMPLETE.md
 ├── MILESTONE_2_COMPLETE.md
 ├── MILESTONE_3_COMPLETE.md
@@ -89,7 +91,198 @@ Expected: `{"status":"ok","message":"File handler is running"}`
 
 ---
 
-## Current State (MVP Progress)
+## Architecture Overview
+
+### 3-Path Distribution Architecture
+
+This is the core design principle of the entire system. Every action a user takes falls into one of three paths:
+
+**Path 1: Release (Self-Release to Fans + Streaming)**
+- Purpose: "I'm putting this out myself" — all platforms, one coordinated release
+- Includes: Direct uploads (SoundCloud, Bandcamp), aggregator distribution (DistroKid → Spotify/Apple Music/Beatport/Deezer/Tidal), privacy/scheduling options
+- Key insight: A self-releasing artist does ALL of these together, not as separate actions
+- If a label rejects the track (Path 2), the artist may then choose Path 1 themselves
+
+**Path 2: Submit (Label Pitching)**
+- Purpose: "I want a label to release this" — completely different workflow because the track isn't public yet
+- Includes: LabelRadar submissions, private SoundCloud links for previewing, direct A&R emails
+- If a label signs it, THEY handle distribution (Path 1 becomes the label's responsibility)
+- Sequential flow: Submit → wait for response → if rejected by all labels → optionally self-release via Path 1
+
+**Path 3: Promote (Marketing Content)**
+- Purpose: "I want to create marketing content" — runs alongside Path 1 or Path 2
+- Includes: Captions, clips, visuals for Instagram, TikTok, Facebook, X
+- Used both when self-releasing AND when a label wants promo assets from the artist
+
+### Automation Philosophy: Human-in-the-Loop
+
+The system automates everything EXCEPT actions with legal or financial consequences.
+
+**✅ Automated (system does this):**
+- Open upload pages and navigate to correct forms
+- Identify form fields and map our metadata to them
+- Pre-fill text fields from release metadata
+- Upload audio files and artwork to platform forms
+- Generate metadata text files, ZIP packages, captions
+- Track distribution status in metadata.json
+
+**❌ Manual — Human Required (user clicks these):**
+- Final "Submit" / "Publish" / "Upload" / "Go Live" buttons
+- Payment confirmations
+- Terms of Service acceptance
+- Copyright attestations
+- Any action with legal/financial consequences
+
+**Why this balance:**
+- Eliminates the tedious prep work (filling in 15 form fields manually)
+- User retains control over legally binding actions
+- Semi-automation: prep work automated, final commitment manual
+- Human-in-the-loop is industry best practice for music rights
+
+### Artist vs Label User Types
+
+**MVP = Artist workflow only.** But architected so the label layer wraps around it later.
+
+**Artist Workflow (MVP):**
+Finish track → Decide: submit to labels OR self-release → Upload assets → Choose platforms → Promote → Track results
+
+**Label Workflow (V3 — future):**
+Receive demos → A&R review → Sign track → Manage release (scheduling, ISRC/UPC, metadata) → Coordinate artist promo → Distribute → Track royalties → Manage catalog
+
+**What labels need that artists don't:** Catalog management across many artists, royalty tracking and payment splits, ISRC/UPC generation, Beatport-exclusive scheduling windows, contract and rights management, bulk operations (2-4 releases/month across artists), DDEX standard support.
+
+---
+
+## MVP Roadmap: Mini-MVP Approach
+
+Instead of building all backend → all content generation → all UI (horizontal), the MVP is structured as vertical slices by platform. Each mini-MVP delivers a complete, usable workflow: backend endpoint + UI + automation.
+
+### Shared Foundation (Already Built — Milestones 1-4)
+
+Everything below is shared by all mini-MVPs:
+
+- ✅ **Release Intake:** n8n form → webhook → metadata generation
+- ✅ **File Upload:** Express/Multer API with classify(), version management, validation
+- ✅ **Metadata:** releaseId generation, metadata.json, genre dropdown, validation
+- ✅ **Storage:** Release listing, disk monitoring, duplicate detection, audio validation
+- ✅ **Distribution Tracking:** PATCH endpoint, 3-path structure in metadata.json
+- ✅ **Version Management:** generateVersionId(), getVersionInfo(), multi-version audio support
+
+### Mini-MVP 1: SoundCloud (IN PROGRESS)
+
+**Goal:** Upload a track → system prepares everything → browser automation fills SoundCloud's form → user clicks "Upload" button only.
+
+**What's Done:**
+- ✅ POST /distribute/soundcloud/package — ZIP generator (audio + artwork + metadata.txt)
+- ✅ SoundCloud upload form fully audited (5 screenshots, all fields documented)
+- ✅ Distribution tracking updates automatically
+
+**What's Left:**
+| Step | Task | Status |
+|------|------|--------|
+| 1 | Update soundcloud-metadata.txt — match real SoundCloud form fields (tags, description, permissions guide, advanced details) | ⏳ Next |
+| 2 | Next.js UI — upload form (replaces n8n form) | ⏳ Pending |
+| 3 | Next.js UI — SoundCloud distribution page (select release → configure → generate package) | ⏳ Pending |
+| 4 | Playwright MCP — semi-automated SoundCloud upload (open form, fill fields, upload files, stop before "Upload" button) | ⏳ Pending |
+| 5 | Test end-to-end with real track | ⏳ Pending |
+
+**SoundCloud Automation Scope:**
+- Playwright opens soundcloud.com/upload
+- Uploads the audio file to SoundCloud's dropzone
+- Fills: title, artist, genre (searches dropdown), tags, description, privacy setting
+- Uploads artwork image
+- Sets release date if provided
+- **STOPS** — user reviews everything and clicks "Upload" button themselves
+
+**Mini-MVP 1 Definition of Done:**
+- Can upload a track through Next.js UI
+- Click "Distribute to SoundCloud" → system opens SoundCloud with everything pre-filled
+- User reviews and clicks Upload
+- Distribution status tracked in metadata.json
+
+### Mini-MVP 2: Marketing Captions
+
+**Goal:** Generate platform-specific social media captions for any release.
+
+**Why second:** Every release needs social posts regardless of platform. This provides immediate value alongside SoundCloud.
+
+| Step | Task | Status |
+|------|------|--------|
+| 1 | POST /marketing/captions — generate captions for Instagram, TikTok, Facebook, X | ⏳ Pending |
+| 2 | Next.js UI — caption generation page (select release → generate → copy/edit) | ⏳ Pending |
+| 3 | Platform-specific formatting (Instagram hashtag limits, X character limits, TikTok style) | ⏳ Pending |
+
+**Mini-MVP 2 Definition of Done:**
+- Select any release → click "Generate Captions"
+- Get formatted captions for all 4 platforms
+- Copy to clipboard or edit before posting
+- Track in metadata.json promote path
+
+### Mini-MVP 3: LabelRadar (Submit Path)
+
+**Goal:** Submit unreleased tracks to labels via LabelRadar with maximum automation.
+
+| Step | Task | Status |
+|------|------|--------|
+| 1 | Audit LabelRadar submission form (screenshots, same as SoundCloud audit) | ⏳ Pending |
+| 2 | POST /distribute/labelradar/package — submission package generator | ⏳ Pending |
+| 3 | Next.js UI — label submission page (select release → choose labels → submit) | ⏳ Pending |
+| 4 | Playwright MCP — semi-automated LabelRadar submission (fill form, stop before submit) | ⏳ Pending |
+| 5 | Submission tracking (multiple labels per release, response status) | ⏳ Pending |
+
+**Mini-MVP 3 Definition of Done:**
+- Select release → choose target labels → system prepares LabelRadar submission
+- Playwright fills the form, user clicks Submit
+- Track submission status per label in metadata.json submit path
+- Can submit same track to multiple labels
+
+### Mini-MVP 4: DistroKid (Aggregator Distribution)
+
+**Goal:** Distribute to Spotify, Apple Music, Beatport, and all major streaming platforms via DistroKid.
+
+| Step | Task | Status |
+|------|------|--------|
+| 1 | Audit DistroKid upload form (screenshots) | ⏳ Pending |
+| 2 | POST /distribute/distrokid/package — package + checklist generator | ⏳ Pending |
+| 3 | Next.js UI — DistroKid distribution page | ⏳ Pending |
+| 4 | Playwright MCP — semi-automated DistroKid upload (fill form, stop before submit) | ⏳ Pending |
+| 5 | Beatport-specific handling (genre tagging, artwork validation, exclusive windows) | ⏳ Pending |
+
+**Beatport as First-Class Citizen:**
+- DistroKid distributes to Beatport, but we track Beatport-specific data
+- Proper genre/subgenre tagging (Beatport has specific categories)
+- Artwork validation (1400x1400 minimum for Beatport)
+- Exclusive release windows (common: 2 weeks on Beatport before Spotify)
+
+**Mini-MVP 4 Definition of Done:**
+- Select release → system prepares DistroKid submission with all metadata
+- Playwright fills form, user clicks Upload
+- Track distribution status including individual platform statuses (Beatport live, Spotify pending, etc.)
+- ISRC tracking when received from DistroKid
+
+### Mini-MVP 5: YouTube (API Automation)
+
+**Goal:** Fully automated YouTube upload via API (most complex — requires OAuth).
+
+| Step | Task | Status |
+|------|------|--------|
+| 1 | Set up Google Cloud project + YouTube Data API v3 credentials | ⏳ Pending |
+| 2 | OAuth2 authentication flow | ⏳ Pending |
+| 3 | POST /distribute/youtube — automated video upload | ⏳ Pending |
+| 4 | Next.js UI — YouTube upload page (select release, configure, upload) | ⏳ Pending |
+| 5 | Auto-generate video from artwork + audio (if no video file uploaded) | ⏳ Pending |
+
+**Why last:** Requires Google API credentials and OAuth setup — most technically complex. Also the only platform where we can achieve FULL automation (no human-in-the-loop needed since YouTube API handles the upload directly).
+
+**Mini-MVP 5 Definition of Done:**
+- Select release → click "Upload to YouTube" → fully automated
+- Video uploaded with title, description, tags, thumbnail
+- Distribution status tracked in metadata.json
+- No manual steps required (YouTube API handles everything)
+
+---
+
+## Completed Work (Milestones 1-4)
 
 ### ✅ Milestone 1 Complete: Release Intake
 - n8n "Release Intake" workflow receives JSON metadata via webhook
@@ -122,141 +315,75 @@ Expected: `{"status":"ok","message":"File handler is running"}`
 - Console logging: Helpful emoji indicators (🚫 duplicate, 🎵 validating, ✅ valid, 💾 disk check, 📂 listing)
 - Installed packages: music-metadata, check-disk-space, file-type-checker
 
-### ⏳ Milestone 5: Distribution Orchestrator (IN PROGRESS)
-
-**Build Order & Status:**
-
-| Step | Feature | Status |
-|------|---------|--------|
-| 1 | GET /releases/:releaseId — fetch single release | ✅ Complete |
-| 2 | PATCH /releases/:releaseId/distribution — update tracking | ✅ Complete |
-| 3 | Version management — multi-version support per release | ✅ Complete |
-| 4a | POST /distribute/soundcloud/package — SoundCloud ZIP package | ✅ Complete (metadata.txt needs update) |
-| 4b | SoundCloud form field analysis — screenshot audit of real upload form | ✅ Complete |
-| 4c | Update soundcloud-metadata.txt generation — match real SoundCloud fields | ⏳ Next |
-| 4d | POST /distribute/distrokid/package — DistroKid package + checklist | ⏳ Pending |
-| 4e | POST /distribute/labelradar — LabelRadar submission | ⏳ Pending |
-| 5 | POST /marketing/captions — social media caption generator | ⏳ Pending |
-| 6 | POST /distribute/youtube — YouTube API automated upload | ⏳ Pending |
-
-**What Was Built in This Session:**
-
-**Version Management System (new helper functions + updated Multer):**
-- `generateVersionId()` — converts version names to URL-safe folder names (e.g., "Extended Mix" → "extended-mix")
-- `getVersionInfo()` — extracts version data from request, defaults to "Primary Version"
-- Multer updated: audio files route to `versions/<versionId>/audio/`, artwork and video stay shared at release level
-- POST /releases/:releaseId/versions — add new audio versions to existing releases
-- Bug fix: route 6g had structural issues (missing upload.any() middleware, code in wrong function scope, undefined variables) — all fixed
-
-**SoundCloud Package Generator (route 6i):**
-- POST /distribute/soundcloud/package endpoint working
-- Creates ZIP containing: audio file, artwork, soundcloud-metadata.txt
-- Accepts: releaseId, versionId, privacy (public/private)
-- Auto-updates distribution tracking in metadata.json
-- Uses archiver package for ZIP creation
-
-**SoundCloud Form Analysis (completed — informs next step):**
-- Audited all 5 sections of the real SoundCloud upload form via screenshots
-- Documented every field: type, required/optional, defaults
-- Identified gaps in our current metadata.txt generation
-- See "SoundCloud Field Reference" section below for full details
-
 ---
 
-### SoundCloud Upload Form — Field Reference
+## SoundCloud Upload Form — Field Reference
 
-This section documents every field in SoundCloud's upload form (audited February 7, 2026). Used to ensure our package generator provides accurate, complete metadata.
+This section documents every field in SoundCloud's upload form (audited February 7, 2026). Used to ensure our package generator and Playwright automation provide accurate, complete data.
 
 **Basic Info Tab:**
 
-| Field | Type | Required? | Our System Has It? | Notes |
-|-------|------|-----------|-------------------|-------|
-| Track title | Text input | ✅ Yes | ✅ Yes | Shows red error if empty |
+| Field | Type | Required? | Our System Has It? | Automation |
+|-------|------|-----------|-------------------|------------|
+| Track title | Text input | ✅ Yes | ✅ Yes | Playwright fills |
 | Track link | URL slug | Auto-generated | N/A | Auto-fills from title |
-| Main Artist(s) | Text input | Likely required | ✅ Yes | "Use commas for multiple artists" |
-| Genre | Searchable dropdown | Optional | ✅ Yes | SoundCloud has predefined list |
-| Tags | Text input | Optional | ❌ Missing | "styles, moods, tempo" — high discoverability value |
-| Description | Text area | Optional | ✅ Yes | "Tracks with descriptions get more plays" |
-| Track Privacy | Radio: Public/Private/Schedule | Required | ✅ Yes | |
-| Artwork | Image upload | Optional | ✅ Yes (in ZIP) | |
+| Main Artist(s) | Text input | Likely required | ✅ Yes | Playwright fills |
+| Genre | Searchable dropdown | Optional | ✅ Yes | Playwright searches + selects |
+| Tags | Text input | Optional | ❌ Build in metadata.txt update | Playwright fills |
+| Description | Text area | Optional | ✅ Yes (needs improvement) | Playwright fills |
+| Track Privacy | Radio: Public/Private/Schedule | Required | ✅ Yes | Playwright selects |
+| Artwork | Image upload | Optional | ✅ Yes (in ZIP) | Playwright uploads |
 
 **Permissions Tab:**
 
-| Field | Type | Default | Action for MVP |
-|-------|------|---------|---------------|
-| Enable direct downloads | Toggle | OFF | Document in guide |
-| Offline listening | Toggle | ON | Document in guide |
-| Include in RSS feed | Toggle | ON | Document in guide |
-| Display embed code | Toggle | ON | Document in guide |
-| Enable app playback | Toggle | ON | Document in guide |
-| Allow comments | Toggle | ON | Document in guide |
-| Show comments to public | Toggle | OFF | Document in guide |
-| Show track insights to public | Toggle | ON | Document in guide |
-| Geoblocking | Radio: Worldwide/Exclusive/Blocked | Worldwide | Document in guide |
+| Field | Type | Default | Action |
+|-------|------|---------|--------|
+| Enable direct downloads | Toggle | OFF | Document in guide (default is fine) |
+| Offline listening | Toggle | ON | Document in guide (default is fine) |
+| Include in RSS feed | Toggle | ON | Document in guide (default is fine) |
+| Display embed code | Toggle | ON | Document in guide (default is fine) |
+| Enable app playback | Toggle | ON | Document in guide (default is fine) |
+| Allow comments | Toggle | ON | Document in guide (default is fine) |
+| Show comments to public | Toggle | OFF | Document in guide (default is fine) |
+| Show track insights to public | Toggle | ON | Document in guide (default is fine) |
+| Geoblocking | Radio: Worldwide/Exclusive/Blocked | Worldwide | Document in guide (default is fine) |
 
 **Audio Clip Tab:**
-- 20-second preview clip selector (users pick which 20 seconds play in feeds)
-- Default: first 20 seconds — document this, user configures manually
+- 20-second preview clip selector — user configures manually (leave as default first 20 seconds)
 
 **Licensing Tab:**
 
-| Field | Type | Default | Action for MVP |
-|-------|------|---------|---------------|
+| Field | Type | Default | Action |
+|-------|------|---------|--------|
 | All rights reserved | Radio | ✅ Selected | Recommend as default |
 | Creative Commons | Radio | Not selected | Mention as option |
 
 **Options Tab:**
 - "Set to public for reach" — Artist Pro feature, public tracks only
 - "Get paid for streams" — Artist Pro monetization
-- Both are SoundCloud account-level features, not per-upload
+- Both are account-level features, not per-upload
 
 **Advanced Details Tab:**
 
-| Field | Type | Required? | Our System Has It? | Notes |
-|-------|------|-----------|-------------------|-------|
-| Buy link | URL input | Optional | ❌ Missing | Link fans to purchase |
-| Buy link title | Text (default "Buy") | Optional | ❌ Missing | |
-| Record label | Text input | Optional | ❌ Missing | |
-| Release date | Date picker (MM/DD/YYYY) | Optional | ✅ Yes | |
-| Publisher | Text input | Optional | ❌ Missing | |
-| ISRC | Text input | Optional | ❌ Missing (planned for DistroKid) | |
-| Contains explicit content | Checkbox | Optional | ❌ Missing | |
-| P line | Text input | Optional | ❌ Missing | Rights holder info |
+| Field | Type | Required? | Our System Has It? | Automation |
+|-------|------|-----------|-------------------|------------|
+| Buy link | URL input | Optional | ❌ Include as empty in guide | User fills manually |
+| Buy link title | Text (default "Buy") | Optional | ❌ Include in guide | User fills manually |
+| Record label | Text input | Optional | ❌ Include in guide | User fills manually |
+| Release date | Date picker (MM/DD/YYYY) | Optional | ✅ Yes | Playwright fills |
+| Publisher | Text input | Optional | ❌ Include in guide | User fills manually |
+| ISRC | Text input | Optional | ❌ Planned for DistroKid | User fills manually |
+| Contains explicit content | Checkbox | Optional | ❌ Include in guide | User checks manually |
+| P line | Text input | Optional | ❌ Include in guide | User fills manually |
 
 **Known Character Limits:**
 - Title: 100 characters
 - Description: 4,000 characters
 - Tags: up to 30 tags total
 
-**Key Findings for Metadata.txt Update:**
-1. **Tags** — biggest gap. High-value for discoverability. Auto-generate from genre + artist + title
-2. **Description** — current format is basic. Should be richer with more hashtags
-3. **Permissions/Licensing** — don't need automation, just guidance text with recommended defaults
-4. **Advanced Details** — Buy link, record label, ISRC are optional but valuable. Include as empty fields with guidance
-5. **Multiple artists** — commas separate artists. Our single `artist` field works fine
-
 ---
 
-### 3-Path Distribution Architecture
-
-**Path 1: Release (Direct-to-Fan + Streaming Platforms)**
-- Purpose: Make music publicly available
-- Platforms: SoundCloud (package + guide), YouTube (API automation), Bandcamp (package + guide), DistroKid → Spotify/Apple Music/Beatport
-- Privacy options per platform: Public, Private, Unlisted
-
-**Path 2: Submit (A&R / Demo Submission)**
-- Purpose: Pitch unreleased tracks to record labels
-- Platforms: LabelRadar
-- Allows multiple entries per platform (different labels)
-- Tracked by platform + label combination
-
-**Path 3: Promote (Social Media Content)**
-- Purpose: Create promotional content
-- Platforms: Instagram, TikTok, Facebook, X
-- Content types: Captions with hashtags, emojis, platform-specific formatting
-- Future (Milestone 6): 30-sec audio clips, social graphics, video teasers
-
-**Distribution Tracking Structure (metadata.json):**
+## Distribution Tracking Structure (metadata.json)
 
 ```json
 {
@@ -314,7 +441,7 @@ This section documents every field in SoundCloud's upload form (audited February
 ```
 
 **Distribution Tracking Rules:**
-- `release` path: One entry per platform. Updates existing entry if same platform.
+- `release` path: One entry per platform+versionId. Updates existing entry if same combo.
 - `submit` path: Can have MULTIPLE entries for same platform but different labels. Tracked by platform + label combination.
 - `promote` path: One entry per platform per content type.
 - All entries get automatic `updatedAt` timestamps.
@@ -326,7 +453,7 @@ This section documents every field in SoundCloud's upload form (audited February
 - **V2:** 30-day temporary cloud storage (AWS S3, files deleted after distribution)
 - **V3:** Permanent storage tier for paid users
 
-### Storage Structure (Updated with Version Management)
+### Storage Structure (Version-Aware)
 
 ```
 Releases/
@@ -346,20 +473,6 @@ Releases/
         │   └── soundcloud-primary.zip
         └── metadata.json
 ```
-
----
-
-### ⏳ Milestone 6: Promo Content Generator
-- Social media graphics (artwork with text overlays)
-- Audio snippets (30-sec clips for Reels/TikTok)
-- Video teasers (artwork + audio snippet as video)
-- Advanced caption variations and A/B testing
-
-### ⏳ Milestone 7: Next.js UI
-- User-facing upload form (replaces n8n Form Trigger)
-- Distribution path selection interface (Release / Submit / Promote with visual flow)
-- Release dashboard (all releases + distribution status across all platforms)
-- Individual release view (full distribution timeline)
 
 ---
 
@@ -392,14 +505,14 @@ Releases/
 | POST | /releases/:releaseId/versions | Add audio version to existing release | 6g | ✅ |
 | POST | /distribute/soundcloud/package | Generate SoundCloud upload package (ZIP) | 6i | ✅ (metadata.txt needs update) |
 
-**Milestone 5 Endpoints (still to build):**
+**Endpoints Still to Build (by Mini-MVP):**
 
-| Method | Path | Purpose | Section |
-|--------|------|---------|---------|
-| POST | /distribute/distrokid/package | Generate DistroKid submission package (ZIP) | 6j |
-| POST | /distribute/labelradar | Submit to LabelRadar / generate package | 6k |
-| POST | /distribute/youtube | Upload video to YouTube via API | 6l |
-| POST | /marketing/captions | Generate social media captions | 6m |
+| Mini-MVP | Method | Path | Purpose |
+|----------|--------|------|---------|
+| 2 | POST | /marketing/captions | Generate social media captions |
+| 3 | POST | /distribute/labelradar/package | Generate LabelRadar submission package |
+| 4 | POST | /distribute/distrokid/package | Generate DistroKid submission package |
+| 5 | POST | /distribute/youtube | Upload video to YouTube via API |
 
 **V2 Endpoints (deferred):**
 
@@ -431,7 +544,6 @@ Releases/
 - check-disk-space (disk monitoring)
 - file-type-checker (reserved for V2 enhanced validation)
 - archiver (ZIP file creation for distribution packages)
-- googleapis, google-auth-library (YouTube API — to be installed when YouTube endpoint is built)
 
 ---
 
@@ -450,42 +562,11 @@ IF Node (checks if video file uploaded)
   └─→ HTTP Request (no video) → Create Metadata (no video) → Save Metadata (no video) → Respond
 ```
 
-### Milestone 5 New Workflows (to be created):
-- **Distribution Router Workflow:** User selects path(s), triggers appropriate sub-workflows
-- **YouTube Upload Workflow:** Automated upload via YouTube Data API v3
-- **Release Package Workflow:** Generates ZIP packages for SoundCloud/Bandcamp/DistroKid
-- **Label Submission Workflow:** LabelRadar submission + tracking
-- **Marketing Caption Workflow:** Generates captions for all social platforms
+**Note:** The n8n Form Trigger will be replaced by the Next.js UI in Mini-MVP 1. The n8n workflow continues to handle backend orchestration.
 
 ---
 
-## Official Product Roadmap
-
-### MVP (Current — Target: 2-4 Weeks)
-
-**Scope:**
-- Release Types: Singles only
-- User Type: Artist only (solo use — just me)
-- Infrastructure: Local (n8n Docker, file-handler on Mac, Next.js UI local)
-- Automation Level: YouTube fully automated, everything else manual with guides + packages
-
-**7 Milestones:**
-1. ✅ Release Intake (n8n webhook)
-2. ✅ File Upload Handler (Express/Multer API)
-3. ✅ Metadata Transformer (releaseId, validation, metadata.json)
-4. ✅ Storage Manager (listing, disk monitoring, duplicate detection, audio validation)
-5. ⏳ Distribution Orchestrator (3-path system: Release, Submit, Promote) — IN PROGRESS
-6. ⏳ Promo Content Generator (graphics, audio snippets, video teasers)
-7. ⏳ Next.js UI (upload form, distribution dashboard)
-
-**MVP Success Criteria:**
-- Upload a single track → choose path(s) → execute distribution
-- Track distribution history across all platforms
-- Come back later to add more paths to same release
-- YouTube upload fully automated
-- SoundCloud/Bandcamp/DistroKid have package generators + guides
-- LabelRadar submission with status tracking
-- Marketing captions auto-generated for Instagram/TikTok/Facebook/X
+## Product Roadmap (Beyond MVP)
 
 ### V2 (Multi-User SaaS — Target: 2-3 Months After MVP)
 
@@ -540,10 +621,22 @@ IF Node (checks if video file uploaded)
 
 ## Key Technical Decisions & Rationale
 
+**Mini-MVP Approach (not horizontal milestones)**
+- Each mini-MVP delivers a complete, usable vertical slice: backend + UI + automation for one platform
+- User can release music through the system after Mini-MVP 1, not after all milestones
+- Faster feedback loops — catch design mistakes early before building 4 more platforms on a broken foundation
+- Learning compounds: Next.js knowledge from Mini-MVP 1 makes Mini-MVP 2 much faster
+
 **3-Path Distribution (not 4)**
 - Merged "Publish" and "Distribute" into "Release" because artists think in intentions, not mechanisms
 - SoundCloud + Spotify + Beatport are all part of one release strategy
 - Cleaner UX, matches real producer workflows
+
+**Semi-Automation via Playwright (not full-manual packages)**
+- Playwright MCP opens platform upload forms, fills fields, uploads files
+- System stops before the final Submit/Publish button — user clicks that
+- Much faster than "download ZIP, open SoundCloud, fill everything manually"
+- Respects legal boundaries (user confirms Terms of Service, copyright attestation)
 
 **releaseId Format: YYYY-MM-DD_ArtistName_TrackTitle**
 - Sortable by date, human-readable, filesystem-safe, unique per release
@@ -555,29 +648,19 @@ IF Node (checks if video file uploaded)
 
 **Version Management Architecture**
 - Audio files are version-specific: `versions/<versionId>/audio/`
-- Artwork and video are shared across all versions (same cover art for Original Mix and Extended Mix)
+- Artwork and video are shared across all versions
 - `generateVersionId()` converts names to URL-safe folder names
 - Default version is "Primary Version" (versionId: "primary")
-- Why: Producers routinely create Original Mix, Extended Mix, Radio Edit, Instrumental, etc.
 
 **No Database in MVP**
 - metadata.json files in release folders
 - Simpler for learning, fewer moving parts, easy to inspect
 - V2 adds PostgreSQL for multi-user queries
 
-**Audio Validation After Upload**
-- Multer uploads first, then music-metadata validates
-- Invalid files deleted with fsSync.unlinkSync(), returns 422
-
-**Distribution Tracking in metadata.json**
-- 3 paths: release, submit, promote
-- Each entry tracks: platform, status, timestamps, URLs, platform-specific data
-- Automatic updatedAt timestamps on every change
-- Duplicate prevention per platform (except submit, which allows multiple labels)
-
-**SoundCloud Package (not API)**
+**SoundCloud Package + Playwright (not SoundCloud API)**
 - SoundCloud's API access is restricted and requires application approval
-- MVP uses package generator (ZIP with audio + artwork + metadata text) + manual upload guide
+- MVP uses Playwright browser automation to fill the upload form
+- metadata.txt in ZIP serves as backup / reference if Playwright isn't available
 - V2: Apply for SoundCloud API access, add full automation if approved
 
 **Beatport as First-Class Citizen**
@@ -632,7 +715,7 @@ IF Node (checks if video file uploaded)
 2. Claude Project Knowledge (copy for AI context — update after editing repo version)
 
 **When to Update:**
-- ✅ After completing each milestone
+- ✅ After completing each mini-MVP
 - ✅ When making significant architectural decisions
 - ✅ After solving tricky bugs
 - ✅ When changing tech stack or dependencies
@@ -646,7 +729,8 @@ IF Node (checks if video file uploaded)
 - v2.4: Milestone 5 scoped (4-path architecture)
 - v2.5: Milestone 5 re-architected (3-path: Release, Submit, Promote) + Artist/Label user types defined
 - v2.6: Version management built, SoundCloud package generator built, SoundCloud form field audit complete, route 6g bug fixed
-- v2.7: (future) SoundCloud metadata.txt updated, remaining Milestone 5 endpoints built
+- v2.7: Restructured from horizontal milestones to mini-MVP vertical slices. Added Playwright automation vision. Preserved 3-path architecture and human-in-the-loop philosophy.
+- v2.8: (future) Mini-MVP 1 complete — SoundCloud end-to-end working
 - v3.0: (future) V2 phase begins
 
 **Archive Process:**
@@ -657,13 +741,14 @@ IF Node (checks if video file uploaded)
 
 ---
 
-**Changes in v2.6:**
-- Version management system built: generateVersionId(), getVersionInfo(), version-aware Multer, POST /releases/:releaseId/versions endpoint
-- SoundCloud package generator (route 6i) built and working — creates ZIP with audio, artwork, metadata text
-- Route 6g (add version) bug identified and fixed — was missing upload.any() middleware and had code in wrong function scope
-- SoundCloud upload form fully audited via 5 screenshots — all fields documented with types, requirements, defaults
-- Identified metadata.txt gaps: missing Tags, improved Description needed, Permissions/Licensing guidance needed, Advanced Details fields
-- Updated storage structure to reflect version management (versions/<versionId>/audio/)
-- Updated build order with completion status
-- Added SoundCloud Field Reference section
-- Updated helper functions table and endpoint table
+**Changes in v2.7:**
+- Restructured entire roadmap from horizontal milestones (5→6→7) to vertical mini-MVPs (SoundCloud→Captions→LabelRadar→DistroKid→YouTube)
+- Each mini-MVP delivers complete backend + UI + automation for one platform
+- Added Playwright MCP automation philosophy: automate everything except legal/financial actions
+- Defined human-in-the-loop boundaries (what system does vs what user clicks)
+- Moved 3-path architecture and artist/label vision into top-level Architecture Overview section
+- Added Definition of Done for each mini-MVP
+- Added SoundCloud automation scope (exactly what Playwright will fill)
+- Preserved all existing technical decisions and completed work documentation
+- Added Playwright MCP to tech stack
+- Updated version history and archive list
