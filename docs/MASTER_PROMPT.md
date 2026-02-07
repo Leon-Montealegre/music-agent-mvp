@@ -1,9 +1,9 @@
-# Music Agent - Master Project Context v2.5
+# Music Agent - Master Project Context v2.6
 
 **Document Info**  
-Last Updated: February 6, 2026, 12:00 PM CET  
+Last Updated: February 7, 2026, 11:00 AM CET  
 Status: Milestones 1-4 Complete | Milestone 5 (Distribution Orchestrator) IN PROGRESS  
-Version: 2.5 (3-path distribution architecture: Release, Submit, Promote)
+Version: 2.6 (Version management + SoundCloud package generator built, SoundCloud form analysis complete)
 
 ---
 
@@ -46,11 +46,17 @@ node server.js
 Success message: `✅ File-handler server running on port 3001`  
 Keep this terminal window open.
 
-**Step 3: Verify Health Check (new terminal tab)**
+**Step 3: Verify Health Check**
 ```bash
 curl http://localhost:3001/health
 ```
 Expected: `{"status":"ok","message":"File handler is running"}`
+
+**Quick Verification Checklist:**
+- n8n accessible at http://localhost:5678
+- File-handler API responds to /health endpoint
+- ~/Documents/Music Agent/Releases/ folder exists
+- Terminal window with `node server.js` is running (don't close it)
 
 ---
 
@@ -59,19 +65,20 @@ Expected: `{"status":"ok","message":"File handler is running"}`
 ```
 ~/Documents/music-agent-mvp/
 ├── file-handler/
-│   ├── server.js              ← Main API server (8 sections, fully commented)
+│   ├── server.js (Express API - main backend)
 │   ├── package.json
 │   ├── package-lock.json
 │   └── node_modules/
 ├── workflows/
 │   └── Release_Form_Workflow.json (exported n8n workflow)
 ├── docs/
-│   ├── MASTER_PROMPT.md       ← This file (current version, also in Claude Project Knowledge)
-│   └── archive/               ← Previous versions of this document
+│   ├── MASTER_PROMPT.md (this file - current version)
+│   └── archive/
 │       ├── MASTER_PROMPT_2026-02-05_22-03.md
 │       ├── MASTER_PROMPT_2026-02-05_23-33.md
 │       ├── MASTER_PROMPT_2026-02-06_01-09.md
-│       └── MASTER_PROMPT_2026-02-06_02-36.md
+│       ├── MASTER_PROMPT_2026-02-06_02-36.md
+│       └── MASTER_PROMPT_2026-02-07_03-27.md
 ├── MILESTONE_1_COMPLETE.md
 ├── MILESTONE_2_COMPLETE.md
 ├── MILESTONE_3_COMPLETE.md
@@ -79,70 +86,6 @@ Expected: `{"status":"ok","message":"File handler is running"}`
 ├── README.md
 └── .gitignore
 ```
-
----
-
-## App Design Philosophy
-
-### Core Concept: 3 Distribution Paths
-
-When an electronic music producer finishes a track, they have **3 intentions** — not based on platforms, but on what they want to accomplish:
-
-```
-Track is ready
-    │
-    ├── RELEASE  → "I want to put this out myself"
-    │     ├── Direct uploads: SoundCloud, Bandcamp, YouTube
-    │     ├── Aggregator: DistroKid → Spotify, Apple Music, Beatport, Deezer, Tidal
-    │     └── Options: release date scheduling, privacy, pre-save campaigns
-    │
-    ├── SUBMIT   → "I want a label to release this"
-    │     ├── Platforms: LabelRadar, direct email, private SoundCloud links
-    │     ├── Tracking: which labels, when submitted, response status
-    │     └── If rejected → option to self-release (go to RELEASE)
-    │
-    └── PROMOTE  → "I want to create marketing content"
-          ├── Captions: Instagram, TikTok, Facebook, X
-          ├── Future: 30-sec audio clips, social graphics, video teasers
-          └── Runs alongside RELEASE or SUBMIT
-```
-
-### Why 3 Paths (Not 4)
-
-Previous versions separated "Publish" (SoundCloud, YouTube) from "Distribute" (Spotify via DistroKid). This was merged into a single **RELEASE** path because:
-
-- Artists think "I want to release this track" — they don't separate platforms by mechanism
-- A self-releasing artist almost always wants SoundCloud AND Spotify AND Beatport together
-- The difference between platforms is just the upload method, not the artist's intention
-- One coordinated release with multiple destinations is cleaner than two separate workflows
-
-### Beatport: First-Class Citizen
-
-Beatport is the most important platform in electronic music for DJ-oriented genres. DistroKid distributes to Beatport, but our system treats Beatport with extra attention:
-
-- Proper genre/subgenre tagging (Beatport has specific categories)
-- Artwork spec validation (1400x1400 minimum for Beatport)
-- Beatport-exclusive release windows (common practice: 2 weeks on Beatport before Spotify)
-- Future: Beatport chart tracking, Hype chart eligibility
-
-### Two User Types (MVP = Artist Only)
-
-**Artist Workflow (MVP):**
-Finish track → Decide: submit to labels OR self-release → Upload assets → Choose platforms → Promote → Track results
-
-**Label Workflow (V2/V3):**
-Receive demos → A&R review → Sign track → Manage release (scheduling, ISRC/UPC, metadata) → Coordinate artist promo → Distribute to all platforms → Track royalties → Manage catalog
-
-**What labels need that artists don't:**
-- Catalog management across many artists
-- Royalty tracking and payment splits
-- ISRC/UPC generation and management
-- Beatport-exclusive scheduling windows
-- Contract and rights management
-- Bulk operations (2-4 releases per month across artists)
-- DDEX standard support for label-level distribution
-
-**Architecture decision:** Build the artist workflow first. The label layer wraps around it later — labels do the same RELEASE/SUBMIT/PROMOTE actions, just on behalf of their artists with additional management features.
 
 ---
 
@@ -154,7 +97,7 @@ Receive demos → A&R review → Sign track → Manage release (scheduling, ISRC
 - Responds with confirmation
 
 ### ✅ Milestone 2 Complete: File Upload Handler
-- File-handler API fully functional (server.js in ~/Documents/music-agent-mvp/file-handler/)
+- File-handler API fully functional (server.js)
 - Successfully tested: curl + n8n Form uploads work perfectly
 - Server uses .any() to accept any field name, classify() function sorts by mimetype + file extension fallback
 - n8n Form Trigger with 7 fields: artist, title, genre (dropdown), releaseType, audioFile, artworkFile, videoFile (optional)
@@ -181,29 +124,159 @@ Receive demos → A&R review → Sign track → Manage release (scheduling, ISRC
 
 ### ⏳ Milestone 5: Distribution Orchestrator (IN PROGRESS)
 
-**Build Order:**
+**Build Order & Status:**
 
 | Step | Feature | Status |
 |------|---------|--------|
 | 1 | GET /releases/:releaseId — fetch single release | ✅ Complete |
-| 2 | PATCH /releases/:releaseId/distribution — update tracking | ⏳ Next |
-| 3 | POST /marketing/captions — social media caption generator | ⏳ Pending |
-| 4a | POST /distribute/soundcloud/package — SoundCloud package + guide | ⏳ Pending |
-| 4b | POST /distribute/distrokid/package — DistroKid package + checklist | ⏳ Pending |
-| 4c | POST /distribute/labelradar — LabelRadar submission | ⏳ Pending |
-| 5 | POST /distribute/youtube — YouTube API automated upload | ⏳ Pending |
+| 2 | PATCH /releases/:releaseId/distribution — update tracking | ✅ Complete |
+| 3 | Version management — multi-version support per release | ✅ Complete |
+| 4a | POST /distribute/soundcloud/package — SoundCloud ZIP package | ✅ Complete (metadata.txt needs update) |
+| 4b | SoundCloud form field analysis — screenshot audit of real upload form | ✅ Complete |
+| 4c | Update soundcloud-metadata.txt generation — match real SoundCloud fields | ⏳ Next |
+| 4d | POST /distribute/distrokid/package — DistroKid package + checklist | ⏳ Pending |
+| 4e | POST /distribute/labelradar — LabelRadar submission | ⏳ Pending |
+| 5 | POST /marketing/captions — social media caption generator | ⏳ Pending |
+| 6 | POST /distribute/youtube — YouTube API automated upload | ⏳ Pending |
+
+**What Was Built in This Session:**
+
+**Version Management System (new helper functions + updated Multer):**
+- `generateVersionId()` — converts version names to URL-safe folder names (e.g., "Extended Mix" → "extended-mix")
+- `getVersionInfo()` — extracts version data from request, defaults to "Primary Version"
+- Multer updated: audio files route to `versions/<versionId>/audio/`, artwork and video stay shared at release level
+- POST /releases/:releaseId/versions — add new audio versions to existing releases
+- Bug fix: route 6g had structural issues (missing upload.any() middleware, code in wrong function scope, undefined variables) — all fixed
+
+**SoundCloud Package Generator (route 6i):**
+- POST /distribute/soundcloud/package endpoint working
+- Creates ZIP containing: audio file, artwork, soundcloud-metadata.txt
+- Accepts: releaseId, versionId, privacy (public/private)
+- Auto-updates distribution tracking in metadata.json
+- Uses archiver package for ZIP creation
+
+**SoundCloud Form Analysis (completed — informs next step):**
+- Audited all 5 sections of the real SoundCloud upload form via screenshots
+- Documented every field: type, required/optional, defaults
+- Identified gaps in our current metadata.txt generation
+- See "SoundCloud Field Reference" section below for full details
+
+---
+
+### SoundCloud Upload Form — Field Reference
+
+This section documents every field in SoundCloud's upload form (audited February 7, 2026). Used to ensure our package generator provides accurate, complete metadata.
+
+**Basic Info Tab:**
+
+| Field | Type | Required? | Our System Has It? | Notes |
+|-------|------|-----------|-------------------|-------|
+| Track title | Text input | ✅ Yes | ✅ Yes | Shows red error if empty |
+| Track link | URL slug | Auto-generated | N/A | Auto-fills from title |
+| Main Artist(s) | Text input | Likely required | ✅ Yes | "Use commas for multiple artists" |
+| Genre | Searchable dropdown | Optional | ✅ Yes | SoundCloud has predefined list |
+| Tags | Text input | Optional | ❌ Missing | "styles, moods, tempo" — high discoverability value |
+| Description | Text area | Optional | ✅ Yes | "Tracks with descriptions get more plays" |
+| Track Privacy | Radio: Public/Private/Schedule | Required | ✅ Yes | |
+| Artwork | Image upload | Optional | ✅ Yes (in ZIP) | |
+
+**Permissions Tab:**
+
+| Field | Type | Default | Action for MVP |
+|-------|------|---------|---------------|
+| Enable direct downloads | Toggle | OFF | Document in guide |
+| Offline listening | Toggle | ON | Document in guide |
+| Include in RSS feed | Toggle | ON | Document in guide |
+| Display embed code | Toggle | ON | Document in guide |
+| Enable app playback | Toggle | ON | Document in guide |
+| Allow comments | Toggle | ON | Document in guide |
+| Show comments to public | Toggle | OFF | Document in guide |
+| Show track insights to public | Toggle | ON | Document in guide |
+| Geoblocking | Radio: Worldwide/Exclusive/Blocked | Worldwide | Document in guide |
+
+**Audio Clip Tab:**
+- 20-second preview clip selector (users pick which 20 seconds play in feeds)
+- Default: first 20 seconds — document this, user configures manually
+
+**Licensing Tab:**
+
+| Field | Type | Default | Action for MVP |
+|-------|------|---------|---------------|
+| All rights reserved | Radio | ✅ Selected | Recommend as default |
+| Creative Commons | Radio | Not selected | Mention as option |
+
+**Options Tab:**
+- "Set to public for reach" — Artist Pro feature, public tracks only
+- "Get paid for streams" — Artist Pro monetization
+- Both are SoundCloud account-level features, not per-upload
+
+**Advanced Details Tab:**
+
+| Field | Type | Required? | Our System Has It? | Notes |
+|-------|------|-----------|-------------------|-------|
+| Buy link | URL input | Optional | ❌ Missing | Link fans to purchase |
+| Buy link title | Text (default "Buy") | Optional | ❌ Missing | |
+| Record label | Text input | Optional | ❌ Missing | |
+| Release date | Date picker (MM/DD/YYYY) | Optional | ✅ Yes | |
+| Publisher | Text input | Optional | ❌ Missing | |
+| ISRC | Text input | Optional | ❌ Missing (planned for DistroKid) | |
+| Contains explicit content | Checkbox | Optional | ❌ Missing | |
+| P line | Text input | Optional | ❌ Missing | Rights holder info |
+
+**Known Character Limits:**
+- Title: 100 characters
+- Description: 4,000 characters
+- Tags: up to 30 tags total
+
+**Key Findings for Metadata.txt Update:**
+1. **Tags** — biggest gap. High-value for discoverability. Auto-generate from genre + artist + title
+2. **Description** — current format is basic. Should be richer with more hashtags
+3. **Permissions/Licensing** — don't need automation, just guidance text with recommended defaults
+4. **Advanced Details** — Buy link, record label, ISRC are optional but valuable. Include as empty fields with guidance
+5. **Multiple artists** — commas separate artists. Our single `artist` field works fine
+
+---
+
+### 3-Path Distribution Architecture
+
+**Path 1: Release (Direct-to-Fan + Streaming Platforms)**
+- Purpose: Make music publicly available
+- Platforms: SoundCloud (package + guide), YouTube (API automation), Bandcamp (package + guide), DistroKid → Spotify/Apple Music/Beatport
+- Privacy options per platform: Public, Private, Unlisted
+
+**Path 2: Submit (A&R / Demo Submission)**
+- Purpose: Pitch unreleased tracks to record labels
+- Platforms: LabelRadar
+- Allows multiple entries per platform (different labels)
+- Tracked by platform + label combination
+
+**Path 3: Promote (Social Media Content)**
+- Purpose: Create promotional content
+- Platforms: Instagram, TikTok, Facebook, X
+- Content types: Captions with hashtags, emojis, platform-specific formatting
+- Future (Milestone 6): 30-sec audio clips, social graphics, video teasers
 
 **Distribution Tracking Structure (metadata.json):**
 
 ```json
 {
-  "releaseId": "2026-02-06_Artist_Track",
+  "releaseId": "2026-02-07_Artist_Track",
   "artist": "Artist Name",
   "title": "Track Title",
   "genre": "Melodic House and Techno",
   "releaseType": "Single",
-  "releaseDate": "2026-02-06",
-  "createdAt": "2026-02-06T04:00:00.000Z",
+  "releaseDate": "2026-02-07",
+  "createdAt": "2026-02-07T04:00:00.000Z",
+  "versions": {
+    "primary": {
+      "versionName": "Primary Version",
+      "versionId": "primary"
+    },
+    "extended-mix": {
+      "versionName": "Extended Mix",
+      "versionId": "extended-mix"
+    }
+  },
   "files": {
     "audio": [{ "filename": "track.wav", "size": 56379422, "mimetype": "audio/wav" }],
     "artwork": [{ "filename": "cover.png", "size": 3437306, "mimetype": "image/png" }],
@@ -213,53 +286,19 @@ Receive demos → A&R review → Sign track → Manage release (scheduling, ISRC
     "release": [
       {
         "platform": "SoundCloud",
-        "status": "published",
+        "versionId": "primary",
+        "status": "package_generated",
         "privacy": "public",
-        "url": "https://soundcloud.com/...",
-        "updatedAt": "2026-02-06T04:00:00.000Z"
-      },
-      {
-        "platform": "YouTube",
-        "status": "published",
-        "privacy": "unlisted",
-        "videoId": "abc123",
-        "url": "https://youtube.com/watch?v=abc123",
-        "updatedAt": "2026-02-06T04:05:00.000Z"
-      },
-      {
-        "platform": "DistroKid",
-        "status": "pending",
-        "stores": ["Spotify", "Apple Music", "Beatport", "Deezer", "Tidal"],
-        "releaseDate": "2026-03-01",
-        "beatportExclusive": true,
-        "beatportExclusiveUntil": "2026-03-15",
-        "upc": "123456789012",
-        "isrc": "USXXX2600001",
-        "updatedAt": "2026-02-06T05:00:00.000Z"
-      },
-      {
-        "platform": "Bandcamp",
-        "status": "published",
-        "url": "https://artist.bandcamp.com/track/...",
-        "updatedAt": "2026-02-06T04:10:00.000Z"
+        "packagePath": "packages/soundcloud-primary.zip",
+        "generatedAt": "2026-02-07T04:00:00.000Z"
       }
     ],
     "submit": [
       {
         "platform": "LabelRadar",
-        "label": "Afterlife",
-        "status": "submitted",
-        "submittedAt": "2026-02-06T03:30:00.000Z",
-        "submissionId": "lr_abc123",
-        "updatedAt": "2026-02-06T03:30:00.000Z"
-      },
-      {
-        "platform": "LabelRadar",
         "label": "Anjunadeep",
-        "status": "rejected",
-        "submittedAt": "2026-02-01T10:00:00.000Z",
-        "respondedAt": "2026-02-05T14:00:00.000Z",
-        "updatedAt": "2026-02-05T14:00:00.000Z"
+        "status": "submitted",
+        "submittedAt": "2026-02-07T03:30:00.000Z"
       }
     ],
     "promote": [
@@ -267,43 +306,48 @@ Receive demos → A&R review → Sign track → Manage release (scheduling, ISRC
         "platform": "Instagram",
         "contentType": "caption",
         "status": "generated",
-        "updatedAt": "2026-02-06T06:00:00.000Z"
-      },
-      {
-        "platform": "TikTok",
-        "contentType": "caption",
-        "status": "generated",
-        "updatedAt": "2026-02-06T06:00:00.000Z"
+        "generatedAt": "2026-02-07T06:00:00.000Z"
       }
     ]
   }
 }
 ```
 
-**Key Design Decisions for Distribution Tracking:**
-- `release` path: One entry per platform. DistroKid entry lists all stores it distributes to.
-- `submit` path: Can have MULTIPLE entries for the same platform (LabelRadar) but different labels. This is tracked by both `platform` AND `label` fields.
+**Distribution Tracking Rules:**
+- `release` path: One entry per platform. Updates existing entry if same platform.
+- `submit` path: Can have MULTIPLE entries for same platform but different labels. Tracked by platform + label combination.
 - `promote` path: One entry per platform per content type.
 - All entries get automatic `updatedAt` timestamps.
-- Duplicate detection: prevents same platform being added twice in `release` and `promote`. For `submit`, duplicates are checked by platform + label combination.
 
-**Milestone 5 MVP Deliverables:**
-- ✅ User uploads track and chooses distribution path(s) immediately OR later
-- ✅ Can select multiple paths simultaneously (Release + Promote)
-- ✅ Can add paths sequentially over time (Submit to labels first, then Release if rejected)
-- ✅ System tracks distribution history in metadata.json
-- ✅ YouTube upload fully automated via API
-- ✅ SoundCloud/DistroKid/Bandcamp have manual guides + package generators
-- ✅ LabelRadar submission package + tracking
-- ✅ Marketing captions auto-generated for Instagram/TikTok/Facebook/X
+---
 
-**Milestone 5 New Dependencies:**
-```bash
-npm install googleapis google-auth-library archiver
+### Storage Strategy
+- **MVP:** Local storage only (files on Mac, no cloud costs)
+- **V2:** 30-day temporary cloud storage (AWS S3, files deleted after distribution)
+- **V3:** Permanent storage tier for paid users
+
+### Storage Structure (Updated with Version Management)
+
 ```
-- googleapis: Google's Node.js client for YouTube Data API v3
-- google-auth-library: OAuth2 authentication for YouTube uploads
-- archiver: Creates ZIP files for distribution packages
+Releases/
+  └── 2026-02-07_Artist_Track/
+        ├── versions/
+        │   ├── primary/
+        │   │   └── audio/
+        │   │       └── track.wav
+        │   └── extended-mix/
+        │       └── audio/
+        │           └── track-extended.wav
+        ├── artwork/              (shared by all versions)
+        │   └── cover.png
+        ├── video/                (shared by all versions)
+        │   └── promo.mp4
+        ├── packages/             (generated ZIP files)
+        │   └── soundcloud-primary.zip
+        └── metadata.json
+```
+
+---
 
 ### ⏳ Milestone 6: Promo Content Generator
 - Social media graphics (artwork with text overlays)
@@ -325,36 +369,37 @@ npm install googleapis google-auth-library archiver
 
 | Section | Purpose |
 |---------|---------|
-| 1. Imports | Loading packages (express, multer, cors, etc.) |
-| 2. Server Configuration | Express app, port, middleware (CORS, JSON parser) |
+| 1. Imports | Loading packages (express, multer, cors, path, fs, checkDiskSpace, musicMetadata, archiver) |
+| 2. Server Configuration | Express app, port 3001, middleware (CORS, JSON parser) |
 | 3. Constants | RELEASES_BASE path |
-| 4. Helper Functions | requireReleaseId(), classify(), validateAudioFile() |
-| 5. Multer Configuration | File upload storage settings |
-| 6. API Routes | All endpoint handlers (6a through 6g+) |
+| 4. Helper Functions | requireReleaseId(), classify(), validateAudioFile(), generateVersionId(), getVersionInfo() |
+| 5. Multer Configuration | File upload storage settings (version-aware for audio) |
+| 6. API Routes | All endpoint handlers (6a through 6i+) |
 | 7. Error Handler | Catch-all for unhandled errors |
 | 8. Start Server | app.listen() |
 
 **Current Endpoints:**
 
+| Method | Path | Purpose | Section | Status |
+|--------|------|---------|---------|--------|
+| GET | /health | Server status check | 6a | ✅ |
+| POST | /upload?releaseId=...&artist=...&title=...&genre=...&versionName=... | File upload with duplicate detection + audio validation | 6b | ✅ |
+| POST | /metadata | Save metadata.json for a release | 6c | ✅ |
+| GET | /releases | List all releases (sorted newest first) | 6d | ✅ |
+| GET | /storage/status | Disk space information | 6h | ✅ |
+| GET | /releases/:releaseId | Get single release details | 6e | ✅ |
+| PATCH | /releases/:releaseId/distribution | Update distribution tracking | 6f | ✅ |
+| POST | /releases/:releaseId/versions | Add audio version to existing release | 6g | ✅ |
+| POST | /distribute/soundcloud/package | Generate SoundCloud upload package (ZIP) | 6i | ✅ (metadata.txt needs update) |
+
+**Milestone 5 Endpoints (still to build):**
+
 | Method | Path | Purpose | Section |
 |--------|------|---------|---------|
-| GET | /health | Server status check | 6a |
-| POST | /upload?releaseId=...&artist=...&title=...&genre=... | File upload with duplicate detection + audio validation | 6b |
-| POST | /metadata | Save metadata.json for a release | 6c |
-| GET | /releases | List all releases (sorted newest first) | 6d |
-| GET | /releases/:releaseId | Get single release details | 6f (Milestone 5) |
-| GET | /storage/status | Disk space information | 6e |
-
-**Milestone 5 Endpoints (to be added):**
-
-| Method | Path | Purpose | Section |
-|--------|------|---------|---------|
-| PATCH | /releases/:releaseId/distribution | Update distribution tracking | 6g |
-| POST | /marketing/captions | Generate social media captions | 6h |
-| POST | /distribute/soundcloud/package | Generate SoundCloud upload package (ZIP) | 6i |
 | POST | /distribute/distrokid/package | Generate DistroKid submission package (ZIP) | 6j |
 | POST | /distribute/labelradar | Submit to LabelRadar / generate package | 6k |
 | POST | /distribute/youtube | Upload video to YouTube via API | 6l |
+| POST | /marketing/captions | Generate social media captions | 6m |
 
 **V2 Endpoints (deferred):**
 
@@ -363,32 +408,30 @@ npm install googleapis google-auth-library archiver
 | POST | /releases/:releaseId/archive | Archive a release |
 | DELETE | /releases/:releaseId | Delete a release (with confirmation) |
 
-**Multer Configuration:**
+**Helper Functions (Section 4):**
+
+| Function | Purpose |
+|----------|---------|
+| `requireReleaseId(req)` | Extracts releaseId from URL params or query string, throws 400 if missing |
+| `classify(file)` | Determines file type (audio/artwork/video) by mimetype then extension fallback |
+| `validateAudioFile(filePath)` | Validates audio with music-metadata: checks duration (1s-1hr), format, codec |
+| `generateVersionId(versionName)` | Converts version name to URL-safe folder name ("Extended Mix" → "extended-mix") |
+| `getVersionInfo(req)` | Extracts version data from request, defaults to "Primary Version" |
+
+**Multer Configuration (Section 5):**
 - Uses .any() to accept any field name
 - classify() function: mimetype first, file extension fallback
-  - Audio: .wav, .mp3, .flac, .aiff, .m4a, .ogg → audio/ folder
-  - Image: .jpg, .jpeg, .png, .gif, .webp, .bmp → artwork/ folder
-  - Video: .mp4, .mov, .avi, .mkv, .webm → video/ folder
-
-**Storage Structure:**
-```
-Releases/
-  └── 2026-02-06_mrelby_elbyboy/
-        ├── audio/
-        │   └── track.wav
-        ├── artwork/
-        │   └── cover.png
-        ├── video/
-        │   └── promo.mp4
-        └── metadata.json
-```
+  - Audio: .wav, .mp3, .flac, .aiff, .m4a, .ogg → `versions/<versionId>/audio/` folder
+  - Image: .jpg, .jpeg, .png, .gif, .webp, .bmp → `artwork/` folder (shared)
+  - Video: .mp4, .mov, .avi, .mkv, .webm → `video/` folder (shared)
 
 **Installed npm Packages:**
 - express, multer, cors (core server)
 - music-metadata (audio validation)
 - check-disk-space (disk monitoring)
 - file-type-checker (reserved for V2 enhanced validation)
-- googleapis, google-auth-library, archiver (Milestone 5 — to be installed)
+- archiver (ZIP file creation for distribution packages)
+- googleapis, google-auth-library (YouTube API — to be installed when YouTube endpoint is built)
 
 ---
 
@@ -476,14 +519,13 @@ IF Node (checks if video file uploaded)
 
 **Label Features (New User Type):**
 - Multi-artist catalog management
-- A&R demo review pipeline (receive, review, accept/reject demos)
+- A&R demo review pipeline
 - Royalty tracking and payment splits
 - ISRC/UPC generation and management
-- Beatport-exclusive scheduling windows (2-week exclusives before wide release)
+- Beatport-exclusive scheduling windows
 - DDEX standard support for label-level distribution
 - Contract and rights management
-- Bulk release operations (2-4 releases per month across artists)
-- White-label option for label branding
+- Bulk release operations
 
 **Business Model:**
 
@@ -511,18 +553,17 @@ IF Node (checks if video file uploaded)
 - 10 options: Ambient, Deep House, House, Indie Dance, Melodic House and Techno, Progressive House, Tech House, Techno, Trance, Other
 - Ensures data consistency, prevents typos, easier for analytics
 
-**Metadata in Upload Response**
-- File-handler returns artist/title/genre in POST /upload response
-- Allows metadata generation without referencing n8n nodes by name
+**Version Management Architecture**
+- Audio files are version-specific: `versions/<versionId>/audio/`
+- Artwork and video are shared across all versions (same cover art for Original Mix and Extended Mix)
+- `generateVersionId()` converts names to URL-safe folder names
+- Default version is "Primary Version" (versionId: "primary")
+- Why: Producers routinely create Original Mix, Extended Mix, Radio Edit, Instrumental, etc.
 
 **No Database in MVP**
 - metadata.json files in release folders
 - Simpler for learning, fewer moving parts, easy to inspect
 - V2 adds PostgreSQL for multi-user queries
-
-**Async/Await for File Operations**
-- fs.promises for route handlers (non-blocking)
-- fsSync for Multer callbacks (needs synchronous)
 
 **Audio Validation After Upload**
 - Multer uploads first, then music-metadata validates
@@ -534,9 +575,10 @@ IF Node (checks if video file uploaded)
 - Automatic updatedAt timestamps on every change
 - Duplicate prevention per platform (except submit, which allows multiple labels)
 
-**Label Submissions: Multiple Entries Per Platform**
-- Unlike release/promote (one entry per platform), the submit path allows multiple entries for the same platform (e.g., LabelRadar) but different labels
-- Tracked by platform + label combination
+**SoundCloud Package (not API)**
+- SoundCloud's API access is restricted and requires application approval
+- MVP uses package generator (ZIP with audio + artwork + metadata text) + manual upload guide
+- V2: Apply for SoundCloud API access, add full automation if approved
 
 **Beatport as First-Class Citizen**
 - DistroKid distributes to Beatport, but we track Beatport-specific data
@@ -561,6 +603,7 @@ IF Node (checks if video file uploaded)
 | Merge node not executing in n8n | Don't use Merge after IF; duplicate nodes on each branch | Merge expects both inputs, IF sends one |
 | Genre showing "Unknown" | Pass genre as query parameter, return in response | Metadata code can't access Form Trigger directly |
 | Git tracking node_modules/ | Add to .gitignore + `git rm -r --cached file-handler/node_modules` | node_modules regenerates with npm install |
+| Route 6g (add version) broken | Missing upload.any() middleware + code was in wrong function scope | 3 middleware functions must be chained: check → upload.any() → async handler |
 
 ---
 
@@ -602,7 +645,8 @@ IF Node (checks if video file uploaded)
 - v2.3: Milestone 4 complete
 - v2.4: Milestone 5 scoped (4-path architecture)
 - v2.5: Milestone 5 re-architected (3-path: Release, Submit, Promote) + Artist/Label user types defined
-- v2.6: (future) Milestone 5 complete
+- v2.6: Version management built, SoundCloud package generator built, SoundCloud form field audit complete, route 6g bug fixed
+- v2.7: (future) SoundCloud metadata.txt updated, remaining Milestone 5 endpoints built
 - v3.0: (future) V2 phase begins
 
 **Archive Process:**
@@ -613,16 +657,13 @@ IF Node (checks if video file uploaded)
 
 ---
 
-**Changes in v2.5:**
-- Merged "Publish" and "Distribute" into single "Release" path (3 paths instead of 4)
-- Renamed paths: Release, Submit, Promote (was: Publish, Distribute, Submit to Labels, Market)
-- Added Beatport as first-class citizen with electronic-music-specific features
-- Defined Artist vs Label user types and their different workflows
-- Label features scoped for V3 (not MVP)
-- Updated metadata.json distribution structure (release/submit/promote)
-- Updated all API endpoints to reflect 3-path architecture
-- Added submit path duplicate logic (platform + label, not just platform)
-- Added Beatport-exclusive scheduling to distribution tracking
-- Updated business model with Label tier
-- Reorganized server.js section reference table
-- Added Milestone 5 build order with completion status
+**Changes in v2.6:**
+- Version management system built: generateVersionId(), getVersionInfo(), version-aware Multer, POST /releases/:releaseId/versions endpoint
+- SoundCloud package generator (route 6i) built and working — creates ZIP with audio, artwork, metadata text
+- Route 6g (add version) bug identified and fixed — was missing upload.any() middleware and had code in wrong function scope
+- SoundCloud upload form fully audited via 5 screenshots — all fields documented with types, requirements, defaults
+- Identified metadata.txt gaps: missing Tags, improved Description needed, Permissions/Licensing guidance needed, Advanced Details fields
+- Updated storage structure to reflect version management (versions/<versionId>/audio/)
+- Updated build order with completion status
+- Added SoundCloud Field Reference section
+- Updated helper functions table and endpoint table
