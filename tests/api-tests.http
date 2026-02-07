@@ -1,0 +1,182 @@
+# =============================================================================
+# Music Agent MVP - API Tests
+# =============================================================================
+# How to use REST Client:
+# 1. Place cursor anywhere in a request block (between ### separators)
+# 2. Click "Send Request" link that appears above the request
+# 3. Response opens in right panel
+# 4. Cmd+K to close response panel when done
+# =============================================================================
+
+@baseUrl = http://localhost:3001
+
+# PATHS WITH ACTUAL FILES:
+@audioFile = /Users/Mathias2/Desktop/Music Agent Test Files/Sophie Joe - Tell Me (Vocal Mix).wav
+@artworkFile = /Users/Mathias2/Desktop/Music Agent Test Files/Tell Me - Sophie Joe.png
+
+
+# =============================================================================
+# BASIC TESTS
+# =============================================================================
+
+### Health Check
+# Quick test to verify server is running
+GET {{baseUrl}}/health
+
+
+### List All Releases
+# Shows all releases currently in storage
+GET {{baseUrl}}/releases
+
+
+### Storage Status
+# Check disk space
+GET {{baseUrl}}/storage/status
+
+
+# =============================================================================
+# MILESTONE 5 - PHASE 1A TESTS (Multi-Version Upload)
+# =============================================================================
+
+### Test 1: Upload WITHOUT versionName (defaults to "Primary Version")
+POST {{baseUrl}}/upload?releaseId=2026-02-07_TestArtist_VersionTest&artist=Test Artist&title=Version Test&genre=House
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="audioFile"; filename="Sophie Joe - Tell Me (Vocal Mix).wav"
+Content-Type: audio/wav
+
+< {{audioFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="artworkFile"; filename="Tell Me - Sophie Joe.png"
+Content-Type: image/png
+
+< {{artworkFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+### Test 2: Upload WITH versionName = "Extended Mix"
+POST {{baseUrl}}/upload?releaseId=2026-02-07_TestArtist_ExtendedTest&artist=Test Artist&title=Extended Test&genre=Techno&versionName=Extended Mix
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="audioFile"; filename="Sophie Joe - Tell Me (Vocal Mix).wav"
+Content-Type: audio/wav
+
+< {{audioFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="artworkFile"; filename="Tell Me - Sophie Joe.png"
+Content-Type: image/png
+
+< {{artworkFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+### Test 3: Upload WITH versionName = "Radio Edit"
+POST {{baseUrl}}/upload?releaseId=2026-02-07_TestArtist_RadioTest&artist=Test Artist&title=Radio Test&genre=House&versionName=Radio Edit
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="audioFile"; filename="Sophie Joe - Tell Me (Vocal Mix).wav"
+Content-Type: audio/wav
+
+< {{audioFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="artworkFile"; filename="Tell Me - Sophie Joe.png"
+Content-Type: image/png
+
+< {{artworkFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+### Test 4: Duplicate Upload Detection
+# Expected: 409 Conflict error (duplicate release)
+# This should fail because we already uploaded this releaseId in Test 1
+POST {{baseUrl}}/upload?releaseId=2026-02-07_TestArtist_VersionTest&artist=Test Artist&title=Version Test&genre=House
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="audioFile"; filename="test-audio.wav"
+Content-Type: audio/wav
+
+< {{audioFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+# =============================================================================
+# MILESTONE 5 - PHASE 1B TESTS (Add Version to Existing Release)
+# =============================================================================
+
+### Test 5: Add "Radio Edit" to Test 1 Release
+# This adds a second version to the "VersionTest" release from Test 1
+# Expected: Creates versions/radio-edit/audio/ folder alongside versions/primary/
+POST {{baseUrl}}/releases/2026-02-07_TestArtist_VersionTest/versions
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="versionName"
+
+Radio Edit
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="audioFile"; filename="Sophie Joe - Tell Me (Vocal Mix).wav"
+Content-Type: audio/wav
+
+< {{audioFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+### Test 6: Try to add duplicate version (should fail with 409)
+# This attempts to add "Radio Edit" again to the same release
+# Expected: 409 Conflict error
+POST {{baseUrl}}/releases/2026-02-07_TestArtist_VersionTest/versions
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="versionName"
+
+Radio Edit
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="audioFile"; filename="Sophie Joe - Tell Me (Vocal Mix).wav"
+Content-Type: audio/wav
+
+< {{audioFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+### Test 7: Try to add version to non-existent release (should fail with 404)
+# Expected: 404 Not Found error
+POST {{baseUrl}}/releases/FAKE_RELEASE_ID/versions
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="versionName"
+
+Extended Mix
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="audioFile"; filename="Sophie Joe - Tell Me (Vocal Mix).wav"
+Content-Type: audio/wav
+
+< {{audioFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+
+### Test 8: Add "Instrumental" to Test 1 Release
+# This adds a THIRD version to the same release
+# Expected: Now has 3 versions: primary, radio-edit, instrumental
+POST {{baseUrl}}/releases/2026-02-07_TestArtist_VersionTest/versions
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="versionName"
+
+Instrumental
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="audioFile"; filename="Sophie Joe - Tell Me (Vocal Mix).wav"
+Content-Type: audio/wav
+
+< {{audioFile}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+# =============================================================================
+# FUTURE DISTRIBUTION TESTS
+# =============================================================================
+# SoundCloud package generation, DistroKid, etc. - coming in Phase 2-5
