@@ -180,3 +180,12 @@ Content-Type: audio/wav
 # FUTURE DISTRIBUTION TESTS
 # =============================================================================
 # SoundCloud package generation, DistroKid, etc. - coming in Phase 2-5
+### Test: Generate SoundCloud Package
+POST {{baseUrl}}/distribute/soundcloud/package
+Content-Type: application/json
+
+{
+  "releaseId": "2026-02-07_TestArtist_VersionTest",
+  "versionId": "primary",
+  "privacy": "public"
+}

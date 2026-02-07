@@ -633,21 +633,15 @@ app.patch('/releases/:releaseId/distribution', async (req, res) => {
 // The release must already exist (created via POST /upload).
 // This allows adding "Radio Edit", "Instrumental", etc. to releases over time.
 //
-// URL format: POST /releases/:releaseId/versions?versionName=Extended%20Mix
-// Body: multipart/form-data with audioFile
-//
-// How the 3 middleware functions work together:
-//   1. First function: checks if release exists BEFORE uploading
-//   2. upload.any(): Multer saves the uploaded file(s) to disk
-//   3. Third function (async): validates audio, moves file, sends response
+// URL format: POST /releases/:releaseId/versions
+// Body: multipart/form-data with versionName and audioFile
 
-app.post('/releases/:releaseId/versions',
-
-  // --- Middleware 1: Check if release exists BEFORE Multer runs ---
+app.post('/releases/:releaseId/versions', 
+  // Middleware 1: Check if release exists BEFORE Multer runs
   (req, res, next) => {
     const releaseId = req.params.releaseId;
     const releasePath = path.join(RELEASES_BASE, releaseId);
-
+    
     if (!fsSync.existsSync(releasePath)) {
       console.log(`🔍 Release not found: ${releaseId}`);
       return res.status(404).json({
@@ -655,125 +649,7 @@ app.post('/releases/:releaseId/versions',
         error: 'Release not found',
         message: `No release found with ID "${releaseId}". Create the release first with POST /upload`
       });
-    }
-
-    // Check if versionName was provided
-    const versionName = (req.query.versionName || '').trim();
-    if (!versionName) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing versionName',
-        message: 'Add ?versionName=YourVersionName to the URL (e.g., ?versionName=Extended%20Mix)'
-      });
-    }
-
-    // Check if this version already exists
-    const versionId = generateVersionId(versionName);
-    const versionPath = path.join(releasePath, 'versions', versionId);
-
-    if (fsSync.existsSync(versionPath)) {
-      console.log(`🚫 Version already exists: ${versionId} in ${releaseId}`);
-      return res.status(409).json({
-        success: false,
-        error: 'Version already exists',
-        message: `Version "${versionName}" (${versionId}) already exists for release "${releaseId}"`
-      });
-    }
-
-    next();  // Release exists, version is new → continue to Multer upload
-  },
-
-  // --- Middleware 2: Multer saves the uploaded file to disk ---
-  upload.any(),
-
-  // --- Middleware 3: Validate audio and send response ---
-  async (req, res) => {
-    try {
-      const releaseId = req.params.releaseId;
-      const releasePath = path.join(RELEASES_BASE, releaseId);
-      const versionInfo = getVersionInfo(req);
-      const versionName = versionInfo.versionName;
-      const versionId = versionInfo.versionId;
-      const versionPath = path.join(releasePath, 'versions', versionId);
-
-      // --- STEP 1: Check that audio files were uploaded ---
-      const audioFiles = (req.files || []).filter(f => classify(f) === 'audio');
-
-      if (audioFiles.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: 'No audio file uploaded',
-          message: 'You must upload at least one audio file for the new version'
-        });
-      }
-
-      // --- STEP 2: Audio validation ---
-      const audioFile = audioFiles[0];
-
-      console.log(`🎵 Validating audio for new version "${versionName}": ${audioFile.originalname}...`);
-
-      const validation = await validateAudioFile(audioFile.path);
-
-      if (!validation.valid) {
-        console.error(`❌ Audio validation failed: ${audioFile.originalname}`);
-        console.error(`   Error: ${validation.error}`);
-
-        // Delete the invalid file (Multer already saved it)
-        try {
-          fsSync.unlinkSync(audioFile.path);
-          // Try to clean up empty directories
-          const audioDir = path.dirname(audioFile.path);
-          fsSync.rmdirSync(audioDir);
-          fsSync.rmdirSync(versionPath);
-        } catch (cleanupErr) {
-          // Cleanup is best-effort, don't crash if folders aren't empty
-          console.warn(`⚠️  Cleanup note: ${cleanupErr.message}`);
-        }
-
-        return res.status(422).json({
-          success: false,
-          error: 'Audio file validation failed',
-          file: audioFile.originalname,
-          reason: validation.error
-        });
-      }
-
-      console.log(`✅ Audio valid: ${audioFile.originalname} (${validation.metadata.duration}s, ${validation.metadata.codec})`);
-      console.log(`📦 Added version "${versionName}" (${versionId}) to ${releaseId}`);
-
-      // --- STEP 3: Success response ---
-      res.json({
-        success: true,
-        message: `Version "${versionName}" added successfully`,
-        releaseId,
-        versionInfo: {
-          versionName,
-          versionId,
-          isPrimary: versionId === 'primary'
-        },
-        audioFile: {
-          originalName: audioFile.originalname,
-          savedTo: audioFile.path,
-          size: audioFile.size,
-          mimetype: audioFile.mimetype
-        },
-        audioValidation: {
-          file: audioFile.originalname,
-          ...validation.metadata
-        }
-      });
-
-    } catch (error) {
-      console.error(`❌ Error adding version to ${req.params.releaseId}:`, error.message);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to add version',
-        details: error.message
-      });
-    }
-  }
-);
-// --- 6i: Generate SoundCloud Package ---
+      // --- 6i: Generate SoundCloud Package ---
 // Creates a distribution-ready ZIP package for manual SoundCloud upload.
 // The ZIP contains: audio file, artwork, and formatted metadata text file.
 //
@@ -857,7 +733,7 @@ app.post('/distribute/soundcloud/package', async (req, res) => {
       });
     }
 
-    const audioFile = audioFiles[0];
+    const audioFile = audioFiles[0]; // Take the first (should only be one)
     const audioPath = path.join(audioDir, audioFile);
 
     // --- STEP 5: Find the artwork file ---
@@ -889,21 +765,25 @@ app.post('/distribute/soundcloud/package', async (req, res) => {
 
     // --- STEP 6: Generate SoundCloud metadata text ---
     
+    // Get version name from metadata (or generate from versionId)
     const versionName = metadata.versions?.[versionId]?.versionName || 
                        versionId.split('-').map(word => 
                          word.charAt(0).toUpperCase() + word.slice(1)
                        ).join(' ');
     
+    // Format the title: "Track Title (Version Name)" or just "Track Title" for primary
     const displayTitle = versionId === 'primary' 
       ? metadata.title
       : `${metadata.title} (${versionName})`;
     
+    // Format release date as "Month Year"
     const releaseDate = new Date(metadata.releaseDate);
     const monthYear = releaseDate.toLocaleDateString('en-US', { 
       month: 'long', 
       year: 'numeric' 
     });
     
+    // Generate hashtags (lowercase, no spaces)
     const artistTag = metadata.artist.toLowerCase().replace(/\s+/g, '');
     const titleTag = metadata.title.toLowerCase().replace(/\s+/g, '');
     const genreTag = metadata.genre.toLowerCase().replace(/\s+/g, '').replace(/&/g, 'and');
@@ -939,6 +819,7 @@ Follow ${metadata.artist}:
     const zipFileName = `soundcloud-${versionId}.zip`;
     const zipPath = path.join(packagesDir, zipFileName);
     
+    // Delete old ZIP if it exists (we're regenerating)
     try {
       await fs.unlink(zipPath);
       console.log(`   Deleted old package: ${zipFileName}`);
@@ -948,11 +829,13 @@ Follow ${metadata.artist}:
 
     console.log(`   Creating ZIP: ${zipFileName}`);
 
+    // Create a write stream for the ZIP file
     const output = fsSync.createWriteStream(zipPath);
     const archive = archiver('zip', {
-      zlib: { level: 9 }
+      zlib: { level: 9 } // Maximum compression
     });
 
+    // Listen for archive completion
     const zipPromise = new Promise((resolve, reject) => {
       output.on('close', () => {
         console.log(`✅ ZIP created: ${archive.pointer()} bytes`);
@@ -965,13 +848,23 @@ Follow ${metadata.artist}:
       });
     });
 
+    // Pipe archive data to the file
     archive.pipe(output);
+
+    // Add files to the archive
     archive.file(audioPath, { name: audioFile });
     archive.file(artworkPath, { name: artworkFile });
+    
+    // Add metadata text file
     archive.append(metadataText, { name: 'soundcloud-metadata.txt' });
+
+    // Finalize the archive (this triggers the 'close' event)
     await archive.finalize();
+    
+    // Wait for the ZIP to finish writing
     await zipPromise;
 
+    // Get the final file size
     const stats = await fs.stat(zipPath);
     const fileSizeKB = (stats.size / 1024).toFixed(2);
 
@@ -987,6 +880,7 @@ Follow ${metadata.artist}:
       metadata.distribution.publish = [];
     }
 
+    // Check if SoundCloud entry already exists for this version
     const existingIndex = metadata.distribution.publish.findIndex(
       e => e.platform === 'SoundCloud' && e.versionId === versionId
     );
@@ -1001,16 +895,19 @@ Follow ${metadata.artist}:
     };
 
     if (existingIndex >= 0) {
+      // Update existing entry
       metadata.distribution.publish[existingIndex] = {
         ...metadata.distribution.publish[existingIndex],
         ...distributionEntry
       };
       console.log(`   Updated SoundCloud distribution tracking for ${versionId}`);
     } else {
+      // Add new entry
       metadata.distribution.publish.push(distributionEntry);
       console.log(`   Added SoundCloud to distribution tracking for ${versionId}`);
     }
 
+    // Save updated metadata
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
 
     // --- STEP 10: Success response ---
@@ -1047,6 +944,144 @@ Follow ${metadata.artist}:
     });
   }
 });
+    }
+    
+    next(); // Release exists, continue to Multer
+  },
+  // Middleware 2: Multer handles file upload
+  upload.any(), 
+  // Middleware 3: Route handler
+  async (req, res) => {
+  try {
+    const releaseId = req.params.releaseId;
+    const versionName = req.body.versionName?.trim();
+    const releasePath = path.join(RELEASES_BASE, releaseId);
+
+    // --- STEP 1: Validate inputs ---
+    
+    if (!versionName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing versionName',
+        message: 'Request body must include "versionName" field (e.g., "Radio Edit", "Instrumental")'
+      });
+    }
+
+    // Check if audio file was uploaded
+    const audioFiles = req.files?.filter(f => classify(f) === 'audio') || [];
+    
+    if (audioFiles.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing audio file',
+        message: 'Request must include an audio file upload'
+      });
+    }
+
+    if (audioFiles.length > 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Too many audio files',
+        message: 'Only one audio file can be uploaded per version'
+      });
+    }
+
+    // --- STEP 2: Generate versionId and check for duplicates ---
+    
+    const versionId = generateVersionId(versionName);
+    const versionPath = path.join(releasePath, 'versions', versionId);
+
+    if (fsSync.existsSync(versionPath)) {
+      console.log(`🚫 Duplicate version blocked: ${versionId} already exists for ${releaseId}`);
+      // Delete the uploaded file since we're rejecting the request
+      audioFiles.forEach(f => {
+        if (fsSync.existsSync(f.path)) {
+          fsSync.unlinkSync(f.path);
+        }
+      });
+      return res.status(409).json({
+        success: false,
+        error: 'Duplicate version',
+        message: `Version "${versionName}" (${versionId}) already exists for this release.`,
+        existingPath: versionPath
+      });
+    }
+
+    // --- STEP 3: Move file to correct location ---
+    
+    const audioFile = audioFiles[0];
+    const targetDir = path.join(versionPath, 'audio');
+    const targetPath = path.join(targetDir, audioFile.originalname);
+    
+    // Create the target directory
+    fsSync.mkdirSync(targetDir, { recursive: true });
+    
+    // Move the file from temporary location to target
+    fsSync.renameSync(audioFile.path, targetPath);
+    
+    console.log(`📁 Created version folder: ${versionId}/audio/`);
+    console.log(`📦 Moved audio file to: ${targetPath}`);
+
+    // --- STEP 4: Audio validation ---
+    
+    console.log(`🎵 Validating audio for new version "${versionName}": ${audioFile.originalname}...`);
+    
+    const validation = await validateAudioFile(targetPath);
+    
+    if (!validation.valid) {
+      console.error(`❌ Audio validation failed: ${audioFile.originalname}`);
+      console.error(`   Error: ${validation.error}`);
+      
+      // Delete the invalid file
+      fsSync.unlinkSync(targetPath);
+      // Also delete the empty folder structure
+      fsSync.rmdirSync(targetDir);
+      fsSync.rmdirSync(versionPath);
+      
+      return res.status(422).json({
+        success: false,
+        error: 'Audio file validation failed',
+        file: audioFile.originalname,
+        reason: validation.error
+      });
+    }
+    
+    console.log(`✅ Audio valid: ${audioFile.originalname} (${validation.metadata.duration}s, ${validation.metadata.codec})`);
+    console.log(`📦 Added version "${versionName}" (${versionId}) to ${releaseId}`);
+
+    // --- STEP 5: Success response ---
+
+    res.json({
+      success: true,
+      message: `Version "${versionName}" added successfully`,
+      releaseId,
+      versionInfo: {
+        versionName,
+        versionId,
+        isPrimary: versionId === 'primary'
+      },
+      audioFile: {
+        originalName: audioFile.originalname,
+        savedTo: targetPath,
+        size: audioFile.size,
+        mimetype: audioFile.mimetype
+      },
+      audioValidation: {
+        file: audioFile.originalname,
+        ...validation.metadata
+      }
+    });
+
+  } catch (error) {
+    console.error(`❌ Error adding version to ${req.params.releaseId}:`, error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to add version',
+      details: error.message
+    });
+  }
+});
+
 
 // --- 6h: Storage Status ---
 // Reports disk space usage for the Releases drive.
