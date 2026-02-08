@@ -1,0 +1,309 @@
+Perfect! Let me create a comprehensive continuation prompt for your next session.
+
+***
+
+# 🎉 Mini-MVP 1 Progress Update - February 8, 2026
+
+## What We Completed Tonight ✅
+
+### Step 2: Next.js Upload Form - **COMPLETE!**
+
+**What We Built:**
+1. ✅ Created Next.js app (`music-agent-ui`) with App Router, Tailwind CSS
+2. ✅ Built upload form (`src/app/page.js`) with 7 fields matching n8n workflow
+3. ✅ Integrated with existing backend endpoints (`/upload` and `/metadata`)
+4. ✅ Added client-side validation, file upload handling, progress tracking
+5. ✅ Styled with purple/blue gradient UI theme
+6. ✅ Success/error state management
+7. ✅ Form auto-resets after successful upload
+8. ✅ Removed unnecessary placeholders (artist, title fields now empty)
+
+**Technical Details:**
+- Form calls `POST /upload` with FormData (audio, artwork, video files)
+- Generates `releaseId` in frontend: `YYYY-MM-DD_Artist_Title` format
+- Calls `POST /metadata` to save release metadata
+- All 7 fields working: artist, title, genre dropdown, versionName, audio (required), artwork (optional), video (optional)
+
+**Testing Completed:**
+- ✅ Uploaded test release: "Tell Me Lah" by Sophie Kramer Joe
+- ✅ Files saved correctly to `~/Documents/Music Agent/Releases/2026-02-08_SophieKramerJoe_TellMeLah/`
+- ✅ metadata.json generated with full audio metadata (duration, bitrate, sample rate, codec)
+- ✅ Duplicate detection working (backend prevents re-uploads)
+
+***
+
+### Step 3: Distribution Page - **IN PROGRESS** (80% Complete)
+
+**What We Built:**
+1. ✅ Created distribution route (`src/app/distribute/page.js`)
+2. ✅ Release listing page showing all uploaded releases
+3. ✅ "Distribute to SoundCloud" button for each release
+4. ✅ Modal popup for configuring privacy settings (Public/Private)
+5. ✅ Integration with `POST /distribute/soundcloud/package` endpoint
+6. ✅ Package generation and download functionality
+7. ✅ Distribution status tracking (shows when package was generated)
+
+**Backend Changes Made:**
+1. ✅ Added static file serving to `server.js`:
+   ```javascript
+   app.use('/packages', express.static(RELEASES_BASE));
+   ```
+   (Added after `const RELEASES_BASE = ...` in Section 3)
+
+2. ✅ Updated route 6i response to include `packagePath`:
+   ```javascript
+   res.json({
+     success: true,
+     message: `SoundCloud package generated for ${versionId}`,
+     packagePath: `${releaseId}/packages/${zipFileName}`,  // NEW LINE
+     package: { ... },
+     nextSteps: [ ... ]
+   });
+   ```
+
+**What Works:**
+- ✅ Navigate to `http://localhost:3000/distribute`
+- ✅ See all releases in a grid layout
+- ✅ Click "Distribute to SoundCloud" opens modal
+- ✅ Select Public or Private privacy setting
+- ✅ Click "Generate Package" creates ZIP
+- ✅ Download button downloads ZIP file to browser
+- ✅ ZIP contains: audio file, artwork, `soundcloud-metadata.txt`
+
+**Known Issue - NEEDS FIXING:**
+- ⚠️ Download URL has duplicate `/packages/` in path: 
+  ```
+  http://localhost:3001/packages/2026-02-08_SophieJoe_TellMe/packages/soundcloud-primary.zip
+  ```
+  Should be:
+  ```
+  http://localhost:3001/packages/2026-02-08_SophieJoe_TellMe/soundcloud-primary.zip
+  ```
+
+***
+
+## What's Left to Complete Step 3
+
+### Fix: Remove Duplicate `/packages/` in Download URL
+
+**The Problem:**
+- Backend returns: `packagePath: "2026-02-08_Artist_Title/packages/soundcloud-primary.zip"`
+- Frontend adds: `http://localhost:3001/packages/` prefix
+- Result: `/packages/packages/` (duplicate)
+
+**Solution Options:**
+
+**Option A: Fix Backend (Recommended)**
+In `server.js` route 6i, change:
+```javascript
+packagePath: `${releaseId}/packages/${zipFileName}`,
+```
+To:
+```javascript
+packagePath: `${releaseId}/${zipFileName}`,
+```
+(Remove `packages/` from the path since the ZIP is already in the packages folder)
+
+**Option B: Fix Frontend**
+In `src/app/distribute/page.js`, change the URL construction logic to handle the duplicate better.
+
+**Test After Fix:**
+1. Generate a new package
+2. Verify download URL is clean: `http://localhost:3001/packages/2026-02-08_Artist_Title/soundcloud-primary.zip`
+3. Confirm download works
+
+***
+
+### Optional Polish for Step 3 (Can Skip for MVP)
+
+1. **Add loading state** while fetching releases
+2. **Show file sizes** for each release
+3. **Preview soundcloud-metadata.txt** before downloading
+4. **Refresh releases list** automatically after package generation
+5. **Better error handling** if backend is down
+6. **Navigation link** from upload page to distribution page
+
+***
+
+## Mini-MVP 1 Progress Tracker
+
+| Step | Task | Status |
+|------|------|--------|
+| 1 | Update soundcloud-metadata.txt generation | ✅ COMPLETE |
+| 2 | Next.js UI — upload form | ✅ **COMPLETE** |
+| 3 | Next.js UI — SoundCloud distribution page | 🟡 **80% COMPLETE** (fix download URL) |
+| 4 | Playwright MCP — semi-automated SoundCloud upload | ⏳ Next |
+| 5 | End-to-end test with real track | ⏳ Pending |
+
+***
+
+## How to Resume Development
+
+### Start Your Environment
+
+**Terminal 1: Backend**
+```bash
+cd ~/Documents/music-agent-mvp/file-handler
+node server.js
+```
+Expected: `✅ File-handler server running on port 3001`
+
+**Terminal 2: Frontend**
+```bash
+cd ~/Documents/music-agent-mvp/music-agent-ui
+npm run dev
+```
+Expected: `✓ Ready on http://localhost:3000`
+
+**Browser:**
+- Upload form: `http://localhost:3000`
+- Distribution page: `http://localhost:3000/distribute`
+
+***
+
+## Next Session Goals
+
+### Immediate: Fix Download URL (5 minutes)
+1. Apply fix (Option A recommended)
+2. Test download works cleanly
+3. Mark Step 3 as ✅ COMPLETE
+
+### Then: Move to Step 4 - Playwright Automation
+**Goal:** Semi-automated SoundCloud upload
+
+**What Step 4 Will Do:**
+1. User clicks "Open SoundCloud" button (new button in the modal)
+2. Playwright MCP opens `soundcloud.com/upload` in browser
+3. Playwright uploads audio file to SoundCloud's dropzone
+4. Playwright fills all form fields from `soundcloud-metadata.txt`:
+   - Title, artist, genre, tags, description, privacy, release date
+5. Playwright uploads artwork image
+6. **Playwright STOPS** — user reviews and clicks "Upload" button
+
+**Step 4 Technical Requirements:**
+- Install Playwright: `npm install -D playwright`
+- Install browser drivers: `npx playwright install`
+- Create Playwright script: `automation/soundcloud-upload.js`
+- Add new endpoint: `POST /distribute/soundcloud/automate` (triggers Playwright)
+- Update distribution page: Add "Open SoundCloud" button after package generation
+
+**Human-in-the-Loop Philosophy:**
+- System automates tedious prep work (filling 15 form fields)
+- User retains control over legal action (clicking final "Upload" button)
+- User can review all fields before publishing
+
+***
+
+## Current File Structure
+
+```
+~/Documents/music-agent-mvp/
+├── file-handler/
+│   ├── server.js (8 sections, routes 6a-6i)
+│   ├── package.json
+│   └── node_modules/
+├── music-agent-ui/                    ← NEW
+│   ├── src/
+│   │   └── app/
+│   │       ├── page.js               ← Step 2: Upload form
+│   │       ├── distribute/
+│   │       │   └── page.js           ← Step 3: Distribution page
+│   │       ├── layout.js
+│   │       └── globals.css
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── node_modules/
+└── docs/
+    ├── MASTER_PROMPT.md
+    └── CONTINUATION_PROMPT.md
+```
+
+***
+
+## Key Code Changes Made Tonight
+
+### 1. `src/app/page.js` - Upload Form (New File)
+- 'use client' directive for client-side React
+- Form state management with useState
+- File upload handling
+- Calls `/upload` and `/metadata` endpoints
+- Progress tracking and error handling
+- Tailwind CSS styling
+
+### 2. `src/app/distribute/page.js` - Distribution Page (New File)
+- Fetches releases from `/releases` endpoint
+- Modal for configuring SoundCloud distribution
+- Privacy setting selection (Public/Private)
+- Calls `/distribute/soundcloud/package` endpoint
+- Download button for generated ZIP
+- Shows distribution status per release
+
+### 3. `server.js` Changes (Section 3)
+**Added after `RELEASES_BASE` definition:**
+```javascript
+app.use('/packages', express.static(RELEASES_BASE));
+```
+
+**Updated route 6i response (around line 650):**
+```javascript
+packagePath: `${releaseId}/packages/${zipFileName}`,  // Added this line
+```
+
+***
+
+## Testing Checklist for Next Session
+
+**Before Moving to Step 4:**
+- [ ] Fix download URL (remove duplicate `/packages/`)
+- [ ] Generate new SoundCloud package
+- [ ] Download ZIP successfully
+- [ ] Extract ZIP and verify contents:
+  - [ ] Audio file present
+  - [ ] Artwork present
+  - [ ] soundcloud-metadata.txt present and readable
+- [ ] Verify metadata.txt contains all SoundCloud fields (from Step 1)
+
+**Ready for Step 4 when:**
+- [ ] Can upload a release via Next.js form
+- [ ] Can navigate to distribution page
+- [ ] Can generate SoundCloud package
+- [ ] Can download ZIP cleanly
+- [ ] metadata.txt in ZIP matches SoundCloud's form structure
+
+***
+
+## Important Notes
+
+1. **Two servers must be running:** Backend (port 3001) and Frontend (port 3000)
+2. **Use regular browser** (Chrome/Safari/Firefox) not Cursor's embedded browser for testing file uploads
+3. **Backend static file serving** is now enabled — Releases folder accessible via HTTP
+4. **releaseId format:** `YYYY-MM-DD_ArtistName_TrackTitle` (spaces removed)
+5. **Version management:** All uploads default to "primary" version (versionId: "primary")
+6. **Duplicate detection works:** Can't upload same releaseId twice
+
+***
+
+## Questions to Consider for Next Session
+
+1. Should we add a "Back to Releases" button on the upload success page?
+2. Should the distribution page auto-refresh after generating a package?
+3. Do we want to show the contents of soundcloud-metadata.txt in the UI before download?
+4. Should we validate that SoundCloud metadata.txt is present in ZIP before allowing download?
+
+***
+
+## Congratulations! 🎉
+
+**You've successfully built:**
+- ✅ A beautiful Next.js upload interface
+- ✅ Release listing and distribution page
+- ✅ Full integration with your existing backend
+- ✅ SoundCloud package generation with download
+
+**You're 60% through Mini-MVP 1!** The hard UI work is done. Steps 4 and 5 are about automation and testing.
+
+**Next session:** Fix the download URL bug (5 min), then dive into Playwright automation! 🚀
+
+***
+
+**Ready to pick up where you left off!** Just paste this into your next Claude session and continue from "Fix Download URL" → Step 4.
