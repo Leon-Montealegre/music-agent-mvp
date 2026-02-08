@@ -49,6 +49,8 @@ app.use(express.json());   // Parse JSON request bodies (needed for POST /metada
 // Every release gets its own subfolder inside this directory.
 
 const RELEASES_BASE = '/Users/Mathias2/Documents/Music Agent/Releases';
+app.use('/packages', express.static(RELEASES_BASE));
+
 
 
 // =============================================================================
@@ -1262,36 +1264,36 @@ Artist retains all rights. Review all fields before publishing.
 
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
 
-    // --- STEP 10: Success response ---
+// --- STEP 10: Success response ---
     
-    res.json({
-      success: true,
-      message: `SoundCloud package generated for ${versionId}`,
-      package: {
-        fileName: zipFileName,
-        path: zipPath,
-        sizeKB: parseFloat(fileSizeKB),
-        contents: [
-          audioFile,
-          artworkFile,
-          'soundcloud-metadata.txt'
-        ]
-      },
-      nextSteps: [
-        '1. Download the ZIP file from the packages folder',
-        '2. Extract the ZIP',
-        '3. Playwright will open soundcloud.com/upload (Step 4)',
-        '4. Playwright will upload audio and fill all fields',
-        '5. YOU review and click "Upload" button to publish'
-      ]
-    });
+res.json({
+  success: true,
+  message: `SoundCloud package generated for ${versionId}`,
+  packagePath: `${releaseId}/packages/${zipFileName}`,  // Added this line for frontend
+  package: {
+    fileName: zipFileName,
+    path: zipPath,
+    sizeKB: parseFloat(fileSizeKB),
+    contents: [
+      audioFile,
+      artworkFile,
+      'soundcloud-metadata.txt'
+    ]
+  },
+  nextSteps: [
+    '1. Download the ZIP file from the packages folder',
+    '2. Extract the ZIP',
+    '3. Playwright will open soundcloud.com/upload (Step 4)',
+    '4. Playwright will upload audio and fill all fields',
+    '5. YOU review and click "Upload" button to publish'
+  ]
+});
 
   } catch (error) {
-    console.error(`❌ Error generating SoundCloud package:`, error.message);
+    console.error('❌ SoundCloud package error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to generate SoundCloud package',
-      details: error.message
+      error: error.message
     });
   }
 });
