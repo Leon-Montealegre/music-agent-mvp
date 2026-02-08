@@ -17,6 +17,9 @@
     "express": "^5.2.1",
     "file-type-checker": "^1.1.6",
     "multer": "^2.0.2",
-    "music-metadata": "^11.11.2"
+    "music-metadata": "^11.11.2",
+    "playwright": "^1.58.2",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
 }
