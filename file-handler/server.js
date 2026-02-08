@@ -49,7 +49,7 @@ app.use(express.json());   // Parse JSON request bodies (needed for POST /metada
 // Every release gets its own subfolder inside this directory.
 
 const RELEASES_BASE = '/Users/Mathias2/Documents/Music Agent/Releases';
-app.use('/packages', express.static(RELEASES_BASE));
+app.use('/releases', express.static(RELEASES_BASE));
 
 
 

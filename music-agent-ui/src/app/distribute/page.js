@@ -51,7 +51,7 @@ export default function DistributePage() {
       const data = await response.json();
       console.log('Backend returned packagePath:', data.packagePath);
       const cleanPath = data.packagePath.startsWith('/') ? data.packagePath.slice(1) : data.packagePath;
-      const finalUrl = `http://localhost:3001/packages/${cleanPath}`;
+      const finalUrl = `http://localhost:3001/releases/${data.packagePath}`;
       console.log('Final download URL:', finalUrl);
       setPackageUrl(finalUrl);
       setGenerating(false);
