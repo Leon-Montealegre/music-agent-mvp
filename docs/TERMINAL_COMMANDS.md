@@ -33,3 +33,14 @@ curl http://localhost:3001/health
 ```
 
 You should get back: `{"status":"ok","timestamp":"..."}`
+
+# Terminal 2: Frontend
+cd ~/Documents/music-agent-mvp/music-agent-ui
+npm run dev
+
+# Test Playwright
+cd ~/Documents/music-agent-mvp/file-handler
+node automation/test-soundcloud.js
+
+# Check Playwright version:
+npx playwright --version
