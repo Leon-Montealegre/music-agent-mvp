@@ -629,6 +629,34 @@ app.get('/releases', async (req, res) => {
 // --- 6e: Get Single Release ---
 // Returns complete details for one specific release.
 // Includes metadata, all versions, files, and distribution tracking.
+// 6j. Serve artwork images
+app.get('/releases/:releaseId/artwork/', (req, res) => {
+  const { releaseId } = req.params;
+  const releasePath = path.join(RELEASES_BASE, releaseId);
+  const artworkPath = path.join(releasePath, 'artwork');
+
+  console.log('Looking for artwork at:', artworkPath);
+
+  // Check if artwork directory exists - use fsSync
+  if (!fsSync.existsSync(artworkPath)) {
+    console.log('Artwork directory not found');
+    return res.status(404).json({ success: false, error: 'No artwork directory found' });
+  }
+
+  // Find the first artwork file - use fsSync
+  const artworkFiles = fsSync.readdirSync(artworkPath);
+  console.log('Found artwork files:', artworkFiles);
+  
+  if (artworkFiles.length === 0) {
+    return res.status(404).json({ success: false, error: 'No artwork files found' });
+  }
+
+  // Serve the first artwork file
+  const firstArtwork = artworkFiles[0];
+  const filePath = path.join(artworkPath, firstArtwork);
+  console.log('Serving artwork:', filePath);
+  res.sendFile(filePath);
+});
 
 app.get('/releases/:releaseId', async (req, res) => {
   try {

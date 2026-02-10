@@ -50,7 +50,7 @@ export async function fetchReleases() {
  */
 export async function fetchRelease(releaseId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}`);
+    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/`);
     
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
