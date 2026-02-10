@@ -1,6 +1,11 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 
 export default function ReleaseCard({ release }) {
+  const [imageError, setImageError] = useState(false)
+  
   // Build the artwork URL (with trailing slash!)
   const artworkUrl = `http://localhost:3001/releases/${release.releaseId}/artwork/`
   
@@ -13,16 +18,12 @@ export default function ReleaseCard({ release }) {
       <div className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer overflow-hidden">
         {/* Artwork */}
         <div className="aspect-square bg-gray-200 relative">
-          {release.fileCounts?.artwork > 0 ? (
+          {release.fileCounts?.artwork > 0 && !imageError ? (
             <img
               src={artworkUrl}
               alt={`${release.title} artwork`}
               className="w-full h-full object-cover"
-              onError={(e) => {
-                // Fallback if image fails to load
-                e.target.style.display = 'none'
-                e.target.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400 text-4xl">🎵</div>'
-              }}
+              onError={() => setImageError(true)}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-400 text-6xl">

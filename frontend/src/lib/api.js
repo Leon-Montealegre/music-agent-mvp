@@ -72,6 +72,12 @@ export async function fetchRelease(releaseId) {
  */
 export async function updateDistribution(releaseId, path, entry) {
   try {
+    // Add the path to the entry object (Express expects it there)
+    const entryWithPath = {
+      ...entry,
+      path: path
+    };
+    
     const response = await fetch(
       `${API_BASE_URL}/releases/${releaseId}/distribution`,
       {
@@ -79,12 +85,15 @@ export async function updateDistribution(releaseId, path, entry) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path, entry }),
+        body: JSON.stringify(entryWithPath),  // Send just the entry with path inside
       }
     );
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      // Get the error message from the response
+      const errorData = await response.json().catch(() => ({}));
+      console.error('API error response:', errorData);
+      throw new Error(`API error: ${response.status} - ${errorData.error || 'Unknown error'}`);
     }
     
     const data = await response.json();
