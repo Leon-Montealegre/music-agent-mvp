@@ -154,21 +154,20 @@ export default function ReleaseDetailPage({ params }) {
           {/* Left Column - Artwork & Info */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow p-6 sticky top-8">
-              {/* Artwork */}
-              <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-6">
-                {metadata.files?.artwork?.length > 0 ? (
-                  <img
-                    src={artworkUrl}
-                    alt={`${metadata.title} artwork`}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-400 text-6xl">
-                    🎵
-                  </div>
-                )}
-              </div>
-
+            {/* Artwork */}
+<div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-6">
+  {(release.files?.artwork?.length > 0 || release.versions?.primary?.files?.artwork?.length > 0) ? (
+    <img
+      src={artworkUrl}
+      alt={`${metadata.title} artwork`}
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <div className="flex items-center justify-center h-full text-gray-400 text-6xl">
+      🎵
+    </div>
+  )}
+</div>
               {/* Basic Info */}
               <div className="space-y-3">
                 <div>
