@@ -19,7 +19,7 @@ export default function TrackDetailPage({ params }) {
   const [showLabelSigningModal, setShowLabelSigningModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  // Function to load track data (replaces the old loadTrack inside useEffect)
+  // Function to load track data
   async function loadTrack() {
     try {
       setLoading(true)
@@ -84,39 +84,6 @@ export default function TrackDetailPage({ params }) {
       setSubmitting(false)
     }
   }
-
-  async function handleSubmissionSubmit(formData) {
-    setSubmitting(true)
-    
-    try {
-      const entry = {
-        label: formData.label,
-        platform: formData.platform,
-        status: formData.status,
-        timestamp: new Date().toISOString()
-      }
-      
-      if (formData.notes) entry.notes = formData.notes
-      
-      await updateDistribution(trackId, 'submit', entry)
-      
-      const updatedData = await fetchRelease(trackId)
-      const updatedTrack = updatedData.release || updatedData
-      
-      setTrack(updatedTrack)
-      setShowSubmissionModal(false)
-      
-      console.log('Submission logged successfully!')
-    } catch (err) {
-      console.error('Error logging submission:', err)
-      alert('Failed to log submission. Please try again.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  // Rest of your code continues below...
-
 
   async function handleSubmissionSubmit(formData) {
     setSubmitting(true)
@@ -253,23 +220,71 @@ export default function TrackDetailPage({ params }) {
                 </div>
               </div>
 
+              {/* FILES SECTION - UPDATED WITH FIX 2 */}
               <div className="mt-6 pt-6 border-t">
                 <h3 className="font-semibold mb-3">Files</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Audio:</span>
-                    <span className="font-medium">{metadata.files?.audio?.length || 0}</span>
+                
+                {/* Audio Files */}
+                <div className="mb-3">
+                  <p className="text-sm text-gray-600 mb-1">
+                    <span className="font-medium">Audio Files:</span> {
+                      track.versions?.primary?.files?.audio?.length || 
+                      track.metadata?.files?.audio?.length || 
+                      0
+                    }
+                  </p>
+                  {(track.versions?.primary?.files?.audio || track.metadata?.files?.audio || []).map((file, idx) => (
+                    <div key={idx} className="text-xs text-gray-500 ml-4 mb-1">
+                    🎵 {file.filename} 
+                    <span className="text-gray-400 ml-2">
+                      ({Math.round(file.size / 1024 / 1024)}MB
+                      {file.duration ? `, ${Math.floor(file.duration / 60)}:${String(file.duration % 60).padStart(2, '0')}` : ''})
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Artwork:</span>
-                    <span className="font-medium">{metadata.files?.artwork?.length || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Video:</span>
-                    <span className="font-medium">{metadata.files?.video?.length || 0}</span>
-                  </div>
+                  ))}
                 </div>
+                
+                {/* Artwork Files */}
+                <div className="mb-3">
+                  <p className="text-sm text-gray-600 mb-1">
+                    <span className="font-medium">Artwork:</span> {
+                      track.versions?.primary?.files?.artwork?.length || 
+                      track.metadata?.files?.artwork?.length || 
+                      0
+                    }
+                  </p>
+                  {(track.versions?.primary?.files?.artwork || track.metadata?.files?.artwork || []).map((file, idx) => (
+                    <div key={idx} className="text-xs text-gray-500 ml-4 mb-1">
+                      🖼️ {file.filename}
+                      <span className="text-gray-400 ml-2">
+                        ({Math.round(file.size / 1024 / 1024)}MB)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Video Files (if any) */}
+                {((track.versions?.primary?.files?.video || track.metadata?.files?.video || []).length > 0) && (
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-600 mb-1">
+                      <span className="font-medium">Video:</span> {
+                        track.versions?.primary?.files?.video?.length || 
+                        track.metadata?.files?.video?.length || 
+                        0
+                      }
+                    </p>
+                    {(track.versions?.primary?.files?.video || track.metadata?.files?.video || []).map((file, idx) => (
+                      <div key={idx} className="text-xs text-gray-500 ml-4 mb-1">
+                        🎬 {file.filename}
+                        <span className="text-gray-400 ml-2">
+                          ({Math.round(file.size / 1024 / 1024)}MB)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+              {/* END FILES SECTION */}
 
               {isSigned && (
                 <div className="mt-6 pt-6 border-t">
@@ -415,7 +430,7 @@ export default function TrackDetailPage({ params }) {
                   onClick={() => setShowPlatformModal(true)}
                   className="mt-4 w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-medium"
                 >
-                  + Log Platform Upload
+                  + Log Platform Release
                 </button>
               </div>
             </div>
