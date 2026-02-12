@@ -450,6 +450,331 @@ app.get('/releases/:releaseId/artwork/', (req, res) => {
   res.sendFile(filePath);
 });
 
+// Serve artwork for a release
+app.get('/releases/:releaseId/artwork/', async (req, res) => {
+  // ... existing artwork endpoint code ...
+})
+
+// Download any file from a release
+app.get('/releases/:releaseId/files/:fileType/:filename', async (req, res) => {
+  try {
+    const { releaseId, fileType, filename } = req.params
+    
+    // Validate file type
+    if (!['audio', 'artwork', 'video'].includes(fileType)) {
+      return res.status(400).json({ error: 'Invalid file type' })
+    }
+    
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    
+    // Try multiple possible file locations
+    const possiblePaths = [
+      path.join(releasePath, fileType, filename),                       // Root level ✅ Check this FIRST
+      path.join(releasePath, 'versions/primary', fileType, filename),  // Standard location
+      path.join(releasePath, 'versions', 'primary', 'files', fileType, filename) // Alternative structure
+    ]
+    
+    let filePath = null
+    
+    // Check each possible path
+    for (const possiblePath of possiblePaths) {
+      try {
+        await fs.access(possiblePath)
+        filePath = possiblePath
+        console.log('✅ Found file at:', possiblePath)
+        break
+      } catch (err) {
+        // File not at this location, try next
+        console.log('❌ Not found at:', possiblePath)
+      }
+    }
+    
+    if (!filePath) {
+      console.error('❌ File not found in any expected location:', filename)
+      return res.status(404).json({ error: 'File not found' })
+    }
+    
+    // Set headers for download
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    
+    // Determine content type
+    const ext = path.extname(filename).toLowerCase()
+    const contentTypes = {
+      '.wav': 'audio/wav',
+      '.mp3': 'audio/mpeg',
+      '.flac': 'audio/flac',
+      '.m4a': 'audio/mp4',
+      '.aiff': 'audio/aiff',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.mp4': 'video/mp4',
+      '.mov': 'video/quicktime',
+      '.avi': 'video/x-msvideo',
+      '.mkv': 'video/x-matroska'
+    }
+    
+    if (contentTypes[ext]) {
+      res.setHeader('Content-Type', contentTypes[ext])
+    }
+    
+    // Stream the file
+    const fileStream = require('fs').createReadStream(filePath)
+    fileStream.pipe(res)
+    
+    console.log(`✅ Serving file: ${filename}`)
+    
+  } catch (error) {
+    console.error('❌ Error serving file:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete an entire release
+app.delete('/releases/:releaseId', async (req, res) => {
+  try {
+    const { releaseId } = req.params
+    
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    
+    console.log('🗑️ Attempting to delete release:', releaseId)
+    console.log('🗑️ Path:', releasePath)
+    
+    // Check if release exists
+    try {
+      await fs.access(releasePath)
+    } catch (err) {
+      console.log('❌ Release not found:', releasePath)
+      return res.status(404).json({ error: 'Release not found' })
+    }
+    
+    // Delete the entire release folder
+    await fs.rm(releasePath, { recursive: true, force: true })
+    
+    console.log('✅ Successfully deleted release:', releaseId)
+    
+    res.json({ 
+      success: true, 
+      message: `Release ${releaseId} deleted successfully` 
+    })
+    
+  } catch (error) {
+    console.error('❌ Error deleting release:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// ============================================
+// LABEL DEAL ENDPOINTS
+// ============================================
+
+// Upload label deal file
+app.post('/releases/:releaseId/label-deal/files', upload.single('file'), async (req, res) => {
+  try {
+    const { releaseId } = req.params
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' })
+    }
+    
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    const labelDealPath = path.join(releasePath, 'label-deal')
+    const metadataPath = path.join(releasePath, 'metadata.json')
+    
+    // Create label-deal folder if it doesn't exist
+    await fs.mkdir(labelDealPath, { recursive: true })
+    
+    // Move file to label-deal folder
+    const filename = req.file.originalname
+    const targetPath = path.join(labelDealPath, filename)
+    await fs.rename(req.file.path, targetPath)
+    
+    // Update metadata
+    const rawData = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(rawData)
+    
+    if (!metadata.metadata.labelInfo) {
+      metadata.metadata.labelInfo = {}
+    }
+    if (!metadata.metadata.labelInfo.contractDocuments) {
+      metadata.metadata.labelInfo.contractDocuments = []
+    }
+    
+    // Add file to contractDocuments array
+    metadata.metadata.labelInfo.contractDocuments.push({
+      filename: filename,
+      uploadedAt: new Date().toISOString(),
+      size: req.file.size
+    })
+    
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
+    
+    console.log(`✅ Uploaded label deal file: ${filename}`)
+    
+    res.json({
+      success: true,
+      file: {
+        filename: filename,
+        size: req.file.size,
+        uploadedAt: new Date().toISOString()
+      }
+    })
+    
+  } catch (error) {
+    console.error('❌ Error uploading label deal file:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Download label deal file
+app.get('/releases/:releaseId/label-deal/files/:filename', async (req, res) => {
+  try {
+    const { releaseId, filename } = req.params
+    
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    const filePath = path.join(releasePath, 'label-deal', filename)
+    
+    console.log('🔍 Looking for label deal file at:', filePath)
+    
+    // Check if file exists
+    try {
+      await fs.access(filePath)
+    } catch (err) {
+      console.log('❌ File not found at:', filePath)
+      return res.status(404).json({ error: 'File not found' })
+    }
+    
+    // Set headers for download
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    
+    // Determine content type
+    const ext = path.extname(filename).toLowerCase()
+    const contentTypes = {
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.txt': 'text/plain',
+      '.zip': 'application/zip'
+    }
+    
+    if (contentTypes[ext]) {
+      res.setHeader('Content-Type', contentTypes[ext])
+    }
+    
+    // Stream the file
+    const fileStream = require('fs').createReadStream(filePath)
+    fileStream.pipe(res)
+    
+    console.log(`✅ Serving label deal file: ${filename}`)
+    
+  } catch (error) {
+    console.error('❌ Error serving label deal file:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete label deal file
+app.delete('/releases/:releaseId/label-deal/files/:filename', async (req, res) => {
+  try {
+    const { releaseId, filename } = req.params
+    
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    const filePath = path.join(releasePath, 'label-deal', filename)
+    const metadataPath = path.join(releasePath, 'metadata.json')
+    
+    // Delete the file
+    try {
+      await fs.unlink(filePath)
+      console.log(`🗑️ Deleted file: ${filename}`)
+    } catch (err) {
+      console.log('❌ File not found:', filePath)
+      return res.status(404).json({ error: 'File not found' })
+    }
+    
+    // Update metadata
+    const rawData = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(rawData)
+    
+    if (metadata.metadata.labelInfo?.contractDocuments) {
+      metadata.metadata.labelInfo.contractDocuments = metadata.metadata.labelInfo.contractDocuments.filter(
+        doc => doc.filename !== filename
+      )
+    }
+    
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
+    
+    console.log(`✅ Removed ${filename} from metadata`)
+    
+    res.json({ success: true, message: 'File deleted' })
+    
+  } catch (error) {
+    console.error('❌ Error deleting label deal file:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Save/Update label contact
+app.patch('/releases/:releaseId/label-deal/contact', async (req, res) => {
+  try {
+    const { releaseId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Name and email are required' })
+    }
+    
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    const metadataPath = path.join(releasePath, 'metadata.json')
+    
+    // Read metadata
+    const rawData = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(rawData)
+    
+    if (!metadata.metadata.labelInfo) {
+      metadata.metadata.labelInfo = {}
+    }
+    
+    // Save contact info
+    metadata.metadata.labelInfo.contact = {
+      name,
+      label: label || metadata.metadata.labelInfo.label || '',
+      email,
+      phone: phone || '',
+      location: location || '',
+      role: role || 'A&R',
+      notes: notes || '',
+      lastContact: null,
+      createdAt: metadata.metadata.labelInfo.contact?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+    
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
+    
+    console.log(`✅ Saved label contact for ${releaseId}:`, metadata.metadata.labelInfo.contact.name)
+    
+    res.json({
+      success: true,
+      contact: metadata.metadata.labelInfo.contact
+    })
+    
+  } catch (error) {
+    console.error('❌ Error saving label contact:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Next endpoint continues below...
+
+
 // --- Get Single Release (FIX 2 - FLATTENED STRUCTURE) ---
 app.get('/releases/:releaseId/', async (req, res) => {
   try {
@@ -660,6 +985,147 @@ app.patch('/releases/:releaseId/sign', async (req, res) => {
   }
 })
 
+// Delete a distribution entry (submission or platform release)
+app.delete('/releases/:releaseId/distribution/:pathType/:timestamp', async (req, res) => {
+  try {
+    const { releaseId, pathType, timestamp } = req.params
+    
+    // Validate pathType
+    if (!['release', 'submit', 'promote'].includes(pathType)) {
+      return res.status(400).json({ success: false, error: 'Invalid path type' })
+    }
+    
+    // Build path
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    const metadataPath = path.join(releasePath, 'metadata.json')
+    
+    // Check if metadata exists
+    try {
+      await fs.access(metadataPath)
+    } catch (err) {
+      return res.status(404).json({ success: false, error: 'Release not found' })
+    }
+    
+    // Read metadata
+    const rawData = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(rawData)
+    
+    // Navigate to the correct distribution array
+    if (!metadata.metadata?.distribution?.[pathType]) {
+      return res.status(404).json({ success: false, error: 'Distribution path not found' })
+    }
+    
+    const entries = metadata.metadata.distribution[pathType]
+    const originalLength = entries.length
+    
+    // Find the entry to check if it's signed
+    const entryToDelete = entries.find(entry => entry.timestamp === timestamp)
+    const wasSignedSubmission = pathType === 'submit' && entryToDelete?.status === 'signed'
+    
+    // Filter out the entry with matching timestamp
+    metadata.metadata.distribution[pathType] = entries.filter(
+      entry => entry.timestamp !== timestamp
+    )
+    
+    if (metadata.metadata.distribution[pathType].length === originalLength) {
+      return res.status(404).json({ success: false, error: 'Entry not found' })
+    }
+    
+    // If we deleted a signed submission, clear labelInfo
+    if (wasSignedSubmission) {
+      if (!metadata.metadata.labelInfo) {
+        metadata.metadata.labelInfo = {}
+      }
+      metadata.metadata.labelInfo.isSigned = false
+      metadata.metadata.labelInfo.label = null
+      metadata.metadata.labelInfo.signedDate = null
+      console.log('🔄 Cleared labelInfo because signed submission was deleted')
+    }
+    
+    // Update timestamp
+    metadata.updatedAt = new Date().toISOString()
+    
+    // Write back
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
+    
+    console.log(`✅ Deleted ${pathType} entry from ${releaseId}`)
+    
+    res.json({ success: true, message: 'Entry deleted' })
+    
+  } catch (error) {
+    console.error('❌ Error deleting entry:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+
+// Edit a distribution entry
+app.patch('/releases/:releaseId/distribution/:pathType/:timestamp', async (req, res) => {
+  try {
+    const { releaseId, pathType, timestamp } = req.params
+    const updatedData = req.body
+    
+    // Validate pathType
+    if (!['release', 'submit', 'promote'].includes(pathType)) {
+      return res.status(400).json({ success: false, error: 'Invalid path type' })
+    }
+    
+    // Build path
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    const metadataPath = path.join(releasePath, 'metadata.json')
+    
+    // Check if metadata exists
+    try {
+      await fs.access(metadataPath)
+    } catch (err) {
+      return res.status(404).json({ success: false, error: 'Release not found' })
+    }
+    
+    // Read metadata
+    const rawData = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(rawData)
+    
+    // Navigate to the correct distribution array
+    if (!metadata.metadata?.distribution?.[pathType]) {
+      return res.status(404).json({ success: false, error: 'Distribution path not found' })
+    }
+    
+    const entries = metadata.metadata.distribution[pathType]
+    
+    // Find the entry with matching timestamp
+    const entryIndex = entries.findIndex(entry => entry.timestamp === timestamp)
+    
+    if (entryIndex === -1) {
+      return res.status(404).json({ success: false, error: 'Entry not found' })
+    }
+    
+    // Update the entry (merge with existing data)
+    metadata.metadata.distribution[pathType][entryIndex] = {
+      ...entries[entryIndex],
+      ...updatedData,
+      timestamp: entries[entryIndex].timestamp, // Keep original timestamp
+      updatedAt: new Date().toISOString()
+    }
+    
+    // Update metadata timestamp
+    metadata.updatedAt = new Date().toISOString()
+    
+    // Write back
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
+    
+    console.log(`✅ Updated ${pathType} entry in ${releaseId}`)
+    
+    res.json({ 
+      success: true, 
+      message: 'Entry updated',
+      entry: metadata.metadata.distribution[pathType][entryIndex]
+    })
+    
+  } catch (error) {
+    console.error('❌ Error updating entry:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
 
 
 // --- Add Audio Version ---
