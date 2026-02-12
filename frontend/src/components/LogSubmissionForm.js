@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { updateDistribution, updateDistributionEntry } from '@/lib/api'
 
-export default function LogSubmissionForm({ releaseId, onSuccess, onCancel }) {
+export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, editMode = false, existingEntry = null }) {
   const [formData, setFormData] = useState({
     label: '',
     platform: '',
@@ -10,153 +11,138 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel }) {
     notes: ''
   })
 
-  const platforms = [
-    'LabelRadar',
-    'Email',
-    'Private SoundCloud Link',
-    'SubmitHub',
-    'Direct Message',
-    'Other'
-  ]
-
-  const statuses = [
-    'Submitted',
-    'Listened',
-    'Rejected',
-    'Signed',
-    'No Response'
-  ]
+  // Pre-fill form if editing
+  useEffect(() => {
+    if (editMode && existingEntry) {
+      setFormData({
+        label: existingEntry.label || '',
+        platform: existingEntry.platform || '',
+        status: existingEntry.status || '',
+        notes: existingEntry.notes || ''
+      })
+    }
+  }, [editMode, existingEntry])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    // Validate required fields
+
     if (!formData.label || !formData.platform || !formData.status) {
-      alert('Please fill in label name, platform, and status')
+      alert('Label, platform, and status are required')
       return
     }
 
     try {
-      const entry = {
-        label: formData.label,
-        platform: formData.platform,
-        status: formData.status,
-        notes: formData.notes,
-        timestamp: new Date().toISOString()
+      if (editMode && existingEntry) {
+        // Update existing entry
+        await updateDistributionEntry(releaseId, 'submit', existingEntry.timestamp, formData)
+      } else {
+        // Create new entry
+        const entry = {
+          label: formData.label,
+          platform: formData.platform,
+          status: formData.status,
+          timestamp: new Date().toISOString()
+        }
+        if (formData.notes) entry.notes = formData.notes
+        await updateDistribution(releaseId, 'submit', entry)
       }
 
-      // Call API directly
-      const response = await fetch(`http://localhost:3001/releases/${releaseId}/distribution`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          path: 'submit',
-          entry: entry
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update distribution')
-      }
-
-      // Success - call parent's success handler
-      if (onSuccess) {
-        onSuccess()
-      }
-      
+      onSuccess()
     } catch (error) {
-      console.error('Label submission error:', error)
-      alert('Failed to log submission. Please try again.')
+      console.error('Error saving submission entry:', error)
+      alert('Failed to save. Please try again.')
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="p-6 space-y-4">
       {/* Label Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Label Name *
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Label Name <span className="text-red-400">*</span>
         </label>
         <input
           type="text"
           value={formData.label}
           onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-          placeholder="e.g., Anjunadeep, Cercle Records..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+          placeholder="e.g., Anjunadeep"
+          className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
           required
         />
       </div>
 
       {/* Platform */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Submission Platform *
-        </label>
-        <select
-          value={formData.platform}
-          onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-          required
-        >
-          <option value="">Select platform...</option>
-          {platforms.map((platform) => (
-            <option key={platform} value={platform}>
-              {platform}
-            </option>
-          ))}
-        </select>
-      </div>
+<div>
+  <label className="block text-sm font-medium text-gray-300 mb-2">
+    Platform <span className="text-red-400">*</span>
+  </label>
+  <select
+    value={formData.platform}
+    onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
+    className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+    required
+  >
+    {!editMode && <option value="">Select platform</option>}
+    <option value="LabelRadar">LabelRadar</option>
+    <option value="Email">Email</option>
+    <option value="SubmitHub">SubmitHub</option>
+    <option value="Labelbase">Labelbase</option>
+    <option value="Direct Website">Direct Website</option>
+    <option value="SoundCloud">SoundCloud</option>
+    <option value="Other">Other</option>
+  </select>
+</div>
 
-      {/* Status */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Status *
-        </label>
-        <select
-          value={formData.status}
-          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-          required
-        >
-          <option value="">Select status...</option>
-          {statuses.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
-      </div>
+
+ {/* Status */}
+<div>
+  <label className="block text-sm font-medium text-gray-300 mb-2">
+    Status <span className="text-red-400">*</span>
+  </label>
+  <select
+    value={formData.status}
+    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+    className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+    required
+  >
+    {!editMode && <option value="">Select status</option>}
+    <option value="Submitted">Submitted</option>
+    <option value="Listened">Listened</option>
+    <option value="Under Review">Under Review</option>
+    <option value="Accepted">Accepted</option>
+    <option value="Rejected">Rejected</option>
+    <option value="No Response">No Response</option>
+  </select>
+</div>
 
       {/* Notes */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
           Notes (optional)
         </label>
         <textarea
           value={formData.notes}
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          placeholder="Any feedback, response details, or reminders..."
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+          placeholder="Add any notes..."
+          className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
         />
       </div>
 
       {/* Buttons */}
       <div className="flex gap-3 pt-4">
         <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+          type="submit"
+          className="flex-1 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium"
         >
-          Cancel
+          {editMode ? 'Update' : 'Save'}
         </button>
         <button
-          type="submit"
-          className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+          type="button"
+          onClick={onCancel}
+          className="flex-1 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-all font-medium"
         >
-          Log Submission
+          Cancel
         </button>
       </div>
     </form>

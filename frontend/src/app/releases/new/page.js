@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function CreateTrackPage() {
   const router = useRouter()
@@ -10,11 +11,11 @@ export default function CreateTrackPage() {
   // Form fields
   const [artist, setArtist] = useState('')
   const [title, setTitle] = useState('')
-  const [genre, setGenre] = useState('House')
+  const [genre, setGenre] = useState('') // Empty default
   const [trackDate, setTrackDate] = useState(
     new Date().toISOString().split('T')[0]
   )
-  const [releaseFormat, setReleaseFormat] = useState('Single')
+  const [releaseFormat, setReleaseFormat] = useState('') // Empty default
   
   // Files
   const [audioFile, setAudioFile] = useState(null)
@@ -56,6 +57,12 @@ export default function CreateTrackPage() {
       if (!artist || !title) {
         throw new Error('Artist and Title are required')
       }
+      if (!genre) {
+        throw new Error('Genre is required')
+      }
+      if (!releaseFormat) {
+        throw new Error('Release format is required')
+      }
       if (!audioFile) {
         throw new Error('Audio file is required')
       }
@@ -94,9 +101,9 @@ export default function CreateTrackPage() {
           title,
           genre,
           releaseFormat,
-          releaseType: releaseFormat,  // Add this for backward compatibility
+          releaseType: releaseFormat,
           trackDate,
-          releaseDate: trackDate,  // Add this for backward compatibility
+          releaseDate: trackDate,
           createdAt: new Date().toISOString(),
           files: uploadData.files,
           distribution: {
@@ -134,66 +141,79 @@ export default function CreateTrackPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black py-8 px-4">
       <div className="max-w-2xl mx-auto">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Add New Track
-          </h1>
-          <p className="text-gray-600 mt-2">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl font-bold text-gray-100">
+              Add New Track
+            </h1>
+            <Link 
+              href="/" 
+              className="text-purple-400 hover:text-purple-300 transition-colors"
+            >
+              ← Back to Catalogue
+            </Link>
+          </div>
+          <p className="text-gray-300">
             Upload your track and add it to your catalogue
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6 space-y-6">
           
+          {/* Artist Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Artist Name *
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Artist Name <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
               value={artist}
               onChange={(e) => setArtist(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
-              placeholder="Sophie & Joe"
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             />
           </div>
 
+          {/* Track Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Track Title *
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Track Title <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
-              placeholder="Tell Me"
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             />
           </div>
 
+          {/* Genre */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Genre *
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Genre <span className="text-red-400">*</span>
             </label>
             <select
               value={genre}
               onChange={(e) => setGenre(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             >
+              <option value="">Choose Genre</option>
               {genres.map(g => (
                 <option key={g} value={g}>{g}</option>
               ))}
             </select>
           </div>
 
+          {/* Production Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Production Date *
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Production Date <span className="text-red-400">*</span>
               <span className="text-xs text-gray-500 ml-2">
                 (when you finished this track)
               </span>
@@ -203,92 +223,110 @@ export default function CreateTrackPage() {
               value={trackDate}
               onChange={(e) => setTrackDate(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             />
           </div>
 
+          {/* Release Format */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Release Format *
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Release Format <span className="text-red-400">*</span>
             </label>
             <select
               value={releaseFormat}
               onChange={(e) => setReleaseFormat(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             >
+              <option value="">Pick release format</option>
               {releaseFormats.map(f => (
                 <option key={f} value={f}>{f}</option>
               ))}
             </select>
           </div>
 
+          {/* Audio File */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Audio File * (.wav, .mp3, .flac)
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Audio File <span className="text-red-400">*</span>
+              <span className="text-xs text-gray-500 ml-2">(.wav, .mp3, .flac)</span>
             </label>
             <input
               type="file"
               accept=".wav,.mp3,.flac,.aiff,.m4a,.ogg"
               onChange={(e) => setAudioFile(e.target.files[0])}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-600 file:text-white hover:file:bg-purple-500 file:cursor-pointer"
             />
             {audioFile && (
-              <p className="text-sm text-gray-500 mt-1">
-                Selected: {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)
+              <p className="text-sm text-gray-400 mt-2 bg-gray-900/50 p-2 rounded">
+                ✓ Selected: {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)
               </p>
             )}
           </div>
 
+          {/* Artwork */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Artwork * (.jpg, .png)
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Artwork <span className="text-red-400">*</span>
+              <span className="text-xs text-gray-500 ml-2">(.jpg, .png)</span>
             </label>
             <input
               type="file"
               accept=".jpg,.jpeg,.png,.webp"
               onChange={(e) => setArtworkFile(e.target.files[0])}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-600 file:text-white hover:file:bg-purple-500 file:cursor-pointer"
             />
             {artworkFile && (
-              <p className="text-sm text-gray-500 mt-1">
-                Selected: {artworkFile.name}
+              <p className="text-sm text-gray-400 mt-2 bg-gray-900/50 p-2 rounded">
+                ✓ Selected: {artworkFile.name}
               </p>
             )}
           </div>
 
+          {/* Video (Optional) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Video (Optional) (.mp4, .mov)
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Video <span className="text-gray-500">(Optional)</span>
+              <span className="text-xs text-gray-500 ml-2">(.mp4, .mov)</span>
             </label>
             <input
               type="file"
               accept=".mp4,.mov,.avi,.mkv,.webm"
               onChange={(e) => setVideoFile(e.target.files[0])}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+              className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-600 file:text-white hover:file:bg-purple-500 file:cursor-pointer"
             />
             {videoFile && (
-              <p className="text-sm text-gray-500 mt-1">
-                Selected: {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(2)} MB)
+              <p className="text-sm text-gray-400 mt-2 bg-gray-900/50 p-2 rounded">
+                ✓ Selected: {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(2)} MB)
               </p>
             )}
           </div>
 
+          {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
+            <div className="bg-red-500/10 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg">
+              ⚠️ {error}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
-          >
-            {isSubmitting ? 'Adding Track...' : 'Add Track to Catalogue'}
-          </button>
+          {/* Submit Button */}
+          <div className="flex gap-3 pt-4">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 bg-purple-600 hover:bg-purple-500 hover:shadow-lg hover:shadow-purple-500/50 text-white py-3 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed disabled:shadow-none transition-all font-medium"
+            >
+              {isSubmitting ? '⏳ Adding Track...' : '✓ Add Track to Catalogue'}
+            </button>
+            <Link
+              href="/"
+              className="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all font-medium text-center"
+            >
+              Cancel
+            </Link>
+          </div>
         </form>
       </div>
     </div>

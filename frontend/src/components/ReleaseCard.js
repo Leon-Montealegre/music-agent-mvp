@@ -41,29 +41,30 @@ export default function ReleaseCard({ release }) {
             {release.artist}
           </p>
 
-          {/* Tags Row */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Genre Tag */}
-            {release.genre && (
-              <span className="px-3 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/50 rounded-full text-xs font-medium ring-1 ring-purple-500/20">
-                {release.genre}
-              </span>
-            )}
-
-            {/* Signed/Submitted Badge */}
-            {showBadge && (
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ring-1 ${
+          {/* Badges Row - ABOVE genre */}
+          {showBadge && (
+            <div className="mb-2">
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ring-1 ${
                 isSigned 
                   ? 'bg-green-500/20 text-green-300 border border-green-500/50 ring-green-500/20' 
                   : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 ring-yellow-500/20'
               }`}>
                 {isSigned ? '✓ Signed' : '📤 Submitted'}
               </span>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Genre Tag Row */}
+          {release.genre && (
+            <div className="mb-3">
+              <span className="inline-block px-3 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/50 rounded-full text-xs font-medium ring-1 ring-purple-500/20">
+                {release.genre}
+              </span>
+            </div>
+          )}
 
           {/* Stats */}
-          <div className="mt-3 pt-3 border-t border-gray-700 flex items-center justify-between text-xs text-gray-400">
+          <div className="pt-3 border-t border-gray-700 flex items-center justify-between text-xs text-gray-400">
             <span>
               {release.distribution?.release?.length || 0} platforms
             </span>

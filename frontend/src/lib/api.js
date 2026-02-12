@@ -14,20 +14,17 @@ export async function fetchReleases() {
     }
     
     const data = await response.json();
-    console.log('Raw API Response:', data); // Debug
-    console.log('Type:', typeof data); // Debug
-    console.log('Is Array?', Array.isArray(data)); // Debug
+    console.log('Raw API Response:', data);
+    console.log('Type:', typeof data);
+    console.log('Is Array?', Array.isArray(data));
     
     // Handle different response formats
     if (Array.isArray(data)) {
-      // Direct array: [...]
       return data;
     } else if (data && Array.isArray(data.releases)) {
-      // Wrapped in object: { releases: [...] }
       console.log('Found releases array in object wrapper');
       return data.releases;
     } else if (data && typeof data === 'object') {
-      // Some other object format - try to find an array property
       const firstKey = Object.keys(data)[0];
       if (Array.isArray(data[firstKey])) {
         console.log(`Found array at key: ${firstKey}`);
@@ -35,7 +32,6 @@ export async function fetchReleases() {
       }
     }
     
-    // If we get here, we couldn't find an array
     console.error('Could not find array in response:', data);
     return [];
   } catch (error) {
@@ -72,12 +68,6 @@ export async function fetchRelease(releaseId) {
  */
 export async function updateDistribution(releaseId, path, entry) {
   try {
-    // Add the path to the entry object (Express expects it there)
-    const entryWithPath = {
-      ...entry,
-      path: path
-    };
-    
     const response = await fetch(
       `${API_BASE_URL}/releases/${releaseId}/distribution`,
       {
@@ -85,12 +75,11 @@ export async function updateDistribution(releaseId, path, entry) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(entryWithPath),  // Send just the entry with path inside
+        body: JSON.stringify({ path, entry }),
       }
     );
     
     if (!response.ok) {
-      // Get the error message from the response
       const errorData = await response.json().catch(() => ({}));
       console.error('API error response:', errorData);
       throw new Error(`API error: ${response.status} - ${errorData.error || 'Unknown error'}`);
@@ -100,6 +89,61 @@ export async function updateDistribution(releaseId, path, entry) {
     return data;
   } catch (error) {
     console.error(`Error updating distribution for ${releaseId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a distribution entry
+ * @param {string} releaseId - The release ID
+ * @param {string} pathType - Distribution path: "release", "submit", or "promote"
+ * @param {string} timestamp - The timestamp of the entry to delete
+ */
+export async function deleteDistributionEntry(releaseId, pathType, timestamp) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/releases/${releaseId}/distribution/${pathType}/${timestamp}`,
+      { method: 'DELETE' }
+    );
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete entry');
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error(`Error deleting distribution entry:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing distribution entry
+ * @param {string} releaseId - The release ID
+ * @param {string} pathType - Distribution path: "release", "submit", or "promote"
+ * @param {string} timestamp - The timestamp of the entry to update
+ * @param {object} updatedData - The updated data
+ */
+export async function updateDistributionEntry(releaseId, pathType, timestamp, updatedData) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/releases/${releaseId}/distribution/${pathType}/${timestamp}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      }
+    );
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update entry');
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error(`Error updating distribution entry:`, error);
     throw error;
   }
 }
@@ -115,5 +159,27 @@ export async function checkHealth() {
   } catch (error) {
     console.error('API health check failed:', error);
     return { status: 'error', message: 'Cannot connect to API' };
+  }
+}
+/**
+ * Delete an entire release
+ * @param {string} releaseId - The release ID to delete
+ */
+export async function deleteRelease(releaseId) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/releases/${releaseId}`,
+      { method: 'DELETE' }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to delete release')
+    }
+    
+    return response.json()
+  } catch (error) {
+    console.error(`Error deleting release:`, error)
+    throw error
   }
 }
