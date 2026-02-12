@@ -576,6 +576,91 @@ app.patch('/releases/:releaseId/distribution', async (req, res) => {
     });
   }
 });
+// Mark release as signed by label
+app.patch('/releases/:releaseId/sign', async (req, res) => {
+  try {
+    const { releaseId } = req.params
+    const { labelName } = req.body
+    
+    if (!labelName) {
+      return res.status(400).json({ success: false, error: 'Label name required' })
+    }
+    
+    // Build path to release folder
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    const metadataPath = path.join(releasePath, 'metadata.json')
+    
+    console.log('🔍 Looking for release at:', releasePath)
+    
+    // Check if metadata exists
+    try {
+      await fs.access(metadataPath)
+    } catch (err) {
+      console.log('❌ Release not found at:', metadataPath)
+      return res.status(404).json({ success: false, error: 'Release not found' })
+    }
+    
+    // Read metadata
+    const rawData = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(rawData)
+    
+    // Initialize nested structure if needed
+    if (!metadata.metadata) {
+      metadata.metadata = {}
+    }
+    if (!metadata.metadata.distribution) {
+      metadata.metadata.distribution = { release: [], submit: [], promote: [] }
+    }
+    if (!metadata.metadata.distribution.submit) {
+      metadata.metadata.distribution.submit = []
+    }
+    
+    // Find the submission for this label in metadata.distribution
+    console.log('🔍 Looking for label:', labelName)
+    console.log('🔍 Available submissions:', JSON.stringify(metadata.metadata.distribution.submit, null, 2))
+    
+    const submission = metadata.metadata.distribution.submit.find(s => s.label === labelName)
+    
+    if (!submission) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `No submission found for label: ${labelName}` 
+      })
+    }
+    
+    // Update the submission to "signed"
+    submission.status = 'signed'
+    submission.signedAt = new Date().toISOString()
+    
+    // Also update labelInfo
+    if (!metadata.metadata.labelInfo) {
+      metadata.metadata.labelInfo = {}
+    }
+    metadata.metadata.labelInfo.isSigned = true
+    metadata.metadata.labelInfo.label = labelName
+    metadata.metadata.labelInfo.signedDate = new Date().toISOString()
+    
+    // Mark metadata as updated
+    metadata.updatedAt = new Date().toISOString()
+    
+    // Write back to file
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
+    
+    console.log(`✅ Marked ${releaseId} as signed by ${labelName}`)
+    
+    res.json({ 
+      success: true, 
+      message: `Marked as signed by ${labelName}`,
+      submission 
+    })
+    
+  } catch (error) {
+    console.error('❌ Error signing release:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+
 
 // --- Add Audio Version ---
 app.post('/releases/:releaseId/versions', 
