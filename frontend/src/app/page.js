@@ -53,11 +53,8 @@ export default function HomePage() {
                 {releases.length} release{releases.length !== 1 ? 's' : ''} • {apiStatus}
               </p>
             </div>
-            <Link
-              href="/releases/new"
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-            >
-              + Create New Release
+            <Link href="/releases/new" className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-medium">
+              + Add New Track
             </Link>
           </div>
         </div>
