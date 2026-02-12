@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-export default function LogPlatformForm({ onSubmit, onCancel }) {
+export default function LogPlatformForm({ releaseId, onSuccess, onCancel }) {
   const [formData, setFormData] = useState({
     platform: '',
     status: '',
@@ -28,7 +28,7 @@ export default function LogPlatformForm({ onSubmit, onCancel }) {
     'Live'
   ]
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     
     // Validate required fields
@@ -37,7 +37,40 @@ export default function LogPlatformForm({ onSubmit, onCancel }) {
       return
     }
 
-    onSubmit(formData)
+    try {
+      const entry = {
+        platform: formData.platform,
+        status: formData.status,
+        url: formData.url,
+        notes: formData.notes,
+        timestamp: new Date().toISOString()
+      }
+
+      // Call API directly
+      const response = await fetch(`http://localhost:3001/releases/${releaseId}/distribution`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          path: 'release',
+          entry: entry
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update distribution')
+      }
+
+      // Success - call parent's success handler
+      if (onSuccess) {
+        onSuccess()
+      }
+      
+    } catch (error) {
+      console.error('Platform release error:', error)
+      alert('Failed to log platform release. Please try again.')
+    }
   }
 
   return (
@@ -123,7 +156,7 @@ export default function LogPlatformForm({ onSubmit, onCancel }) {
           type="submit"
           className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
         >
-          Log Upload
+          Log Platform Release
         </button>
       </div>
     </form>

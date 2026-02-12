@@ -9,9 +9,9 @@ export default function ReleaseCard({ release }) {
   // Build the artwork URL (with trailing slash!)
   const artworkUrl = `http://localhost:3001/releases/${release.releaseId}/artwork/`
   
-  // Calculate status counts
-  const platformCount = release.fileCounts?.audio > 0 ? 1 : 0 // Simplified for now
-  const submissionCount = release.hasDistribution ? '?' : 0 // We'll get real counts later
+  // Calculate actual counts from distribution data
+  const platformCount = release.distribution?.release?.length || 0
+  const submissionCount = release.distribution?.submit?.length || 0 
   
   return (
     <Link href={`/releases/${release.releaseId}`}>
@@ -60,14 +60,8 @@ export default function ReleaseCard({ release }) {
 
           {/* Status Indicators */}
           <div className="flex gap-4 text-xs text-gray-600">
-            <div className="flex items-center gap-1">
-              <span className="text-green-600">●</span>
-              <span>{platformCount} platform{platformCount !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-blue-600">●</span>
-              <span>{submissionCount} submission{submissionCount !== 1 ? 's' : ''}</span>
-            </div>
+            <span>{platformCount} platform{platformCount !== 1 ? 's' : ''}</span>
+            <span>{submissionCount} submission{submissionCount !== 1 ? 's' : ''}</span>
           </div>
 
           {/* Version Count */}

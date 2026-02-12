@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-export default function LogSubmissionForm({ onSubmit, onCancel }) {
+export default function LogSubmissionForm({ releaseId, onSuccess, onCancel }) {
   const [formData, setFormData] = useState({
     label: '',
     platform: '',
@@ -27,7 +27,7 @@ export default function LogSubmissionForm({ onSubmit, onCancel }) {
     'No Response'
   ]
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     
     // Validate required fields
@@ -36,7 +36,40 @@ export default function LogSubmissionForm({ onSubmit, onCancel }) {
       return
     }
 
-    onSubmit(formData)
+    try {
+      const entry = {
+        label: formData.label,
+        platform: formData.platform,
+        status: formData.status,
+        notes: formData.notes,
+        timestamp: new Date().toISOString()
+      }
+
+      // Call API directly
+      const response = await fetch(`http://localhost:3001/releases/${releaseId}/distribution`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          path: 'submit',
+          entry: entry
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update distribution')
+      }
+
+      // Success - call parent's success handler
+      if (onSuccess) {
+        onSuccess()
+      }
+      
+    } catch (error) {
+      console.error('Label submission error:', error)
+      alert('Failed to log submission. Please try again.')
+    }
   }
 
   return (

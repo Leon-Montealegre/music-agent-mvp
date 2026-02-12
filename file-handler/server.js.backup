@@ -49,6 +49,8 @@ app.use(express.json());   // Parse JSON request bodies (needed for POST /metada
 // Every release gets its own subfolder inside this directory.
 
 const RELEASES_BASE = '/Users/Mathias2/Documents/Music Agent/Releases';
+app.use('/releases', express.static(RELEASES_BASE));
+
 
 
 // =============================================================================
@@ -200,6 +202,54 @@ function getVersionInfo(req) {
   };
 }
 
+
+// --- 4f: generateSoundCloudTags ---
+// Smart tag generation for maximum SoundCloud discoverability.
+// Extracts keywords from genre, artist, and title.
+// Returns comma-separated string (SoundCloud format).
+//
+// Example input: artist="Sophie Joe", title="Tell Me", genre="Melodic House and Techno"
+// Example output: "melodic, house, techno, sophiejoe, tell, me, electronic music, new music, new release, melodic house and techno"
+//
+// Why this helps:
+// - Tags are crucial for SoundCloud's search algorithm
+// - Automatically generates relevant tags without manual work
+// - Removes duplicates and limits to 30 tags (SoundCloud's max)
+
+function generateSoundCloudTags(artist, title, genre) {
+  const tags = [];
+  
+  // Genre keywords (split multi-word genres like "Melodic House and Techno")
+  const genreWords = genre.toLowerCase()
+    .replace(/ and /g, ' ')  // "House and Techno" → "House Techno"
+    .split(' ')
+    .filter(word => word.length > 2);  // Skip short words like "of", "in"
+  
+  genreWords.forEach(word => tags.push(word));
+  
+  // Artist name (remove spaces, make it one tag)
+  const artistTag = artist.toLowerCase().replace(/\s+/g, '');
+  tags.push(artistTag);
+  
+  // Track title keywords (skip common filler words)
+  const skipWords = ['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'and'];
+  const titleWords = title.toLowerCase()
+    .replace(/[^\w\s]/g, '')  // Remove punctuation
+    .split(' ')
+    .filter(word => word.length > 2 && !skipWords.includes(word));
+  
+  titleWords.forEach(word => tags.push(word));
+  
+  // High-value generic tags (these help with discovery)
+  tags.push('electronic music', 'new music', 'new release', genre.toLowerCase());
+  
+  // Remove duplicates and limit to 30 tags (SoundCloud's max)
+  const uniqueTags = [...new Set(tags)].slice(0, 30);
+  
+  return uniqueTags.join(', ');
+}
+
+
 // =============================================================================
 // SECTION 5: MULTER CONFIGURATION (File Upload Settings)
 // =============================================================================
@@ -211,218 +261,270 @@ function getVersionInfo(req) {
 // 2. Multer calls destination() to decide the folder path
 // 3. Multer calls filename() to decide the file name
 // 4. Multer saves the file to disk
-// 5. THEN your route handler runs with req.files populated
+//
+// Key design decision: Audio files are version-specific, artwork/video are shared.
+// - Audio: saved to versions/<versionId>/audio/
+// - Artwork: saved to artwork/ (shared by all versions)
+// - Video: saved to video/ (shared by all versions)
 
 const storage = multer.diskStorage({
-  // WHERE to save each file
-  // NEW structure: Releases/<releaseId>/versions/<versionId>/audio/ (for audio files)
-  //                Releases/<releaseId>/artwork/ (for artwork - shared by all versions)
-  //                Releases/<releaseId>/video/ (for video - shared by all versions)
+  
+  // Where to save the file (destination folder)
   destination: function (req, file, cb) {
-    try {
-      const releaseId = requireReleaseId(req);
-      const subfolder = classify(file);  // "audio", "artwork", or "video"
-      
-      let fullPath;
-      
-      if (subfolder === 'audio') {
-        // Audio files go into version-specific folders
-        const versionInfo = getVersionInfo(req);
-        fullPath = path.join(RELEASES_BASE, releaseId, 'versions', versionInfo.versionId, 'audio');
-        console.log(`📁 Creating audio path for version "${versionInfo.versionName}": ${versionInfo.versionId}/audio/`);
-      } else {
-        // Artwork and video are shared by all versions (no version subfolder)
-        fullPath = path.join(RELEASES_BASE, releaseId, subfolder);
-        console.log(`📁 Creating shared asset path: ${subfolder}/`);
-      }
-      
-      fsSync.mkdirSync(fullPath, { recursive: true });  // Create folders if they don't exist
-      cb(null, fullPath);  // Tell Multer to save here
-    } catch (e) {
-      cb(e);  // Pass error to Multer
+    const releaseId = requireReleaseId(req);
+    const releasePath = path.join(RELEASES_BASE, releaseId);
+    
+    const fileType = classify(file);
+    
+    let targetFolder;
+    
+    if (fileType === 'audio') {
+      // Audio files are version-specific
+      const { versionId } = getVersionInfo(req);
+      targetFolder = path.join(releasePath, 'versions', versionId, 'audio');
+    } else if (fileType === 'artwork') {
+      // Artwork is shared across all versions
+      targetFolder = path.join(releasePath, 'artwork');
+    } else if (fileType === 'video') {
+      // Video is shared across all versions
+      targetFolder = path.join(releasePath, 'video');
+    } else {
+      // Unknown file type - save to root of release folder
+      targetFolder = releasePath;
     }
+    
+    // Create the folder if it doesn't exist
+    // recursive: true means it creates parent folders too (like mkdir -p)
+    fsSync.mkdirSync(targetFolder, { recursive: true });
+    
+    cb(null, targetFolder);
   },
-  // WHAT to name each file (keep original filename)
+  
+  // What to name the file
   filename: function (req, file, cb) {
+    // Keep the original filename as-is
+    // Example: "Tell Me (Extended Mix).wav" stays as "Tell Me (Extended Mix).wav"
     cb(null, file.originalname);
   }
 });
 
-// Create the upload middleware using our storage configuration
-// .any() means accept files from ANY form field name
-const upload = multer({ storage });
+// Create the Multer upload handler with our custom storage config
+// .any() means accept files from ANY form field name (flexible for different upload methods)
+const upload = multer({ storage: storage });
 
 
 // =============================================================================
-// SECTION 6: API ROUTES
+// SECTION 6: API ROUTES (The actual endpoints)
 // =============================================================================
-// These are the endpoints that handle incoming requests.
-// Each route has: HTTP method (GET/POST), URL path, and handler function.
-//
-// Current routes:
-//   GET  /health          → Server status check
-//   POST /upload          → Upload files for a release (with duplicate detection + audio validation)
-//   POST /metadata        → Save metadata.json for a release
-//   GET  /releases        → List all releases (sorted newest first)
-//   GET  /storage/status  → Check disk space
-//
-// Milestone 5 routes:
-//   GET  /releases/:releaseId              → Get one specific release
-//   POST /releases/:releaseId/versions     → Add version to existing release
-//   PATCH /releases/:releaseId/distribution → Update distribution tracking
-
+// Each route handles a specific action:
+// - GET routes: retrieve data (read-only)
+// - POST routes: create new data or trigger actions
+// - PATCH routes: update existing data
+// - DELETE routes: remove data
 
 // --- 6a: Health Check ---
 // Simple endpoint to verify the server is running.
-// Used by: startup verification, n8n connection tests
+// Example: curl http://localhost:3001/health
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'File handler is running' });
+  res.json({ 
+    status: 'ok', 
+    message: 'File handler is running' 
+  });
 });
 
 
 // --- 6b: File Upload ---
-// Receives files from n8n Form Trigger (or REST Client for testing).
-// This route has TWO middleware functions chained together:
-//   1. First function: checks for duplicates BEFORE uploading
-//   2. upload.any(): Multer saves the files to disk
-//   3. Second function (async): validates audio files AFTER saving
+// Accepts multipart/form-data uploads (audio, artwork, video).
+// Validates audio files to ensure they're not corrupt.
+// Detects duplicates and prevents re-uploading the same file.
 //
-// URL format: POST /upload?releaseId=...&artist=...&title=...&genre=...
-// The query parameters are passed through from n8n so metadata can reference them.
+// Query parameters:
+//   - releaseId (required): The release identifier (e.g., "2026-02-05_SophieJoe_TellMe")
+//   - artist (required): Artist name
+//   - title (required): Track title
+//   - genre (required): Genre
+//   - versionName (optional): Version name (defaults to "Primary Version")
 
-app.post('/upload', (req, res, next) => {
-  // --- STEP 1: Duplicate Detection (runs BEFORE file upload) ---
-  const releaseId = req.query.releaseId;
-  
-  if (!releaseId) {
-    return res.status(400).json({
-      success: false,
-      error: 'Missing releaseId parameter'
-    });
-  }
-  
-  const releasePath = path.join(RELEASES_BASE, releaseId);
-  
-  // Check if a folder with this releaseId already exists
-  if (fsSync.existsSync(releasePath)) {
-    console.log(`🚫 Duplicate upload attempt blocked: ${releaseId} already exists`);
-    return res.status(409).json({  // 409 = Conflict (resource already exists)
-      success: false,
-      error: 'Duplicate release detected',
-      message: `Release "${releaseId}" already exists. Use a different release name or delete the existing release first.`,
-      existingPath: releasePath
-    });
-  }
-  
-  next();  // No duplicate found → continue to Multer upload
-  
-}, upload.any(), async (req, res) => {
-  // --- STEP 2: Post-Upload Processing (runs AFTER files are saved) ---
-  const releaseId = req.query.releaseId;
-  const artist = req.query.artist;
-  const title = req.query.title;
-  const genre = req.query.genre;
-  
-  console.log(`📥 Upload received: ${req.files?.length || 0} files for ${releaseId}`);
-  
-  // --- STEP 3: Audio Validation ---
-  // Find all audio files that were uploaded and validate each one
-  const audioFiles = req.files?.filter(f => classify(f) === 'audio') || [];
-  const validationResults = [];
-  
-  for (const audioFile of audioFiles) {
-    console.log(`🎵 Validating audio: ${audioFile.originalname}...`);
-    const validation = await validateAudioFile(audioFile.path);
+app.post('/upload', upload.any(), async (req, res) => {
+  try {
+    const releaseId = requireReleaseId(req);
+    const { artist, title, genre } = req.query;
+    const { versionName, versionId } = getVersionInfo(req);
     
-    if (!validation.valid) {
-      console.error(`❌ Audio validation failed: ${audioFile.originalname}`);
-      console.error(`   Error: ${validation.error}`);
-      
-      // Delete the invalid file (it was already saved by Multer)
-      fsSync.unlinkSync(audioFile.path);
-      
-      return res.status(422).json({  // 422 = Unprocessable Entity (file is invalid)
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
         success: false,
-        error: 'Audio file validation failed',
-        file: audioFile.originalname,
-        reason: validation.error
+        error: 'No files uploaded'
       });
     }
     
-    console.log(`✅ Audio valid: ${audioFile.originalname} (${validation.metadata.duration}s, ${validation.metadata.codec})`);
-    validationResults.push({
-      file: audioFile.originalname,
-      ...validation.metadata
+    const releasePath = path.join(RELEASES_BASE, releaseId);
+    const metadataPath = path.join(releasePath, 'metadata.json');
+    
+    // Load existing metadata if it exists
+    let metadata = {};
+    try {
+      const metadataContent = await fs.readFile(metadataPath, 'utf8');
+      metadata = JSON.parse(metadataContent);
+    } catch (error) {
+      // Metadata file doesn't exist yet, that's okay
+    }
+    
+    // Initialize versions object if it doesn't exist
+    if (!metadata.versions) {
+      metadata.versions = {};
+    }
+    
+    // Check if this version already has audio (duplicate detection)
+    if (metadata.versions[versionId]) {
+      const versionAudioPath = path.join(releasePath, 'versions', versionId, 'audio');
+      let existingAudioFiles = [];
+      
+      try {
+        existingAudioFiles = await fs.readdir(versionAudioPath);
+      } catch (error) {
+        // Folder doesn't exist, that's fine
+      }
+      
+      if (existingAudioFiles.length > 0) {
+        console.log(`🚫 Duplicate upload detected: ${versionId} already exists for ${releaseId}`);
+        return res.status(409).json({
+          success: false,
+          error: `Version "${versionName}" already exists for this release`,
+          existingVersion: metadata.versions[versionId]
+        });
+      }
+    }
+    
+    const savedFiles = {
+      audio: [],
+      artwork: [],
+      video: []
+    };
+    
+    // Process each uploaded file
+    for (const file of req.files) {
+      const fileType = classify(file);
+      
+      if (fileType === 'audio') {
+        // Validate audio file
+        console.log(`🎵 Validating audio: ${file.originalname}`);
+        
+        const validation = await validateAudioFile(file.path);
+        
+        if (!validation.valid) {
+          // Audio is invalid - delete it and return error
+          await fs.unlink(file.path);
+          return res.status(400).json({
+            success: false,
+            error: validation.error,
+            file: file.originalname
+          });
+        }
+        
+        console.log(`✅ Audio valid: ${validation.metadata.duration}s, ${validation.metadata.codec}`);
+        
+        savedFiles.audio.push({
+          filename: file.originalname,
+          size: file.size,
+          mimetype: file.mimetype,
+          duration: validation.metadata.duration,
+          bitrate: validation.metadata.bitrate,
+          sampleRate: validation.metadata.sampleRate,
+          channels: validation.metadata.channels,
+          codec: validation.metadata.codec
+        });
+      } else {
+        savedFiles[fileType].push({
+          filename: file.originalname,
+          size: file.size,
+          mimetype: file.mimetype
+        });
+      }
+    }
+    
+    // Store version info in metadata
+    metadata.versions[versionId] = {
+      versionName: versionName,
+      versionId: versionId,
+      createdAt: new Date().toISOString(),
+      files: savedFiles
+    };
+    
+    // Save updated metadata
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+    
+    res.json({
+      success: true,
+      message: `Files uploaded successfully for ${versionName}`,
+      releaseId: releaseId,
+      versionId: versionId,
+      versionName: versionName,
+      files: savedFiles,
+      artist: artist,
+      title: title,
+      genre: genre
+    });
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
     });
   }
-  
-  // Log where each file was saved
-  req.files?.forEach(f => {
-    console.log(`   → ${f.originalname} saved to ${path.basename(path.dirname(f.path))}/ folder`);
-  });
-
-  // --- STEP 4: Send Success Response ---
-  // Returns all file info + query params + version info so n8n can generate proper metadata
-  const versionInfo = getVersionInfo(req);
-  
-  res.json({
-    success: true,
-    releaseId,
-    artist,
-    title,
-    genre,
-    versionInfo: {
-      versionName: versionInfo.versionName,
-      versionId: versionInfo.versionId,
-      isPrimary: versionInfo.isPrimary
-    },
-    filesUploaded: (req.files || []).map(f => ({
-      originalName: f.originalname,
-      savedTo: f.path,
-      size: f.size,
-      mimetype: f.mimetype,
-      category: classify(f)  // Added: tells n8n if this is audio/artwork/video
-    })),
-    audioValidation: validationResults
-  });
 });
 
 
 // --- 6c: Save Metadata ---
-// Receives a JSON body with releaseId + metadata object, saves as metadata.json.
-// Called by: n8n "Save Metadata" HTTP Request node after upload.
-//
-// Expected body: { "releaseId": "2026-02-05_...", "metadata": { artist, title, genre, ... } }
+// Saves or updates the metadata.json file for a release.
+// This is called by n8n after the Create Metadata node.
 
-app.post('/metadata', (req, res) => {
-  const { releaseId, metadata } = req.body;
-  
-  if (!releaseId || !metadata) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Missing releaseId or metadata' 
-    });
-  }
-  
-  const releasePath = path.join(RELEASES_BASE, releaseId);
-  const metadataPath = path.join(releasePath, 'metadata.json');
-  
+app.post('/metadata', async (req, res) => {
   try {
-    // Create the release folder if it doesn't exist yet
-    if (!fsSync.existsSync(releasePath)) {
-      fsSync.mkdirSync(releasePath, { recursive: true });
+    const { releaseId, ...metadata } = req.body;
+    
+    if (!releaseId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing releaseId' 
+      });
     }
     
-    // Write metadata as formatted JSON (null, 2 = pretty-print with 2-space indent)
-    fsSync.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    const releasePath = path.join(RELEASES_BASE, releaseId);
+    const metadataPath = path.join(releasePath, 'metadata.json');
+    
+    // Ensure the release folder exists
+    await fs.mkdir(releasePath, { recursive: true });
+    
+    // Read existing metadata if it exists
+    let existingMetadata = {};
+    try {
+      const existingContent = await fs.readFile(metadataPath, 'utf8');
+      existingMetadata = JSON.parse(existingContent);
+    } catch (error) {
+      // File doesn't exist yet, that's fine
+    }
+    
+    // Merge new metadata with existing (preserves versions, files, distribution)
+    const mergedMetadata = {
+      ...existingMetadata,
+      ...metadata,
+      releaseId: releaseId,
+      updatedAt: new Date().toISOString()
+    };
+    
+    await fs.writeFile(metadataPath, JSON.stringify(mergedMetadata, null, 2));
     
     res.json({ 
       success: true, 
-      message: 'Metadata saved successfully',
-      path: metadataPath 
+      message: 'Metadata saved',
+      releaseId: releaseId 
     });
+    
   } catch (error) {
+    console.error('Metadata save error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -431,466 +533,519 @@ app.post('/metadata', (req, res) => {
 });
 
 
-// --- 6d: List All Releases ---
-// Scans the Releases folder, reads each release's metadata.json,
-// and returns them all sorted by creation date (newest first).
-// Called by: Future dashboard UI, testing via REST Client
+// --- 6d: List Releases ---
+// Returns all releases sorted by date (newest first).
+// Each release includes its metadata and file counts.
 
 app.get('/releases', async (req, res) => {
   try {
-    // Read all items in the Releases folder
-    const releasesFolders = await fs.readdir(RELEASES_BASE, { withFileTypes: true });
-    // Filter to only directories (ignore stray files)
-    const releaseDirs = releasesFolders.filter(item => item.isDirectory());
+    console.log('📂 Listing releases...');
+    
+    const folders = await fs.readdir(RELEASES_BASE);
     const releases = [];
     
-    // Read metadata.json from each release folder
-    for (const dir of releaseDirs) {
-      const releaseId = dir.name;
-      const metadataPath = path.join(RELEASES_BASE, releaseId, 'metadata.json');
+    for (const folder of folders) {
+      // Skip hidden files and non-directories
+      if (folder.startsWith('.')) continue;
+      
+      const folderPath = path.join(RELEASES_BASE, folder);
+      const stats = await fs.stat(folderPath);
+      
+      if (!stats.isDirectory()) continue;
+      
+      // Try to read metadata.json
+      const metadataPath = path.join(folderPath, 'metadata.json');
       
       try {
         const metadataContent = await fs.readFile(metadataPath, 'utf8');
         const metadata = JSON.parse(metadataContent);
-        releases.push(metadata);
+        
+        // Count files by type
+        const fileCounts = {
+          audio: 0,
+          artwork: 0,
+          video: 0
+        };
+        
+        // Count files from all versions
+        if (metadata.versions) {
+          for (const versionId in metadata.versions) {
+            const version = metadata.versions[versionId];
+            if (version.files) {
+              fileCounts.audio += version.files.audio?.length || 0;
+              fileCounts.artwork += version.files.artwork?.length || 0;
+              fileCounts.video += version.files.video?.length || 0;
+            }
+          }
+        }
+        
+        releases.push({
+          releaseId: metadata.releaseId || folder,
+          artist: metadata.artist,
+          title: metadata.title,
+          genre: metadata.genre,
+          releaseDate: metadata.releaseDate,
+          createdAt: metadata.createdAt,
+          versionCount: Object.keys(metadata.versions || {}).length,
+          fileCounts: fileCounts,
+          hasDistribution: !!metadata.distribution
+        });
+        
       } catch (error) {
-        // If a folder has no metadata.json, warn but don't crash
-        console.warn(`⚠️  Warning: Could not read metadata for ${releaseId}:`, error.message);
+        // Metadata file doesn't exist or is invalid
+        releases.push({
+          releaseId: folder,
+          error: 'No metadata.json found',
+          createdAt: stats.birthtime
+        });
       }
     }
     
-    // Sort: newest releases first (by createdAt timestamp)
-    releases.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    // Sort by releaseDate (newest first)
+    releases.sort((a, b) => {
+      const dateA = new Date(a.releaseDate || a.createdAt);
+      const dateB = new Date(b.releaseDate || b.createdAt);
+      return dateB - dateA;
+    });
     
-    console.log(`📂 Listed ${releases.length} release(s)`);
+    console.log(`✅ Found ${releases.length} releases`);
     
     res.json({
+      success: true,
       count: releases.length,
       releases: releases
     });
     
   } catch (error) {
     console.error('❌ Error listing releases:', error);
-    res.status(500).json({ error: 'Failed to list releases' });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 });
 
 
-// =============================================================================
-// MILESTONE 5 ROUTES
-// =============================================================================
-
 // --- 6e: Get Single Release ---
-// Returns the full metadata for one specific release.
-// Uses a URL parameter (:releaseId) instead of a query string (?releaseId=...).
-// Example: GET /releases/2026-02-05_SophieJoe_TellMe
+// Returns complete details for one specific release.
+// Includes metadata, all versions, files, and distribution tracking.
+// 6j. Serve artwork images
+app.get('/releases/:releaseId/artwork/', (req, res) => {
+  const { releaseId } = req.params;
+  const releasePath = path.join(RELEASES_BASE, releaseId);
+  const artworkPath = path.join(releasePath, 'artwork');
+
+  console.log('Looking for artwork at:', artworkPath);
+
+  // Check if artwork directory exists - use fsSync
+  if (!fsSync.existsSync(artworkPath)) {
+    console.log('Artwork directory not found');
+    return res.status(404).json({ success: false, error: 'No artwork directory found' });
+  }
+
+  // Find the first artwork file - use fsSync
+  const artworkFiles = fsSync.readdirSync(artworkPath);
+  console.log('Found artwork files:', artworkFiles);
+  
+  if (artworkFiles.length === 0) {
+    return res.status(404).json({ success: false, error: 'No artwork files found' });
+  }
+
+  // Serve the first artwork file
+  const firstArtwork = artworkFiles[0];
+  const filePath = path.join(artworkPath, firstArtwork);
+  console.log('Serving artwork:', filePath);
+  res.sendFile(filePath);
+});
 
 app.get('/releases/:releaseId', async (req, res) => {
   try {
-    const releaseId = req.params.releaseId;
+    const releaseId = requireReleaseId(req);
     const releasePath = path.join(RELEASES_BASE, releaseId);
     const metadataPath = path.join(releasePath, 'metadata.json');
-
-    // Check if the release folder exists
+    
+    // Check if release exists
     try {
       await fs.access(releasePath);
-    } catch {
-      console.log(`🔍 Release not found: ${releaseId}`);
+    } catch (error) {
       return res.status(404).json({
         success: false,
-        error: 'Release not found',
-        message: `No release found with ID "${releaseId}"`
+        error: `Release not found: ${releaseId}`
       });
     }
-
-    // Read and return the metadata
+    
+    // Read metadata
     const metadataContent = await fs.readFile(metadataPath, 'utf8');
     const metadata = JSON.parse(metadataContent);
-
-    console.log(`🔍 Found release: ${releaseId}`);
-
+    
     res.json({
       success: true,
       release: metadata
     });
-
+    
   } catch (error) {
-    console.error(`❌ Error fetching release ${req.params.releaseId}:`, error.message);
+    console.error('Error getting release:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch release details'
+      error: error.message
     });
   }
 });
 
 
 // --- 6f: Update Distribution Tracking ---
-// Adds or updates a distribution entry in a release's metadata.json.
-// This is how the system tracks "where has this track been sent?"
+// Updates the distribution status for a release.
+// Handles all 3 paths: release, submit, promote.
 //
-// Uses PATCH because we're updating PART of an existing resource (not creating new).
-// URL format: PATCH /releases/:releaseId/distribution
+// Body format:
+// {
+//   "path": "release",           // or "submit" or "promote"
+//   "platform": "SoundCloud",
+//   "status": "package_generated",
+//   "versionId": "primary",      // required for release path
+//   "label": "Anjunadeep",       // required for submit path
+//   ... (any other fields)
+// }
 
 app.patch('/releases/:releaseId/distribution', async (req, res) => {
   try {
-    const releaseId = req.params.releaseId;
-    const { path: distPath, entry } = req.body;
-
-    // --- Validation ---
-
-    if (!distPath || !entry) {
+    const releaseId = requireReleaseId(req);
+    const { path: distPath, platform, versionId, label, ...updateData } = req.body;
+    
+    if (!distPath || !platform) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields',
-        message: 'Request body must include "path" (publish/labels/streaming/marketing) and "entry" (object with platform details)'
+        error: 'Missing required fields: path and platform'
       });
     }
-
-    const validPaths = ['publish', 'labels', 'streaming', 'marketing'];
-    if (!validPaths.includes(distPath)) {
+    
+    if (!['release', 'submit', 'promote'].includes(distPath)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid distribution path',
-        message: `"${distPath}" is not valid. Use one of: ${validPaths.join(', ')}`
+        error: 'path must be one of: release, submit, promote'
       });
     }
-
-    if (!entry.platform) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing platform',
-        message: 'The entry object must include a "platform" field (e.g., "YouTube", "SoundCloud", "DistroKid")'
-      });
-    }
-
-    // --- Read existing metadata ---
+    
     const releasePath = path.join(RELEASES_BASE, releaseId);
     const metadataPath = path.join(releasePath, 'metadata.json');
-
-    try {
-      await fs.access(releasePath);
-    } catch {
-      return res.status(404).json({
-        success: false,
-        error: 'Release not found',
-        message: `No release found with ID "${releaseId}"`
-      });
-    }
-
+    
+    // Read existing metadata
     const metadataContent = await fs.readFile(metadataPath, 'utf8');
     const metadata = JSON.parse(metadataContent);
-
-    // --- Update the distribution section ---
-
+    
+    // Initialize distribution structure if it doesn't exist
     if (!metadata.distribution) {
       metadata.distribution = {};
     }
-
+    
     if (!metadata.distribution[distPath]) {
       metadata.distribution[distPath] = [];
     }
-
-    entry.updatedAt = new Date().toISOString();
-
-    const existingIndex = metadata.distribution[distPath].findIndex(
-      e => e.platform === entry.platform
-    );
-
+    
+    // Create the distribution entry
+    const entry = {
+      platform: platform,
+      ...updateData,
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Add path-specific required fields
+    if (distPath === 'release' && versionId) {
+      entry.versionId = versionId;
+    }
+    
+    if (distPath === 'submit' && label) {
+      entry.label = label;
+    }
+    
+    // Find existing entry to update
+    let existingIndex = -1;
+    
+    if (distPath === 'release') {
+      // For release path: match by platform + versionId
+      existingIndex = metadata.distribution[distPath].findIndex(
+        e => e.platform === platform && e.versionId === versionId
+      );
+    } else if (distPath === 'submit') {
+      // For submit path: match by platform + label (can have multiple submissions per platform)
+      existingIndex = metadata.distribution[distPath].findIndex(
+        e => e.platform === platform && e.label === label
+      );
+    } else {
+      // For promote path: match by platform only
+      existingIndex = metadata.distribution[distPath].findIndex(
+        e => e.platform === platform
+      );
+    }
+    
     if (existingIndex >= 0) {
+      // Update existing entry
       metadata.distribution[distPath][existingIndex] = {
         ...metadata.distribution[distPath][existingIndex],
         ...entry
       };
-      console.log(`📦 Updated ${entry.platform} in ${distPath} for ${releaseId}`);
     } else {
+      // Add new entry
       metadata.distribution[distPath].push(entry);
-      console.log(`📦 Added ${entry.platform} to ${distPath} for ${releaseId}`);
     }
-
-    // --- Save the updated metadata ---
+    
+    // Save updated metadata
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
-
+    
     res.json({
       success: true,
-      message: existingIndex >= 0
-        ? `Updated ${entry.platform} in ${distPath}`
-        : `Added ${entry.platform} to ${distPath}`,
-      distribution: metadata.distribution
+      message: `Distribution tracking updated for ${platform} on ${distPath} path`,
+      entry: entry
     });
-
+    
   } catch (error) {
-    console.error(`❌ Error updating distribution for ${req.params.releaseId}:`, error.message);
+    console.error('Error updating distribution:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to update distribution tracking'
+      error: error.message
     });
   }
 });
 
 
-// --- 6g: Add Version to Existing Release ---
-// Adds a new audio version to an existing release.
-// The release must already exist (created via POST /upload).
-// This allows adding "Radio Edit", "Instrumental", etc. to releases over time.
+// --- 6g: Add Audio Version to Existing Release ---
+// Allows adding additional audio versions (Extended Mix, Radio Edit, etc.)
+// to an existing release without re-uploading artwork/video.
 //
-// URL format: POST /releases/:releaseId/versions?versionName=Extended%20Mix
-// Body: multipart/form-data with audioFile
-//
-// How the 3 middleware functions work together:
-//   1. First function: checks if release exists BEFORE uploading
-//   2. upload.any(): Multer saves the uploaded file(s) to disk
-//   3. Third function (async): validates audio, moves file, sends response
+// Query parameters:
+//   - releaseId (required): The release identifier
+//   - versionName (required): Name of the new version (e.g., "Extended Mix")
 
-app.post('/releases/:releaseId/versions',
-
-  // --- Middleware 1: Check if release exists BEFORE Multer runs ---
+app.post('/releases/:releaseId/versions', 
+  // Middleware chain: check releaseId → upload files → process
   (req, res, next) => {
-    const releaseId = req.params.releaseId;
-    const releasePath = path.join(RELEASES_BASE, releaseId);
-
-    if (!fsSync.existsSync(releasePath)) {
-      console.log(`🔍 Release not found: ${releaseId}`);
-      return res.status(404).json({
+    try {
+      requireReleaseId(req);
+      next();
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({
         success: false,
-        error: 'Release not found',
-        message: `No release found with ID "${releaseId}". Create the release first with POST /upload`
+        error: error.message
       });
     }
-
-    // Check if versionName was provided
-    const versionName = (req.query.versionName || '').trim();
-    if (!versionName) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing versionName',
-        message: 'Add ?versionName=YourVersionName to the URL (e.g., ?versionName=Extended%20Mix)'
-      });
-    }
-
-    // Check if this version already exists
-    const versionId = generateVersionId(versionName);
-    const versionPath = path.join(releasePath, 'versions', versionId);
-
-    if (fsSync.existsSync(versionPath)) {
-      console.log(`🚫 Version already exists: ${versionId} in ${releaseId}`);
-      return res.status(409).json({
-        success: false,
-        error: 'Version already exists',
-        message: `Version "${versionName}" (${versionId}) already exists for release "${releaseId}"`
-      });
-    }
-
-    next();  // Release exists, version is new → continue to Multer upload
   },
-
-  // --- Middleware 2: Multer saves the uploaded file to disk ---
   upload.any(),
-
-  // --- Middleware 3: Validate audio and send response ---
   async (req, res) => {
     try {
-      const releaseId = req.params.releaseId;
-      const releasePath = path.join(RELEASES_BASE, releaseId);
-      const versionInfo = getVersionInfo(req);
-      const versionName = versionInfo.versionName;
-      const versionId = versionInfo.versionId;
-      const versionPath = path.join(releasePath, 'versions', versionId);
-
-      // --- STEP 1: Check that audio files were uploaded ---
-      const audioFiles = (req.files || []).filter(f => classify(f) === 'audio');
-
-      if (audioFiles.length === 0) {
+      const releaseId = requireReleaseId(req);
+      const { versionName, versionId } = getVersionInfo(req);
+      
+      if (!req.files || req.files.length === 0) {
         return res.status(400).json({
           success: false,
-          error: 'No audio file uploaded',
-          message: 'You must upload at least one audio file for the new version'
+          error: 'No audio files uploaded'
         });
       }
-
-      // --- STEP 2: Audio validation ---
-      const audioFile = audioFiles[0];
-
-      console.log(`🎵 Validating audio for new version "${versionName}": ${audioFile.originalname}...`);
-
-      const validation = await validateAudioFile(audioFile.path);
-
-      if (!validation.valid) {
-        console.error(`❌ Audio validation failed: ${audioFile.originalname}`);
-        console.error(`   Error: ${validation.error}`);
-
-        // Delete the invalid file (Multer already saved it)
-        try {
-          fsSync.unlinkSync(audioFile.path);
-          // Try to clean up empty directories
-          const audioDir = path.dirname(audioFile.path);
-          fsSync.rmdirSync(audioDir);
-          fsSync.rmdirSync(versionPath);
-        } catch (cleanupErr) {
-          // Cleanup is best-effort, don't crash if folders aren't empty
-          console.warn(`⚠️  Cleanup note: ${cleanupErr.message}`);
-        }
-
-        return res.status(422).json({
+      
+      const releasePath = path.join(RELEASES_BASE, releaseId);
+      const metadataPath = path.join(releasePath, 'metadata.json');
+      
+      // Load existing metadata
+      const metadataContent = await fs.readFile(metadataPath, 'utf8');
+      const metadata = JSON.parse(metadataContent);
+      
+      // Check if this version already exists
+      if (metadata.versions && metadata.versions[versionId]) {
+        return res.status(409).json({
           success: false,
-          error: 'Audio file validation failed',
-          file: audioFile.originalname,
-          reason: validation.error
+          error: `Version "${versionName}" already exists for this release`,
+          existingVersion: metadata.versions[versionId]
         });
       }
-
-      console.log(`✅ Audio valid: ${audioFile.originalname} (${validation.metadata.duration}s, ${validation.metadata.codec})`);
-      console.log(`📦 Added version "${versionName}" (${versionId}) to ${releaseId}`);
-
-      // --- STEP 3: Success response ---
+      
+      const savedFiles = {
+        audio: [],
+        artwork: [],
+        video: []
+      };
+      
+      // Process uploaded files (should only be audio for this endpoint)
+      for (const file of req.files) {
+        const fileType = classify(file);
+        
+        if (fileType === 'audio') {
+          console.log(`🎵 Validating audio: ${file.originalname}`);
+          
+          const validation = await validateAudioFile(file.path);
+          
+          if (!validation.valid) {
+            await fs.unlink(file.path);
+            return res.status(400).json({
+              success: false,
+              error: validation.error,
+              file: file.originalname
+            });
+          }
+          
+          console.log(`✅ Audio valid: ${validation.metadata.duration}s`);
+          
+          savedFiles.audio.push({
+            filename: file.originalname,
+            size: file.size,
+            mimetype: file.mimetype,
+            duration: validation.metadata.duration,
+            bitrate: validation.metadata.bitrate,
+            sampleRate: validation.metadata.sampleRate,
+            channels: validation.metadata.channels,
+            codec: validation.metadata.codec
+          });
+        } else {
+          // Unexpected file type
+          await fs.unlink(file.path);
+          return res.status(400).json({
+            success: false,
+            error: `Only audio files are allowed for adding versions. Received: ${fileType}`,
+            file: file.originalname
+          });
+        }
+      }
+      
+      // Add new version to metadata
+      if (!metadata.versions) {
+        metadata.versions = {};
+      }
+      
+      metadata.versions[versionId] = {
+        versionName: versionName,
+        versionId: versionId,
+        createdAt: new Date().toISOString(),
+        files: savedFiles
+      };
+      
+      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+      
+      console.log(`✅ Added version: ${versionName} (${versionId})`);
+      
       res.json({
         success: true,
         message: `Version "${versionName}" added successfully`,
-        releaseId,
-        versionInfo: {
-          versionName,
-          versionId,
-          isPrimary: versionId === 'primary'
-        },
-        audioFile: {
-          originalName: audioFile.originalname,
-          savedTo: audioFile.path,
-          size: audioFile.size,
-          mimetype: audioFile.mimetype
-        },
-        audioValidation: {
-          file: audioFile.originalname,
-          ...validation.metadata
-        }
+        releaseId: releaseId,
+        versionId: versionId,
+        versionName: versionName,
+        files: savedFiles
       });
-
+      
     } catch (error) {
-      console.error(`❌ Error adding version to ${req.params.releaseId}:`, error.message);
+      console.error('Error adding version:', error);
       res.status(500).json({
         success: false,
-        error: 'Failed to add version',
-        details: error.message
+        error: error.message
       });
     }
   }
 );
+
+
 // --- 6i: Generate SoundCloud Package ---
-// Creates a distribution-ready ZIP package for manual SoundCloud upload.
-// The ZIP contains: audio file, artwork, and formatted metadata text file.
+// Creates a ZIP file containing audio, artwork, and metadata.txt for SoundCloud upload.
+// This is the first step of Mini-MVP 1 (SoundCloud automation).
 //
-// URL format: POST /distribute/soundcloud/package
-// Body (JSON): { "releaseId": "...", "versionId": "...", "privacy": "public|private" }
+// Query parameters:
+//   - releaseId (required): The release identifier
+//   - versionId (optional): Which version to package (defaults to "primary")
+//   - privacy (optional): "public" or "private" (defaults to "public")
 
 app.post('/distribute/soundcloud/package', async (req, res) => {
   try {
-    const { releaseId, versionId, privacy } = req.body;
-
-    // --- STEP 1: Validate inputs ---
+    const releaseId = requireReleaseId(req);
+    const versionId = req.query.versionId || 'primary';
+    const privacy = req.query.privacy || 'public';
     
-    if (!releaseId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing releaseId',
-        message: 'Request body must include "releaseId"'
-      });
-    }
-
-    if (!versionId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing versionId',
-        message: 'Request body must include "versionId" (e.g., "primary", "extended-mix")'
-      });
-    }
-
-    if (!privacy || !['public', 'private'].includes(privacy)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid privacy setting',
-        message: 'Privacy must be either "public" or "private"'
-      });
-    }
-
-    console.log(`📦 Generating SoundCloud package for ${releaseId} (${versionId})`);
-
-    // --- STEP 2: Check if release exists and read metadata ---
+    console.log(`\n🎵 Generating SoundCloud package for ${releaseId} (${versionId})`);
+    
+    // --- STEP 1: Validate release exists ---
     
     const releasePath = path.join(RELEASES_BASE, releaseId);
     const metadataPath = path.join(releasePath, 'metadata.json');
-
+    
     try {
       await fs.access(releasePath);
-    } catch {
+    } catch (error) {
       return res.status(404).json({
         success: false,
-        error: 'Release not found',
-        message: `No release found with ID "${releaseId}"`
+        error: `Release not found: ${releaseId}`
       });
     }
-
+    
+    // --- STEP 2: Load metadata ---
+    
     const metadataContent = await fs.readFile(metadataPath, 'utf8');
     const metadata = JSON.parse(metadataContent);
-
-    // --- STEP 3: Check if version exists ---
     
-    const versionPath = path.join(releasePath, 'versions', versionId);
+    // --- STEP 3: Validate version exists ---
+    
+    if (!metadata.versions || !metadata.versions[versionId]) {
+      return res.status(404).json({
+        success: false,
+        error: `Version "${versionId}" not found for this release`,
+        availableVersions: Object.keys(metadata.versions || {})
+      });
+    }
+    
+    const version = metadata.versions[versionId];
+    
+    // --- STEP 4: Find audio file ---
+    
+    if (!version.files || !version.files.audio || version.files.audio.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No audio file found for this version'
+      });
+    }
+    
+    const audioFile = version.files.audio[0].filename;
+    const audioPath = path.join(releasePath, 'versions', versionId, 'audio', audioFile);
     
     try {
-      await fs.access(versionPath);
-    } catch {
+      await fs.access(audioPath);
+    } catch (error) {
       return res.status(404).json({
         success: false,
-        error: 'Version not found',
-        message: `Version "${versionId}" not found for release "${releaseId}"`
+        error: `Audio file not found: ${audioFile}`
       });
     }
-
-    // --- STEP 4: Find the audio file ---
     
-    const audioDir = path.join(versionPath, 'audio');
-    const audioFiles = await fs.readdir(audioDir);
+    // --- STEP 5: Find artwork file ---
     
-    if (audioFiles.length === 0) {
-      return res.status(404).json({
+    // Artwork is shared across all versions, so check any version for it
+    let artworkFile = null;
+    let artworkPath = null;
+    
+    for (const vid in metadata.versions) {
+      const v = metadata.versions[vid];
+      if (v.files && v.files.artwork && v.files.artwork.length > 0) {
+        artworkFile = v.files.artwork[0].filename;
+        artworkPath = path.join(releasePath, 'artwork', artworkFile);
+        break;
+      }
+    }
+    
+    if (!artworkFile) {
+      return res.status(400).json({
         success: false,
-        error: 'Audio file missing',
-        message: `No audio file found in ${versionId}/audio/`
+        error: 'No artwork file found for this release'
       });
     }
-
-    const audioFile = audioFiles[0];
-    const audioPath = path.join(audioDir, audioFile);
-
-    // --- STEP 5: Find the artwork file ---
-    
-    const artworkDir = path.join(releasePath, 'artwork');
     
     try {
-      await fs.access(artworkDir);
-    } catch {
+      await fs.access(artworkPath);
+    } catch (error) {
       return res.status(404).json({
         success: false,
-        error: 'Artwork missing',
-        message: 'No artwork folder found. Upload artwork first.'
+        error: `Artwork file not found: ${artworkFile}`
       });
     }
-
-    const artworkFiles = await fs.readdir(artworkDir);
     
-    if (artworkFiles.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Artwork file missing',
-        message: 'No artwork file found in artwork/ folder'
-      });
-    }
-
-    const artworkFile = artworkFiles[0];
-    const artworkPath = path.join(artworkDir, artworkFile);
-
-    // --- STEP 6: Generate SoundCloud metadata text ---
+    // --- STEP 6: Generate metadata.txt content ---
     
-    const versionName = metadata.versions?.[versionId]?.versionName || 
-                       versionId.split('-').map(word => 
+    const versionName = version.versionName
+                       .split('-')
+                       .map(word => 
                          word.charAt(0).toUpperCase() + word.slice(1)
                        ).join(' ');
     
@@ -904,25 +1059,149 @@ app.post('/distribute/soundcloud/package', async (req, res) => {
       year: 'numeric' 
     });
     
+    // Format release date for SoundCloud (MM/DD/YYYY format required)
+    const soundcloudDate = releaseDate.toLocaleDateString('en-US', { 
+      month: '2-digit', 
+      day: '2-digit', 
+      year: 'numeric' 
+    });
+    
+    // Generate smart tags using our helper function
+    const autoTags = generateSoundCloudTags(metadata.artist, metadata.title, metadata.genre);
+    
     const artistTag = metadata.artist.toLowerCase().replace(/\s+/g, '');
     const titleTag = metadata.title.toLowerCase().replace(/\s+/g, '');
     const genreTag = metadata.genre.toLowerCase().replace(/\s+/g, '').replace(/&/g, 'and');
     
-    const metadataText = `Title: ${displayTitle}
-Artist: ${metadata.artist}
-Genre: ${metadata.genre}
-Privacy: ${privacy.charAt(0).toUpperCase() + privacy.slice(1)}
-Release Date: ${metadata.releaseDate}
+    const metadataText = `╔════════════════════════════════════════════════════════════════════╗
+║           SOUNDCLOUD UPLOAD METADATA                                ║
+║           Generated: ${new Date().toLocaleDateString('en-US')}                               ║
+╚════════════════════════════════════════════════════════════════════╝
 
-Description:
+═══════════════════════════════════════════════════════════════════════
+  SECTION 1: BASIC INFO (Playwright will auto-fill these fields)
+═══════════════════════════════════════════════════════════════════════
+
+TRACK_TITLE: ${displayTitle}
+└─ Character limit: 100 chars
+
+MAIN_ARTIST: ${metadata.artist}
+└─ Note: For multiple artists, separate with commas
+
+GENRE: ${metadata.genre}
+└─ SoundCloud uses searchable dropdown - Playwright will search and select
+
+TAGS: ${autoTags}
+└─ Limit: 30 tags max (comma-separated)
+└─ Auto-generated from genre, artist, and track keywords for maximum discoverability
+
+DESCRIPTION:
 ${metadata.artist} - ${displayTitle}
+
 Genre: ${metadata.genre}
 Released: ${monthYear}
 
-Follow ${metadata.artist}:
-[Add your links here]
+${metadata.artist.includes(' ') ? '🎵' : '🎶'} New ${metadata.genre} release
 
-#electronicmusic #${genreTag} #newmusic #${artistTag} #${titleTag}`;
+Follow ${metadata.artist}:
+→ SoundCloud: [Add your SoundCloud profile URL]
+→ Instagram: @[yourusername]
+→ Spotify: [Add your Spotify artist link]
+→ Beatport: [Add your Beatport artist link]
+
+#${genreTag} #${artistTag} #newmusic #electronicmusic
+└─ Character limit: 4,000 chars
+
+PRIVACY: ${privacy.charAt(0).toUpperCase() + privacy.slice(1)}
+└─ Options: Public (recommended for reach) | Private (link-only) | Scheduled
+
+RELEASE_DATE: ${soundcloudDate}
+└─ Format: MM/DD/YYYY (SoundCloud's required format)
+
+═══════════════════════════════════════════════════════════════════════
+  SECTION 2: PERMISSIONS (Defaults recommended - change only if needed)
+═══════════════════════════════════════════════════════════════════════
+
+SoundCloud's default permission settings are optimized for public releases.
+No changes needed unless you have specific requirements:
+
+✓ Enable direct downloads: OFF (keeps control of distribution)
+✓ Offline listening: ON (fans can save for offline play)
+✓ Include in RSS feed: ON (enables podcast/blog embedding)
+✓ Display embed code: ON (allows website embedding)
+✓ Enable app playback: ON (third-party music apps can play)
+✓ Allow comments: ON (fan engagement!)
+✓ Show comments to public: OFF (you moderate first)
+✓ Show track insights to public: ON (transparency)
+✓ Geoblocking: Worldwide (no restrictions)
+
+═══════════════════════════════════════════════════════════════════════
+  SECTION 3: LICENSING (Default recommended)
+═══════════════════════════════════════════════════════════════════════
+
+RECOMMENDED: "All rights reserved" (SoundCloud's default)
+└─ Protects your copyright - correct for most producers
+
+ALTERNATIVE: Creative Commons licenses
+└─ Only use if you explicitly want to allow remixing/sharing
+└─ Options: CC BY, CC BY-NC, CC BY-SA, etc.
+
+═══════════════════════════════════════════════════════════════════════
+  SECTION 4: ADVANCED DETAILS (Optional - fill if applicable)
+═══════════════════════════════════════════════════════════════════════
+
+BUY_LINK: [Leave empty or add purchase link]
+└─ Example: https://yourname.bandcamp.com or Beatport link
+
+BUY_LINK_TITLE: [Default is "Buy"]
+└─ Customize: "Download on Beatport" or "Stream on Spotify"
+
+RECORD_LABEL: [Add if releasing under a label]
+└─ Leave empty for self-releases
+
+ISRC: [Add if you have one from DistroKid/distributor]
+└─ Format: CC-XXX-YY-NNNNN
+└─ If you don't have one yet, leave empty
+
+EXPLICIT_CONTENT: [Check on SoundCloud if applicable]
+└─ Mark if track contains profanity, sexual content, or violence
+
+PUBLISHER: [Add if you have a publishing deal]
+└─ Example: Warner Chappell, Sony ATV
+
+P_LINE: [Phonographic copyright]
+└─ Format: ℗ ${releaseDate.getFullYear()} ${metadata.artist}
+└─ Example: ℗ ${releaseDate.getFullYear()} ${metadata.artist}
+
+═══════════════════════════════════════════════════════════════════════
+  SECTION 5: CHARACTER LIMITS (Quick Reference)
+═══════════════════════════════════════════════════════════════════════
+
+✓ Title: 100 characters max
+✓ Description: 4,000 characters max  
+✓ Tags: 30 tags maximum
+
+═══════════════════════════════════════════════════════════════════════
+  PACKAGE CONTENTS
+═══════════════════════════════════════════════════════════════════════
+
+This ZIP contains:
+1. Audio: ${audioFile}
+2. Artwork: ${artworkFile}
+3. This metadata guide
+
+Next Steps (Mini-MVP 1 - Step 4):
+1. Playwright will open soundcloud.com/upload
+2. Playwright will upload the audio file
+3. Playwright will fill all SECTION 1 fields automatically
+4. YOU review everything and click "Upload" to publish
+
+═══════════════════════════════════════════════════════════════════════
+
+Generated by Music Agent MVP - Mini-MVP 1: SoundCloud
+Version: ${versionId} | Privacy: ${privacy}
+Artist retains all rights. Review all fields before publishing.
+`;
 
     // --- STEP 7: Create packages folder ---
     
@@ -983,11 +1262,11 @@ Follow ${metadata.artist}:
       metadata.distribution = {};
     }
     
-    if (!metadata.distribution.publish) {
-      metadata.distribution.publish = [];
+    if (!metadata.distribution.release) {
+      metadata.distribution.release = [];
     }
 
-    const existingIndex = metadata.distribution.publish.findIndex(
+    const existingIndex = metadata.distribution.release.findIndex(
       e => e.platform === 'SoundCloud' && e.versionId === versionId
     );
 
@@ -1001,49 +1280,48 @@ Follow ${metadata.artist}:
     };
 
     if (existingIndex >= 0) {
-      metadata.distribution.publish[existingIndex] = {
-        ...metadata.distribution.publish[existingIndex],
+      metadata.distribution.release[existingIndex] = {
+        ...metadata.distribution.release[existingIndex],
         ...distributionEntry
       };
       console.log(`   Updated SoundCloud distribution tracking for ${versionId}`);
     } else {
-      metadata.distribution.publish.push(distributionEntry);
+      metadata.distribution.release.push(distributionEntry);
       console.log(`   Added SoundCloud to distribution tracking for ${versionId}`);
     }
 
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
 
-    // --- STEP 10: Success response ---
+// --- STEP 10: Success response ---
     
-    res.json({
-      success: true,
-      message: `SoundCloud package generated for ${versionId}`,
-      package: {
-        fileName: zipFileName,
-        path: zipPath,
-        sizeKB: parseFloat(fileSizeKB),
-        contents: [
-          audioFile,
-          artworkFile,
-          'soundcloud-metadata.txt'
-        ]
-      },
-      nextSteps: [
-        '1. Download the ZIP file from the packages folder',
-        '2. Go to SoundCloud and click Upload',
-        `3. Upload the audio file (${audioFile})`,
-        `4. Upload the artwork (${artworkFile})`,
-        '5. Copy the metadata from soundcloud-metadata.txt and paste into SoundCloud fields',
-        `6. Set privacy to: ${privacy}`
-      ]
-    });
+res.json({
+  success: true,
+  message: `SoundCloud package generated for ${versionId}`,
+  packagePath: `${releaseId}/packages/${zipFileName}`,  // Added this line for frontend
+  package: {
+    fileName: zipFileName,
+    path: zipPath,
+    sizeKB: parseFloat(fileSizeKB),
+    contents: [
+      audioFile,
+      artworkFile,
+      'soundcloud-metadata.txt'
+    ]
+  },
+  nextSteps: [
+    '1. Download the ZIP file from the packages folder',
+    '2. Extract the ZIP',
+    '3. Playwright will open soundcloud.com/upload (Step 4)',
+    '4. Playwright will upload audio and fill all fields',
+    '5. YOU review and click "Upload" button to publish'
+  ]
+});
 
   } catch (error) {
-    console.error(`❌ Error generating SoundCloud package:`, error.message);
+    console.error('❌ SoundCloud package error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to generate SoundCloud package',
-      details: error.message
+      error: error.message
     });
   }
 });
