@@ -721,8 +721,12 @@ app.delete('/releases/:releaseId/label-deal/files/:filename', async (req, res) =
   }
 })
 
-// Save/Update label contact
-app.patch('/releases/:releaseId/label-deal/contact', async (req, res) => {
+// ============================================
+// LABEL CONTACT ENDPOINTS (MULTIPLE CONTACTS)
+// ============================================
+
+// Add a new contact
+app.post('/releases/:releaseId/label-deal/contacts', async (req, res) => {
   try {
     const { releaseId } = req.params
     const { name, label, email, phone, location, role, notes } = req.body
@@ -730,7 +734,6 @@ app.patch('/releases/:releaseId/label-deal/contact', async (req, res) => {
     if (!name) {
       return res.status(400).json({ error: 'Name is required' })
     }
-    
     
     const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
     const metadataPath = path.join(releasePath, 'metadata.json')
@@ -742,41 +745,53 @@ app.patch('/releases/:releaseId/label-deal/contact', async (req, res) => {
     if (!metadata.metadata.labelInfo) {
       metadata.metadata.labelInfo = {}
     }
+    if (!metadata.metadata.labelInfo.contacts) {
+      metadata.metadata.labelInfo.contacts = []
+    }
     
-    // Save contact info
-    metadata.metadata.labelInfo.contact = {
+    // Create new contact with unique ID
+    const newContact = {
+      id: Date.now().toString(), // Simple unique ID
       name,
       label: label || metadata.metadata.labelInfo.label || '',
-      email,
+      email: email || '',
       phone: phone || '',
       location: location || '',
       role: role || '',
       notes: notes || '',
       lastContact: null,
-      createdAt: metadata.metadata.labelInfo.contact?.createdAt || new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
+    
+    // Add to contacts array
+    metadata.metadata.labelInfo.contacts.push(newContact)
     
     metadata.updatedAt = new Date().toISOString()
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
     
-    console.log(`✅ Saved label contact for ${releaseId}:`, metadata.metadata.labelInfo.contact.name)
+    console.log(`✅ Added contact for ${releaseId}:`, newContact.name)
     
     res.json({
       success: true,
-      contact: metadata.metadata.labelInfo.contact
+      contact: newContact
     })
     
   } catch (error) {
-    console.error('❌ Error saving label contact:', error)
+    console.error('❌ Error adding contact:', error)
     res.status(500).json({ error: error.message })
   }
 })
 
-// Delete label contact
-app.delete('/releases/:releaseId/label-deal/contact', async (req, res) => {
+// Update an existing contact
+app.patch('/releases/:releaseId/label-deal/contacts/:contactId', async (req, res) => {
   try {
-    const { releaseId } = req.params
+    const { releaseId, contactId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' })
+    }
     
     const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
     const metadataPath = path.join(releasePath, 'metadata.json')
@@ -785,28 +800,85 @@ app.delete('/releases/:releaseId/label-deal/contact', async (req, res) => {
     const rawData = await fs.readFile(metadataPath, 'utf8')
     const metadata = JSON.parse(rawData)
     
-    if (metadata.metadata.labelInfo?.contact) {
-      // Remove contact
-      delete metadata.metadata.labelInfo.contact
-      
-      metadata.updatedAt = new Date().toISOString()
-      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
-      
-      console.log(`✅ Deleted label contact for ${releaseId}`)
-      
-      res.json({
-        success: true,
-        message: 'Contact deleted'
-      })
-    } else {
-      res.status(404).json({ error: 'No contact found' })
+    if (!metadata.metadata.labelInfo?.contacts) {
+      return res.status(404).json({ error: 'No contacts found' })
     }
     
+    // Find and update the contact
+    const contactIndex = metadata.metadata.labelInfo.contacts.findIndex(c => c.id === contactId)
+    
+    if (contactIndex === -1) {
+      return res.status(404).json({ error: 'Contact not found' })
+    }
+    
+    // Update contact
+    metadata.metadata.labelInfo.contacts[contactIndex] = {
+      ...metadata.metadata.labelInfo.contacts[contactIndex],
+      name,
+      label: label || metadata.metadata.labelInfo.label || '',
+      email: email || '',
+      phone: phone || '',
+      location: location || '',
+      role: role || '',
+      notes: notes || '',
+      updatedAt: new Date().toISOString()
+    }
+    
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
+    
+    console.log(`✅ Updated contact for ${releaseId}:`, name)
+    
+    res.json({
+      success: true,
+      contact: metadata.metadata.labelInfo.contacts[contactIndex]
+    })
+    
   } catch (error) {
-    console.error('❌ Error deleting label contact:', error)
+    console.error('❌ Error updating contact:', error)
     res.status(500).json({ error: error.message })
   }
 })
+
+// Delete a contact
+app.delete('/releases/:releaseId/label-deal/contacts/:contactId', async (req, res) => {
+  try {
+    const { releaseId, contactId } = req.params
+    
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    const metadataPath = path.join(releasePath, 'metadata.json')
+    
+    // Read metadata
+    const rawData = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(rawData)
+    
+    if (!metadata.metadata.labelInfo?.contacts) {
+      return res.status(404).json({ error: 'No contacts found' })
+    }
+    
+    // Filter out the contact
+    const originalLength = metadata.metadata.labelInfo.contacts.length
+    metadata.metadata.labelInfo.contacts = metadata.metadata.labelInfo.contacts.filter(
+      c => c.id !== contactId
+    )
+    
+    if (metadata.metadata.labelInfo.contacts.length === originalLength) {
+      return res.status(404).json({ error: 'Contact not found' })
+    }
+    
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
+    
+    console.log(`✅ Deleted contact from ${releaseId}`)
+    
+    res.json({ success: true, message: 'Contact deleted' })
+    
+  } catch (error) {
+    console.error('❌ Error deleting contact:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
 
 // Next endpoint continues below...
 

@@ -26,6 +26,8 @@ export default function LabelDealPage({ params }) {
   
   // Delete contact state
   const [showDeleteContactModal, setShowDeleteContactModal] = useState(false)
+  const [editingContact, setEditingContact] = useState(null)
+  const [contactToDelete, setContactToDelete] = useState(null)
 
   async function loadTrack() {
     try {
@@ -110,8 +112,10 @@ export default function LabelDealPage({ params }) {
   }
 
   const handleDeleteContact = async () => {
+    if (!contactToDelete) return
+    
     try {
-      const response = await fetch(`http://localhost:3001/releases/${releaseId}/label-deal/contact`, {
+      const response = await fetch(`http://localhost:3001/releases/${releaseId}/label-deal/contacts/${contactToDelete.id}`, {
         method: 'DELETE'
       })
 
@@ -123,6 +127,7 @@ export default function LabelDealPage({ params }) {
       console.log('✅ Contact deleted')
       await loadTrack()
       setShowDeleteContactModal(false)
+      setContactToDelete(null)
     } catch (error) {
       console.error('Error deleting contact:', error)
       alert(`Failed to delete contact: ${error.message}`)
@@ -132,6 +137,7 @@ export default function LabelDealPage({ params }) {
   const handleContactSuccess = (contact) => {
     console.log('✅ Contact saved:', contact)
     setShowContactModal(false)
+    setEditingContact(null)
     loadTrack()
   }
 
@@ -147,7 +153,7 @@ export default function LabelDealPage({ params }) {
   }
 
   const labelInfo = track.metadata?.labelInfo || track.labelInfo || {}
-  const contact = labelInfo.contact
+  const contacts = labelInfo.contacts || []
   const documents = labelInfo.contractDocuments || []
 
   return (
@@ -228,76 +234,102 @@ export default function LabelDealPage({ params }) {
 
           {/* Right Column */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Label Contact Card */}
+            {/* Label Contacts Card */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Label Contact</h2>
-                <p className="text-sm text-gray-400 mt-1">Main contact for this label deal</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-100">Label Contacts</h2>
+                    <p className="text-sm text-gray-400 mt-1">Contacts for this label deal</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEditingContact(null)
+                      setShowContactModal(true)
+                    }}
+                    className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium text-sm"
+                  >
+                    + Add Contact
+                  </button>
+                </div>
               </div>
               <div className="p-6">
-                {contact ? (
+                {contacts.length > 0 ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Name</p>
-                        <p className="text-gray-200 font-medium">{contact.name}</p>
+                    {contacts.map((contact, idx) => (
+                      <div key={contact.id || idx} className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                        <div className="grid grid-cols-2 gap-4 mb-3">
+                          <div>
+                            <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Name</p>
+                            <p className="text-gray-200 font-medium">{contact.name}</p>
+                          </div>
+                          {contact.role && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Role</p>
+                              <p className="text-gray-200">{contact.role}</p>
+                            </div>
+                          )}
+                          {contact.email && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Email</p>
+                              <a href={`mailto:${contact.email}`} className="text-purple-400 hover:text-purple-300 text-sm">
+                                {contact.email}
+                              </a>
+                            </div>
+                          )}
+                          {contact.phone && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Phone</p>
+                              <p className="text-gray-200 text-sm">{contact.phone}</p>
+                            </div>
+                          )}
+                          {contact.location && (
+                            <div className="col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Location</p>
+                              <p className="text-gray-200 text-sm">{contact.location}</p>
+                            </div>
+                          )}
+                          {contact.notes && (
+                            <div className="col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Notes</p>
+                              <p className="text-gray-300 text-sm italic">{contact.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2 pt-2 border-t border-gray-700">
+                          <button
+                            onClick={() => {
+                              setEditingContact(contact)
+                              setShowContactModal(true)
+                            }}
+                            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-all font-medium text-sm"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              setContactToDelete(contact)
+                              setShowDeleteContactModal(true)
+                            }}
+                            className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-300 rounded-lg transition-all font-medium text-sm"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
-                      {contact.role && (
-                        <div>
-                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Role</p>
-                          <p className="text-gray-200">{contact.role}</p>
-                        </div>
-                      )}
-                      {contact.email && (
-                        <div>
-                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Email</p>
-                          <a href={`mailto:${contact.email}`} className="text-purple-400 hover:text-purple-300">
-                            {contact.email}
-                          </a>
-                        </div>
-                      )}
-                      {contact.phone && (
-                        <div>
-                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Phone</p>
-                          <p className="text-gray-200">{contact.phone}</p>
-                        </div>
-                      )}
-                      {contact.location && (
-                        <div className="col-span-2">
-                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Location</p>
-                          <p className="text-gray-200">{contact.location}</p>
-                        </div>
-                      )}
-                      {contact.notes && (
-                        <div className="col-span-2">
-                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Notes</p>
-                          <p className="text-gray-300 text-sm italic">{contact.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => setShowContactModal(true)}
-                        className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-all font-medium text-sm"
-                      >
-                        ✏️ Edit Contact
-                      </button>
-                      <button
-                        onClick={() => setShowDeleteContactModal(true)}
-                        className="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-300 rounded-lg transition-all font-medium text-sm"
-                      >
-                        🗑️ Delete
-                      </button>
-                    </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-gray-500 mb-4">No contact added yet</p>
+                    <p className="text-gray-500 mb-4">No contacts added yet</p>
                     <button
-                      onClick={() => setShowContactModal(true)}
+                      onClick={() => {
+                        setEditingContact(null)
+                        setShowContactModal(true)
+                      }}
                       className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg transition-all font-medium"
                     >
-                      + Add Label Contact
+                      + Add First Contact
                     </button>
                   </div>
                 )}
@@ -398,15 +430,21 @@ export default function LabelDealPage({ params }) {
       {/* Contact Modal */}
       <Modal
         isOpen={showContactModal}
-        onClose={() => setShowContactModal(false)}
-        title={contact ? 'Edit Label Contact' : 'Add Label Contact'}
+        onClose={() => {
+          setShowContactModal(false)
+          setEditingContact(null)
+        }}
+        title={editingContact ? 'Edit Contact' : 'Add Contact'}
       >
         <LabelContactForm
           releaseId={releaseId}
           labelName={labelInfo.label}
-          existingContact={contact}
+          existingContact={editingContact}
           onSuccess={handleContactSuccess}
-          onCancel={() => setShowContactModal(false)}
+          onCancel={() => {
+            setShowContactModal(false)
+            setEditingContact(null)
+          }}
         />
       </Modal>
 
@@ -426,11 +464,14 @@ export default function LabelDealPage({ params }) {
       {/* Delete Contact Confirmation Modal */}
       <ConfirmDeleteModal
         isOpen={showDeleteContactModal}
-        onClose={() => setShowDeleteContactModal(false)}
+        onClose={() => {
+          setShowDeleteContactModal(false)
+          setContactToDelete(null)
+        }}
         onConfirm={handleDeleteContact}
         title="Delete Contact"
         message="Are you sure you want to delete this contact? This action cannot be undone."
-        itemName={contact?.name}
+        itemName={contactToDelete?.name}
       />
     </div>
   )
