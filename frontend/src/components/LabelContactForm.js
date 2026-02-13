@@ -39,11 +39,23 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
 
     setSubmitting(true)
     try {
-      const response = await fetch(`http://localhost:3001/releases/${releaseId}/label-deal/contact`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
+      let response
+      
+      if (existingContact?.id) {
+        // Update existing contact
+        response = await fetch(`http://localhost:3001/releases/${releaseId}/label-deal/contacts/${existingContact.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        })
+      } else {
+        // Add new contact
+        response = await fetch(`http://localhost:3001/releases/${releaseId}/label-deal/contacts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        })
+      }
 
       if (!response.ok) {
         const error = await response.json()
@@ -176,7 +188,7 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
           disabled={submitting}
           className="flex-1 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
-          {submitting ? 'Saving...' : existingContact ? 'Update Contact' : 'Save Contact'}
+          {submitting ? 'Saving...' : existingContact ? 'Update Contact' : 'Add Contact'}
         </button>
         <button
           type="button"

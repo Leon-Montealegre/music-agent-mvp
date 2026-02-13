@@ -218,30 +218,45 @@ export default function TrackDetailPage({ params }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       {/* Header */}
-      <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-100 mb-2">{metadata.title}</h1>
-              <p className="text-3xl text-gray-300">{metadata.artist}</p>
-            </div>
-
-            <div className="flex items-center gap-4">
-              {showBadge && (
-                 <div className={`px-4 py-2 rounded-lg ring-1 ${isSigned ? 'bg-green-500/20 border border-green-500/50 text-green-300 ring-green-500/20' : 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-300 ring-yellow-500/20'}`}>
-      <p className="text-sm font-semibold">{isSigned ? '✓ Signed' : '📤 Submitted'}</p>
-      <p className="text-xs">{displayLabel}</p>
+<div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
+  <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="flex items-center justify-between mb-4">
+      <Link
+        href="/"
+        className="text-purple-400 hover:text-purple-300 transition-colors whitespace-nowrap"
+      >
+        ← Back to Catalogue
+      </Link>
     </div>
-  )}
-  <Link href="/" className="text-purple-400 hover:text-purple-300 transition-colors whitespace-nowrap">
-    ← Back to Catalogue
-  </Link>
+    
+    <div className="flex items-center gap-3 flex-wrap">
+      <h1 className="text-4xl font-bold text-gray-100">
+        {metadata.title || track.title}
+      </h1>
+      
+      {showBadge && (
+        <div className={`px-3 py-1 rounded-md text-sm font-semibold ${
+          isSigned 
+            ? 'bg-green-500/20 border border-green-500/50 text-green-300' 
+            : 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-300'
+        }`}>
+          {isSigned ? '✓ Signed' : '📤 Submitted'}
+        </div>
+      )}
+      
+      {isSigned && displayLabel && (
+        <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">
+          {displayLabel}
+        </div>
+      )}
+    </div>
+    
+    <p className="text-xl text-gray-300 mt-2">
+      {metadata.artist || track.artist}
+    </p>
+  </div>
 </div>
 
-         
-          </div>
-        </div>
-      </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
