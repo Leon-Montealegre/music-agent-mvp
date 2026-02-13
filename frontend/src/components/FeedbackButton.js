@@ -14,6 +14,9 @@ export default function FeedbackButton() {
   });
 
   const currentPage = typeof window !== 'undefined' ? window.location.pathname : '';
+  
+  // Make the page path more readable
+  const displayPage = currentPage === '/' ? 'Home / Catalogue' : currentPage;
 
   useEffect(() => {
     setMounted(true);
@@ -24,38 +27,36 @@ export default function FeedbackButton() {
     setIsSubmitting(true);
 
     try {
-      const timestamp = new Date().toISOString();
+      const timestamp = new Date().toLocaleString();
       const rowData = [
         timestamp,
         formData.type,
-        currentPage,
+        displayPage,
         formData.description,
         formData.priority,
         'New',
         ''
       ];
 
-      const SHEET_ID = '1bVrUIYrm_3F4qj97TTWigIDGB97pT8NCeXP6FV3BA3c';
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYaeTuB5IaNBRZx0i8GX4ZMu8Xcv7xUbAOI07bFagX7kYecsypS3hvLOjS-_SYLs-e/exec';
       
-      const response = await fetch('http://localhost:3001/feedback', {
+      const response = await fetch(SCRIPT_URL, {
         method: 'POST',
+        mode: 'no-cors',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sheetId: SHEET_ID,
           data: rowData
         })
       });
-
-      if (!response.ok) throw new Error('Failed to submit feedback');
 
       alert('✅ Feedback submitted! Thank you!');
       setFormData({ type: 'Bug', description: '', priority: 'Medium' });
       setIsOpen(false);
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      alert('❌ Failed to submit feedback. Please try again.');
+      alert('❌ Faito submit feedback. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -63,7 +64,7 @@ export default function FeedbackButton() {
 
   const modalContent = isOpen && (
     <div 
-      className="fixed inset-0 bg-black/70 flex items-center justify-ce p-4 overflow-y-auto"
+      className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 overflow-y-auto"
       style={{ zIndex: 9999 }}
       onClick={() => setIsOpen(false)}
     >
@@ -90,10 +91,12 @@ export default function FeedbackButton() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Page</label>
+            <label className="block text-sm font-medium mb-2">
+              Current Page <span className="text-gray-400 text-xs">(auto-detected)</span>
+            </label>
             <input
               type="text"
-              value={currentPage}
+              value={displayPage}
               readOnly
               className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-400"
             />
