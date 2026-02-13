@@ -183,3 +183,84 @@ export async function deleteRelease(releaseId) {
     throw error
   }
 }
+/**
+ * Upload label deal file
+ * @param {string} releaseId - The release ID
+ * @param {File} file - The file to upload
+ */
+export async function uploadLabelDealFile(releaseId, file) {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const response = await fetch(
+      `${API_BASE_URL}/releases/${releaseId}/label-deal/files`,
+      {
+        method: 'POST',
+        body: formData
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to upload file')
+    }
+    
+    return response.json()
+  } catch (error) {
+    console.error('Error uploading label deal file:', error)
+    throw error
+  }
+}
+
+/**
+ * Delete label deal file
+ * @param {string} releaseId - The release ID
+ * @param {string} filename - The filename to delete
+ */
+export async function deleteLabelDealFile(releaseId, filename) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/releases/${releaseId}/label-deal/files/${encodeURIComponent(filename)}`,
+      { method: 'DELETE' }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to delete file')
+    }
+    
+    return response.json()
+  } catch (error) {
+    console.error('Error deleting label deal file:', error)
+    throw error
+  }
+}
+
+/**
+ * Save label contact
+ * @param {string} releaseId - The release ID
+ * @param {object} contactData - Contact information
+ */
+export async function saveLabelContact(releaseId, contactData) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/releases/${releaseId}/label-deal/contact`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactData)
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to save contact')
+    }
+    
+    return response.json()
+  } catch (error) {
+    console.error('Error saving label contact:', error)
+    throw error
+  }
+}
