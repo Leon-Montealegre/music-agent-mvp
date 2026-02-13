@@ -727,9 +727,10 @@ app.patch('/releases/:releaseId/label-deal/contact', async (req, res) => {
     const { releaseId } = req.params
     const { name, label, email, phone, location, role, notes } = req.body
     
-    if (!name || !email) {
-      return res.status(400).json({ error: 'Name and email are required' })
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' })
     }
+    
     
     const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
     const metadataPath = path.join(releasePath, 'metadata.json')
@@ -749,7 +750,7 @@ app.patch('/releases/:releaseId/label-deal/contact', async (req, res) => {
       email,
       phone: phone || '',
       location: location || '',
-      role: role || 'A&R',
+      role: role || '',
       notes: notes || '',
       lastContact: null,
       createdAt: metadata.metadata.labelInfo.contact?.createdAt || new Date().toISOString(),
@@ -768,6 +769,41 @@ app.patch('/releases/:releaseId/label-deal/contact', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error saving label contact:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete label contact
+app.delete('/releases/:releaseId/label-deal/contact', async (req, res) => {
+  try {
+    const { releaseId } = req.params
+    
+    const releasePath = path.join(process.env.HOME, 'Documents/Music Agent/Releases', releaseId)
+    const metadataPath = path.join(releasePath, 'metadata.json')
+    
+    // Read metadata
+    const rawData = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(rawData)
+    
+    if (metadata.metadata.labelInfo?.contact) {
+      // Remove contact
+      delete metadata.metadata.labelInfo.contact
+      
+      metadata.updatedAt = new Date().toISOString()
+      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8')
+      
+      console.log(`✅ Deleted label contact for ${releaseId}`)
+      
+      res.json({
+        success: true,
+        message: 'Contact deleted'
+      })
+    } else {
+      res.status(404).json({ error: 'No contact found' })
+    }
+    
+  } catch (error) {
+    console.error('❌ Error deleting label contact:', error)
     res.status(500).json({ error: error.message })
   }
 })
