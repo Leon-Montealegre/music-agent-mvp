@@ -200,6 +200,11 @@ export default function TrackDetailPage({ params }) {
   const hasSubmissions = track?.distribution?.submit?.length > 0
   const submittedLabel = hasSubmissions ? track.distribution.submit.find(s => s.status !== 'signed')?.label || track.distribution.submit[0].label : null
   
+  // Released badge logic
+  const isReleased = track?.distribution?.release?.some(
+    entry => entry.status?.toLowerCase() === 'live'
+  )
+  
   const showBadge = isSigned || hasSubmissions
   const displayLabel = signedLabel || submittedLabel
 
@@ -241,6 +246,12 @@ export default function TrackDetailPage({ params }) {
             : 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-300'
         }`}>
           {isSigned ? '✓ Signed' : '📤 Submitted'}
+        </div>
+      )}
+      
+      {isReleased && (
+        <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">
+          🔴 Released
         </div>
       )}
       
