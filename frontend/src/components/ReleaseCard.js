@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+
 export default function ReleaseCard({ release }) {
   const artworkUrl = `http://localhost:3001/releases/${release.releaseId}/artwork/`
   
@@ -17,6 +18,7 @@ export default function ReleaseCard({ release }) {
   )
   
   const showBadge = isSigned || hasSubmissions
+
 
   return (
     <Link href={`/releases/${release.releaseId}`}>
@@ -61,6 +63,7 @@ export default function ReleaseCard({ release }) {
           )}
         </div>
 
+
         {/* Info */}
         <div className="p-4">
           <h3 className="font-semibold text-lg text-gray-100 mb-1 line-clamp-1">
@@ -70,9 +73,9 @@ export default function ReleaseCard({ release }) {
             {release.artist}
           </p>
 
-          {/* Badges Row - ABOVE genre */}
+          {/* Badges Row */}
           {(showBadge || isReleased) && (
-            <div className="mb-2 flex gap-2 flex-wrap">
+            <div className="mb-3 flex gap-2 flex-wrap">
               {showBadge && (
                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ring-1 ${
                   isSigned 
@@ -88,15 +91,6 @@ export default function ReleaseCard({ release }) {
                   🔴 Released
                 </span>
               )}
-            </div>
-          )}
-
-          {/* Genre Tag Row */}
-          {release.genre && (
-            <div className="mb-3">
-              <span className="inline-block px-3 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/50 rounded-full text-xs font-medium ring-1 ring-purple-500/20">
-                {release.genre}
-          </span>
             </div>
           )}
 

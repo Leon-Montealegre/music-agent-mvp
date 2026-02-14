@@ -1,5 +1,6 @@
 'use client'
 
+
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -10,10 +11,12 @@ import LogSubmissionForm from '@/components/LogSubmissionForm'
 import DownloadModal from '@/components/DownloadModal'
 import DeleteTrackModal from '@/components/DeleteTrackModal'
 
+
 export default function TrackDetailPage({ params }) {
   const unwrappedParams = use(params)
   const trackId = unwrappedParams.releaseId
   const router = useRouter()
+
 
   // State
   const [track, setTrack] = useState(null)
@@ -38,6 +41,7 @@ export default function TrackDetailPage({ params }) {
   const [showDeleteTrackModal, setShowDeleteTrackModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
+
   // Load track data
   async function loadTrack() {
     try {
@@ -54,9 +58,11 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
+
   useEffect(() => {
     loadTrack()
   }, [trackId])
+
 
   // Handlers
   const handleModalSuccess = () => {
@@ -65,11 +71,13 @@ export default function TrackDetailPage({ params }) {
     loadTrack()
   }
 
+
   const handleFileClick = (file, fileType) => {
     setFileToDownload(file)
     setDownloadFileType(fileType)
     setShowDownloadModal(true)
   }
+
 
   async function handlePlatformSubmit(formData) {
     setSubmitting(true)
@@ -94,6 +102,7 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
+
   async function handleSubmissionSubmit(formData) {
     setSubmitting(true)
     try {
@@ -117,6 +126,7 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
+
   const handleMarkAsSigned = async (labelName) => {
     try {
       const response = await fetch(`http://localhost:3001/releases/${trackId}/sign`, {
@@ -125,7 +135,9 @@ export default function TrackDetailPage({ params }) {
         body: JSON.stringify({ labelName })
       })
 
+
       const data = await response.json()
+
 
       if (!response.ok) {
         console.error('Backend error:', data)
@@ -133,17 +145,21 @@ export default function TrackDetailPage({ params }) {
         return
       }
 
+
       console.log('✅ Successfully marked as signed:', data)
+
 
       const updatedTrack = await fetchRelease(trackId)
       setTrack(updatedTrack.release || updatedTrack)
       setShowLabelSigningModal(false)
+
 
     } catch (error) {
       console.error('Error marking as signed:', error)
       alert(`Error: ${error.message}`)
     }
   }
+
 
   const handleDeleteEntry = async (pathType, timestamp) => {
     try {
@@ -158,6 +174,7 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
+
   const handleEditEntry = async (pathType, timestamp, updatedData) => {
     try {
       await updateDistributionEntry(trackId, pathType, timestamp, updatedData)
@@ -170,10 +187,12 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
+
   const confirmDelete = (pathType, timestamp, entryLabel) => {
     setEntryToDelete({ pathType, timestamp, label: entryLabel })
     setShowDeleteConfirm(true)
   }
+
 
   const handleDeleteTrack = async () => {
     setIsDeleting(true)
@@ -188,6 +207,7 @@ export default function TrackDetailPage({ params }) {
       setShowDeleteTrackModal(false)
     }
   }
+
 
   // Derived state
   const metadata = track
@@ -208,6 +228,7 @@ export default function TrackDetailPage({ params }) {
   const showBadge = isSigned || hasSubmissions
   const displayLabel = signedLabel || submittedLabel
 
+
   // Loading state
   if (!metadata) {
     return (
@@ -219,6 +240,7 @@ export default function TrackDetailPage({ params }) {
       </div>
     )
   }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
@@ -269,6 +291,7 @@ export default function TrackDetailPage({ params }) {
 </div>
 
 
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -284,27 +307,56 @@ export default function TrackDetailPage({ params }) {
                 )}
               </div>
 
+
               {/* Metadata */}
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Genre</p>
-                  <p className="text-sm font-medium text-gray-200">{metadata.genre || 'Not set'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Track Type</p>
-                  <p className="text-sm font-medium text-gray-200">{metadata.trackType || metadata.releaseType || 'Original'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Production Date</p>
-                  <p className="text-sm font-medium text-gray-200">
-                    {metadata.trackDate || metadata.releaseDate ? new Date(metadata.trackDate || metadata.releaseDate).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'}) : 'Not set'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Track ID</p>
-                  <p className="text-xs font-mono text-gray-500 break-all">{metadata.releaseId || 'Not set'}</p>
-                </div>
-              </div>
+<div className="space-y-3">
+  {/* Genre - Styled Tag */}
+  {metadata.genre && (
+    <div>
+      <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Genre</p>
+      <span className="inline-block px-3 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/50 rounded-full text-sm font-medium ring-1 ring-purple-500/20">
+        {metadata.genre}
+      </span>
+    </div>
+  )}
+  
+  {/* BPM & Key - Subtle Display */}
+  {(metadata.bpm || metadata.key) && (
+    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+      <div className="grid grid-cols-2 gap-3">
+        {metadata.bpm && (
+          <div>
+            <p className="text-xs text-purple-300 uppercase tracking-wider">BPM</p>
+            <p className="text-sm font-medium text-gray-200">{metadata.bpm}</p>
+          </div>
+        )}
+        {metadata.key && (
+          <div>
+            <p className="text-xs text-purple-300 uppercase tracking-wider">Key</p>
+            <p className="text-sm font-medium text-gray-200">{metadata.key}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+  
+  <div>
+    <p className="text-xs text-gray-400 uppercase tracking-wider">Track Type</p>
+    <p className="text-sm font-medium text-gray-200">{metadata.trackType || metadata.releaseType || 'Original'}</p>
+  </div>
+  <div>
+    <p className="text-xs text-gray-400 uppercase tracking-wider">Production Date</p>
+    <p className="text-sm font-medium text-gray-200">
+      {metadata.trackDate || metadata.releaseDate ? new Date(metadata.trackDate || metadata.releaseDate).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'}) : 'Not set'}
+    </p>
+  </div>
+  <div>
+    <p className="text-xs text-gray-400 uppercase tracking-wider">Track ID</p>
+    <p className="text-xs font-mono text-gray-500 break-all">{metadata.releaseId || 'Not set'}</p>
+  </div>
+</div>
+
+
 
               {/* Files */}
               <div className="mt-6 pt-6 border-t border-gray-700">
@@ -378,6 +430,7 @@ export default function TrackDetailPage({ params }) {
                 </div>
               </div>
 
+
               {/* Label Deal Info */}
               {isSigned && metadata.labelInfo && (
   <div className="mt-6 pt-6 border-t border-gray-700">
@@ -407,8 +460,10 @@ export default function TrackDetailPage({ params }) {
   </div>
 )}
 
+
             </div>
           </div>
+
 
           {/* Right Content */}
           <div className="lg:col-span-2 space-y-8">
@@ -472,6 +527,7 @@ export default function TrackDetailPage({ params }) {
               </div>
             </div>
 
+
             {/* Platform Distribution */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
@@ -525,6 +581,7 @@ export default function TrackDetailPage({ params }) {
               </div>
             </div>
 
+
             {/* Marketing Content */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
@@ -550,6 +607,7 @@ export default function TrackDetailPage({ params }) {
               </div>
             </div>
 
+
             {/* Delete Track Button */}
             <div className="flex justify-end">
               <button
@@ -563,6 +621,7 @@ export default function TrackDetailPage({ params }) {
           </div>
         </div>
       </div>
+
 
 
 
@@ -591,6 +650,7 @@ export default function TrackDetailPage({ params }) {
         />
       </Modal>
 
+
       {/* Submission Modal - Add or Edit */}
       <Modal 
         isOpen={showSubmissionModal || (editingEntry?.pathType === 'submit')} 
@@ -615,6 +675,7 @@ export default function TrackDetailPage({ params }) {
           existingEntry={editingEntry}
         />
       </Modal>
+
 
       {/* Mark as Signed Modal */}
       <Modal
@@ -650,6 +711,7 @@ export default function TrackDetailPage({ params }) {
         </div>
       </Modal>
 
+
       {/* Delete Entry Confirmation Modal */}
       <Modal
         isOpen={showDeleteConfirm}
@@ -682,6 +744,7 @@ export default function TrackDetailPage({ params }) {
         </div>
       </Modal>
 
+
       {/* Download Modal */}
       <DownloadModal
         isOpen={showDownloadModal}
@@ -690,6 +753,7 @@ export default function TrackDetailPage({ params }) {
         releaseId={trackId}
         fileType={downloadFileType}
       />
+
 
       {/* Delete Track Modal */}
       <DeleteTrackModal
