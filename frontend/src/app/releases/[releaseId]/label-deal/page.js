@@ -159,26 +159,30 @@ export default function LabelDealPage({ params }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       {/* Header */}
-      <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-100 mb-2">
-                Label Deal - {labelInfo.label || 'Unknown Label'}
-              </h1>
-              <p className="text-gray-300">
-                {track.metadata?.title || track.title} • {track.metadata?.artist || track.artist}
-              </p>
-            </div>
-            <Link
-              href={`/releases/${releaseId}`}
-              className="text-purple-400 hover:text-purple-300 transition-colors"
-            >
-              ← Back to Track
-            </Link>
-          </div>
-        </div>
+<div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
+  <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="flex items-start justify-between gap-4">
+      {/* Left side: Title */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-100 mb-2">
+          Label Deal - {labelInfo.label || 'Unknown Label'}
+        </h1>
+        <p className="text-gray-300">
+          {track.metadata?.title || track.title} • {track.metadata?.artist || track.artist}
+        </p>
       </div>
+      
+      {/* Right side: Back button */}
+      <Link
+        href={`/releases/${releaseId}`}
+        className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
+      >
+        ← Back to Track
+      </Link>
+    </div>
+  </div>
+</div>
+
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">

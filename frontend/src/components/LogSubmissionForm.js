@@ -85,10 +85,8 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, edit
     {!editMode && <option value="">Select platform</option>}
     <option value="LabelRadar">LabelRadar</option>
     <option value="Email">Email</option>
+    <option value="Website">Website</option>
     <option value="SubmitHub">SubmitHub</option>
-    <option value="Labelbase">Labelbase</option>
-    <option value="Direct Website">Direct Website</option>
-    <option value="SoundCloud">SoundCloud</option>
     <option value="Other">Other</option>
   </select>
 </div>
@@ -107,9 +105,6 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, edit
   >
     {!editMode && <option value="">Select status</option>}
     <option value="Submitted">Submitted</option>
-    <option value="Listened">Listened</option>
-    <option value="Under Review">Under Review</option>
-    <option value="Accepted">Accepted</option>
     <option value="Rejected">Rejected</option>
     <option value="No Response">No Response</option>
   </select>
