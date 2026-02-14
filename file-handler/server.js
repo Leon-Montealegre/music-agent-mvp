@@ -28,7 +28,8 @@ app.use(cors());
 app.use(express.json());
 
 const os = require('os');
-const RELEASES_DIR = path.join(os.homedir(), 'Documents', 'Music Agent', 'Releases');
+const RELEASES_BASE = path.join(os.homedir(), 'Documents', 'Music Agent');
+const RELEASES_DIR = path.join(RELEASES_BASE, 'Releases');
 app.use('/releases', express.static(RELEASES_BASE));
 
 // =============================================================================
