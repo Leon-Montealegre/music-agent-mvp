@@ -4,6 +4,7 @@ import { fetchReleases } from '@/lib/api'
 import ReleaseCard from '@/components/ReleaseCard'
 import Link from 'next/link'
 
+
 export default function HomePage() {
   const [releases, setReleases] = useState([])
   const [loading, setLoading] = useState(true)
@@ -11,6 +12,7 @@ export default function HomePage() {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // all, not-submitted, submitted, signed, released
+
 
   useEffect(() => {
     async function loadReleases() {
@@ -25,6 +27,7 @@ export default function HomePage() {
     }
     loadReleases()
   }, [])
+
 
   // Filter and search logic
   const filteredReleases = releases.filter(release => {
@@ -82,6 +85,7 @@ export default function HomePage() {
       // Also search in submission labels
       metadata.distribution?.submit?.some(s => s.label?.toLowerCase().includes(searchLower))
 
+
     // If doesn't match search, exclude
     if (!matchesSearch) return false
     
@@ -109,8 +113,10 @@ export default function HomePage() {
       return !!isReleased
     }
 
+
     return true
   })
+
 
   if (loading) {
     return (
@@ -122,6 +128,7 @@ export default function HomePage() {
       </div>
     )
   }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
@@ -141,7 +148,7 @@ export default function HomePage() {
             <div className="flex items-center gap-4">
               <Link
                 href="/stats"
-                className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium"
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
               >
                 📊 Statistics
               </Link>
@@ -153,6 +160,7 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
+
 
           {/* Search & Filter Controls */}
           <div className="space-y-4">
@@ -174,6 +182,7 @@ export default function HomePage() {
                 </button>
               )}
             </div>
+
 
             {/* Filter Buttons */}
             <div className="flex gap-2 flex-wrap">
@@ -231,6 +240,7 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 pb-12">
