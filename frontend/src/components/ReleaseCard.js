@@ -18,7 +18,7 @@ export default function ReleaseCard({ release }) {
     <Link href={`/releases/${release.releaseId}`}>
       <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 hover:border-purple-500 rounded-lg overflow-hidden shadow-2xl transition-all hover:shadow-purple-500/20 cursor-pointer">
         {/* Artwork */}
-        <div className="aspect-square bg-gray-900/50 overflow-hidden">
+        <div className="aspect-square bg-gradient-to-br from-gray-800 to-gray-900 overflow-hidden">
           {release.fileCounts?.artwork > 0 ? (
             <img 
               src={artworkUrl} 
@@ -26,8 +26,33 @@ export default function ReleaseCard({ release }) {
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-500 text-6xl">
-              🎵
+            <div className="flex items-center justify-center h-full">
+              {/* Vinyl Record SVG */}
+              <svg width="140" height="140" viewBox="0 0 120 120" className="opacity-60">
+                {/* Glow effect */}
+                <defs>
+                  <radialGradient id="vinylGlow">
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.1"/>
+                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0"/>
+                  </radialGradient>
+                </defs>
+                <circle cx="60" cy="60" r="58" fill="url(#vinylGlow)"/>
+                
+                {/* Outer vinyl circle */}
+                <circle cx="60" cy="60" r="55" fill="#2a2a2a" stroke="#6b7280" strokeWidth="1.5"/>
+                
+                {/* Grooves - lighter for visibility */}
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#4b5563" strokeWidth="0.8"/>
+                <circle cx="60" cy="60" r="45" fill="none" stroke="#4b5563" strokeWidth="0.8"/>
+                <circle cx="60" cy="60" r="40" fill="none" stroke="#4b5563" strokeWidth="0.8"/>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="#4b5563" strokeWidth="0.8"/>
+                
+                {/* Label area - with purple tint */}
+                <circle cx="60" cy="60" r="25" fill="#1a1a2e" stroke="#7c3aed" strokeWidth="1.5"/>
+                
+                {/* Center hole */}
+                <circle cx="60" cy="60" r="8" fill="#000000" stroke="#9ca3af" strokeWidth="1.5"/>
+              </svg>
             </div>
           )}
         </div>
@@ -59,7 +84,7 @@ export default function ReleaseCard({ release }) {
             <div className="mb-3">
               <span className="inline-block px-3 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/50 rounded-full text-xs font-medium ring-1 ring-purple-500/20">
                 {release.genre}
-              </span>
+          </span>
             </div>
           )}
 

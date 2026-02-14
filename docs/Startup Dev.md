@@ -1,7 +1,8 @@
 Your New Dev Startup Routine 🚀
 Every time you start working on your project, run these two terminal commands:
 Terminal 1: Start Backend
-bashcd ~/Documents/music-agent-mvp/file-handler
+bash
+cd ~/Documents/music-agent-mvp/file-handler
 node server.js
 ```
 
