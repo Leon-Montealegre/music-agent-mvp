@@ -509,7 +509,7 @@ export default function TrackDetailPage({ params }) {
                   onClick={() => setShowPlatformModal(true)} 
                   className="mt-4 w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-500 hover:shadow-lg hover:shadow-purple-500/50 transition-all font-medium"
                 >
-                  + Log Platform Release
+                  + Add Platform
                 </button>
               </div>
             </div>
@@ -562,7 +562,7 @@ export default function TrackDetailPage({ params }) {
           setShowPlatformModal(false)
           setEditingEntry(null)
         }} 
-        title={editingEntry?.pathType === 'release' ? "Edit Platform Release" : "Log Platform Release"}
+        title={editingEntry?.pathType === 'release' ? "Edit Platform" : "Add Platform"}
       >
         <LogPlatformForm 
           releaseId={trackId} 
