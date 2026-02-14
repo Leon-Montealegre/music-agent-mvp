@@ -12,6 +12,10 @@ export default function HomePage() {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // all, not-submitted, submitted, signed, released
+  
+  // NEW: Sorting state
+  const [sortBy, setSortBy] = useState('date-newest') // default sort
+  const [sortDirection, setSortDirection] = useState('asc') // asc or desc
 
 
   useEffect(() => {
@@ -121,6 +125,64 @@ export default function HomePage() {
     return true
   })
 
+  // NEW: Sorting logic - happens AFTER filtering
+  const sortedReleases = [...filteredReleases].sort((a, b) => {
+    const metadataA = a.metadata || a
+    const metadataB = b.metadata || b
+    
+    let comparison = 0
+    
+    switch(sortBy) {
+      case 'title':
+        comparison = (metadataA.title || '').localeCompare(metadataB.title || '')
+        break
+      case 'artist':
+        comparison = (metadataA.artist || '').localeCompare(metadataB.artist || '')
+        break
+      case 'genre':
+        comparison = (metadataA.genre || '').localeCompare(metadataB.genre || '')
+        break
+      case 'bpm':
+        comparison = (metadataA.bpm || 0) - (metadataB.bpm || 0)
+        break
+      case 'key':
+        // Musical key sorting: C, C#, D, D#, E, F, F#, G, G#, A, A#, B
+        const keyOrder = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B']
+        const keyA = metadataA.key || ''
+        const keyB = metadataB.key || ''
+        const indexA = keyOrder.indexOf(keyA.split(' ')[0]) // Get just the note (not major/minor)
+        const indexB = keyOrder.indexOf(keyB.split(' ')[0])
+        comparison = indexA - indexB
+        break
+      case 'date-oldest':
+        // Extract date from releaseId (YYYY-MM-DD_Artist_Track)
+        comparison = (a.releaseId || '').localeCompare(b.releaseId || '')
+        break
+      case 'date-newest':
+        // Extract date from releaseId (YYYY-MM-DD_Artist_Track) - reversed
+        comparison = (b.releaseId || '').localeCompare(a.releaseId || '')
+        break
+      case 'platforms':
+        const platformsA = metadataA.distribution?.release?.length || 0
+        const platformsB = metadataB.distribution?.release?.length || 0
+        comparison = platformsA - platformsB
+        break
+      case 'submissions':
+        const subsA = metadataA.distribution?.submit?.length || 0
+        const subsB = metadataB.distribution?.submit?.length || 0
+        comparison = subsA - subsB
+        break
+      default:
+        comparison = 0
+    }
+    
+    // Apply sort direction (only if not date sorting, which handles it itself)
+    if (!sortBy.startsWith('date-')) {
+      return sortDirection === 'asc' ? comparison : -comparison
+    }
+    return comparison
+  })
+
 
   if (loading) {
     return (
@@ -145,7 +207,7 @@ export default function HomePage() {
                 Catalogue Dashboard
               </h1>
               <p className="text-gray-400">
-                {filteredReleases.length} {filteredReleases.length === 1 ? 'track' : 'tracks'} 
+                {sortedReleases.length} {sortedReleases.length === 1 ? 'track' : 'tracks'} 
                 {searchQuery || statusFilter !== 'all' ? ' (filtered)' : ''} • {releases.length} total
               </p>
             </div>
@@ -241,6 +303,39 @@ export default function HomePage() {
                 Released
               </button>
             </div>
+
+            {/* NEW: Sort Controls */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-gray-400 text-sm font-medium">Sort by:</span>
+              
+              {/* Sort Dropdown */}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="date-newest">📅 Date (Newest First)</option>
+                <option value="date-oldest">📅 Date (Oldest First)</option>
+                <option value="title">🎵 Track Name</option>
+                <option value="artist">👤 Artist Name</option>
+                <option value="genre">🎸 Genre</option>
+                <option value="bpm">⚡ BPM</option>
+                <option value="key">🎹 Key</option>
+                <option value="platforms">🔴 # of Releases</option>
+                <option value="submissions">📤 # of Submissions</option>
+              </select>
+
+              {/* Direction Toggle - only show for non-date sorts */}
+              {!sortBy.startsWith('date-') && (
+                <button
+                  onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-white text-sm transition-colors flex items-center gap-2"
+                  title={sortDirection === 'asc' ? 'Ascending (A→Z, Low→High)' : 'Descending (Z→A, High→Low)'}
+                >
+                  {sortDirection === 'asc' ? '↑ Ascending' : '↓ Descending'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -248,7 +343,7 @@ export default function HomePage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 pb-12">
-        {filteredReleases.length === 0 && releases.length === 0 ? (
+        {sortedReleases.length === 0 && releases.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">🎵</div>
             <h2 className="text-2xl font-bold text-gray-300 mb-2">
@@ -264,7 +359,7 @@ export default function HomePage() {
               Upload Track
             </Link>
           </div>
-        ) : filteredReleases.length === 0 ? (
+        ) : sortedReleases.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">🔍</div>
             <h2 className="text-2xl font-bold text-gray-300 mb-2">
@@ -284,8 +379,8 @@ export default function HomePage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredReleases.map((release) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+            {sortedReleases.map((release) => (
               <ReleaseCard key={release.releaseId} release={release} />
             ))}
           </div>
