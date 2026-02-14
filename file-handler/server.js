@@ -27,7 +27,8 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
-const RELEASES_BASE = '/Users/Mathias2/Documents/Music Agent/Releases';
+const os = require('os');
+const RELEASES_DIR = path.join(os.homedir(), 'Documents', 'Music Agent', 'Releases');
 app.use('/releases', express.static(RELEASES_BASE));
 
 // =============================================================================
