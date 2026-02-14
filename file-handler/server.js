@@ -134,7 +134,7 @@ function getVersionInfo(req) {
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const releaseId = requireReleaseId(req);
-    const releasePath = path.join(RELEASES_BASE, releaseId);
+    const releasePath = path.join(RELEASES_DIR, releaseId);
     const fileType = classify(file);
     
     let targetFolder;
@@ -187,7 +187,7 @@ app.post('/upload', upload.any(), async (req, res) => {
       });
     }
     
-    const releasePath = path.join(RELEASES_BASE, releaseId);
+    const releasePath = path.join(RELEASES_DIR, releaseId);
     const metadataPath = path.join(releasePath, 'metadata.json');
     
     // Load existing metadata
@@ -307,7 +307,7 @@ app.post('/metadata', async (req, res) => {
       });
     }
     
-    const releasePath = path.join(RELEASES_BASE, releaseId);
+    const releasePath = path.join(RELEASES_DIR, releaseId);
     const metadataPath = path.join(releasePath, 'metadata.json');
     
     await fs.mkdir(releasePath, { recursive: true });
@@ -349,13 +349,13 @@ app.post('/metadata', async (req, res) => {
 // --- List All Releases (FIX 1 - FLATTENED WITH DISTRIBUTION) ---
 app.get('/releases/', async (req, res) => {
   try {
-    const folders = await fs.readdir(RELEASES_BASE);
+    const folders = await fs.readdir(RELEASES_DIR);
     const releases = [];
     
     for (const folder of folders) {
       if (folder.startsWith('.')) continue;
       
-      const folderPath = path.join(RELEASES_BASE, folder);
+      const folderPath = path.join(RELEASES_DIR, folder);
       const stats = await fs.stat(folderPath);
       
       if (!stats.isDirectory()) continue;
@@ -429,7 +429,8 @@ app.get('/releases/', async (req, res) => {
 // --- Serve Artwork Images ---
 app.get('/releases/:releaseId/artwork/', (req, res) => {
   const { releaseId } = req.params;
-  const artworkPath = path.join(RELEASES_BASE, releaseId, 'artwork');
+  const artworkPath = path.join(RELEASES_DIR, releaseId, 'artwork');
+
 
   if (!fsSync.existsSync(artworkPath)) {
     return res.status(404).json({ 
@@ -889,7 +890,7 @@ app.delete('/releases/:releaseId/label-deal/contacts/:contactId', async (req, re
 app.get('/releases/:releaseId/', async (req, res) => {
   try {
     const releaseId = requireReleaseId(req);
-    const releasePath = path.join(RELEASES_BASE, releaseId);
+    const releasePath = path.join(RELEASES_DIR, releaseId);
     const metadataPath = path.join(releasePath, 'metadata.json');
     
     try {
