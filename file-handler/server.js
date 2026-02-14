@@ -379,6 +379,8 @@ app.get('/releases/', async (req, res) => {
           artist: metadata.artist,
           title: metadata.title,
           genre: metadata.genre,
+          bpm: metadata.bpm,           // ← ADD THIS
+          key: metadata.key,           // ← ADD THIS
           releaseDate: metadata.releaseDate || metadata.trackDate,
           releaseType: metadata.releaseType || metadata.releaseFormat,
           createdAt: metadata.createdAt,
@@ -393,7 +395,8 @@ app.get('/releases/', async (req, res) => {
             submit: [],
             promote: []
           }
-        });
+        })
+        ;
         
       } catch (error) {
         releases.push({
@@ -914,6 +917,8 @@ app.get('/releases/:releaseId/', async (req, res) => {
       artist: metadata.artist,
       title: metadata.title,
       genre: metadata.genre,
+      bpm: metadata.bpm,           // ← ADD THIS
+      key: metadata.key,           // ← ADD THIS
       releaseDate: metadata.releaseDate || metadata.trackDate,
       releaseType: metadata.releaseType || metadata.releaseFormat,
       createdAt: metadata.createdAt,
@@ -930,7 +935,8 @@ app.get('/releases/:releaseId/', async (req, res) => {
         signedDate: null,
         contractDocuments: []
       }
-    };
+    }
+    ;
     
     res.json({
       success: true,

@@ -18,6 +18,8 @@ export default function HomePage() {
     async function loadReleases() {
       try {
         const data = await fetchReleases()
+        console.log('📊 ALL RELEASES DATA:', data)
+        console.log('📊 FIRST RELEASE FULL:', JSON.stringify(data[0], null, 2))
         setReleases(data)
       } catch (err) {
         console.error('Error loading tracks:', err)
@@ -27,6 +29,8 @@ export default function HomePage() {
     }
     loadReleases()
   }, [])
+  
+  
 
 
   // Filter and search logic
