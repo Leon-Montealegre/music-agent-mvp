@@ -1,6 +1,5 @@
 'use client'
 
-
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -10,13 +9,12 @@ import LogPlatformForm from '@/components/LogPlatformForm'
 import LogSubmissionForm from '@/components/LogSubmissionForm'
 import DownloadModal from '@/components/DownloadModal'
 import DeleteTrackModal from '@/components/DeleteTrackModal'
-
+import SongLinks from '@/components/SongLinks'
 
 export default function TrackDetailPage({ params }) {
   const unwrappedParams = use(params)
   const trackId = unwrappedParams.releaseId
   const router = useRouter()
-
 
   // State
   const [track, setTrack] = useState(null)
@@ -41,7 +39,6 @@ export default function TrackDetailPage({ params }) {
   const [showDeleteTrackModal, setShowDeleteTrackModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-
   // Load track data
   async function loadTrack() {
     try {
@@ -58,11 +55,9 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-
   useEffect(() => {
     loadTrack()
   }, [trackId])
-
 
   // Handlers
   const handleModalSuccess = () => {
@@ -71,13 +66,11 @@ export default function TrackDetailPage({ params }) {
     loadTrack()
   }
 
-
   const handleFileClick = (file, fileType) => {
     setFileToDownload(file)
     setDownloadFileType(fileType)
     setShowDownloadModal(true)
   }
-
 
   async function handlePlatformSubmit(formData) {
     setSubmitting(true)
@@ -102,7 +95,6 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-
   async function handleSubmissionSubmit(formData) {
     setSubmitting(true)
     try {
@@ -126,7 +118,6 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-
   const handleMarkAsSigned = async (labelName) => {
     try {
       const response = await fetch(`http://localhost:3001/releases/${trackId}/sign`, {
@@ -135,9 +126,7 @@ export default function TrackDetailPage({ params }) {
         body: JSON.stringify({ labelName })
       })
 
-
       const data = await response.json()
-
 
       if (!response.ok) {
         console.error('Backend error:', data)
@@ -145,21 +134,17 @@ export default function TrackDetailPage({ params }) {
         return
       }
 
-
       console.log('✅ Successfully marked as signed:', data)
-
 
       const updatedTrack = await fetchRelease(trackId)
       setTrack(updatedTrack.release || updatedTrack)
       setShowLabelSigningModal(false)
-
 
     } catch (error) {
       console.error('Error marking as signed:', error)
       alert(`Error: ${error.message}`)
     }
   }
-
 
   const handleDeleteEntry = async (pathType, timestamp) => {
     try {
@@ -174,7 +159,6 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-
   const handleEditEntry = async (pathType, timestamp, updatedData) => {
     try {
       await updateDistributionEntry(trackId, pathType, timestamp, updatedData)
@@ -187,12 +171,10 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-
   const confirmDelete = (pathType, timestamp, entryLabel) => {
     setEntryToDelete({ pathType, timestamp, label: entryLabel })
     setShowDeleteConfirm(true)
   }
-
 
   const handleDeleteTrack = async () => {
     setIsDeleting(true)
@@ -207,7 +189,6 @@ export default function TrackDetailPage({ params }) {
       setShowDeleteTrackModal(false)
     }
   }
-
 
   // Derived state
   const metadata = track
@@ -228,7 +209,6 @@ export default function TrackDetailPage({ params }) {
   const showBadge = isSigned || hasSubmissions
   const displayLabel = signedLabel || submittedLabel
 
-
   // Loading state
   if (!metadata) {
     return (
@@ -241,61 +221,57 @@ export default function TrackDetailPage({ params }) {
     )
   }
 
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       {/* Header */}
-<div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
-  <div className="max-w-7xl mx-auto px-4 py-6">
-    <div className="flex items-start justify-between mb-4 gap-4">
-      {/* Left side: Title and badges */}
-      <div className="flex-1">
-        <div className="flex items-center gap-3 flex-wrap mb-2">
-          <h1 className="text-4xl font-bold text-gray-100">
-            {metadata.title || track.title}
-          </h1>
-          
-          {showBadge && (
-            <div className={`px-3 py-1 rounded-md text-sm font-semibold ${
-              isSigned 
-                ? 'bg-green-500/20 border border-green-500/50 text-green-300' 
-                : 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-300'
-            }`}>
-              {isSigned ? '✓ Signed' : '📤 Submitted'}
+      <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-start justify-between mb-4 gap-4">
+            {/* Left side: Title and badges */}
+            <div className="flex-1">
+              <div className="flex items-center gap-3 flex-wrap mb-2">
+                <h1 className="text-4xl font-bold text-gray-100">
+                  {metadata.title || track.title}
+                </h1>
+                
+                {showBadge && (
+                  <div className={`px-3 py-1 rounded-md text-sm font-semibold ${
+                    isSigned 
+                      ? 'bg-green-500/20 border border-green-500/50 text-green-300' 
+                      : 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-300'
+                  }`}>
+                    {isSigned ? '✓ Signed' : '📤 Submitted'}
+                  </div>
+                )}
+                
+                {isReleased && (
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">
+                    🔴 Released
+                  </div>
+                )}
+                
+                {isSigned && displayLabel && (
+                  <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">
+                    {displayLabel}
+                  </div>
+                )}
+              </div>
+              
+              <p className="text-xl text-gray-300">
+                {metadata.artist || track.artist}
+              </p>
             </div>
-          )}
-          
-          {isReleased && (
-            <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">
-              🔴 Released
-            </div>
-          )}
-          
-          {isSigned && displayLabel && (
-            <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">
-              {displayLabel}
-            </div>
-          )}
+
+            {/* Right side: Back button */}
+            <Link
+              href="/"
+              className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
+            >
+              ← Back to Catalogue
+            </Link>
+          </div>
         </div>
-        
-        <p className="text-xl text-gray-300">
-          {metadata.artist || track.artist}
-        </p>
       </div>
-
-      {/* Right side: Back button */}
-      <Link
-        href="/"
-        className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
-      >
-        ← Back to Catalogue
-      </Link>
-    </div>
-  </div>
-</div>
-
-
-
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -312,56 +288,53 @@ export default function TrackDetailPage({ params }) {
                 )}
               </div>
 
-
               {/* Metadata */}
-<div className="space-y-3">
-  {/* Genre - Styled Tag */}
-  {metadata.genre && (
-    <div>
-      <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Genre</p>
-      <span className="inline-block px-3 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/50 rounded-full text-sm font-medium ring-1 ring-purple-500/20">
-        {metadata.genre}
-      </span>
-    </div>
-  )}
-  
-  {/* BPM & Key - Subtle Display */}
-  {(metadata.bpm || metadata.key) && (
-    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-      <div className="grid grid-cols-2 gap-3">
-        {metadata.bpm && (
-          <div>
-            <p className="text-xs text-purple-300 uppercase tracking-wider">BPM</p>
-            <p className="text-sm font-medium text-gray-200">{metadata.bpm}</p>
-          </div>
-        )}
-        {metadata.key && (
-          <div>
-            <p className="text-xs text-purple-300 uppercase tracking-wider">Key</p>
-            <p className="text-sm font-medium text-gray-200">{metadata.key}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  )}
-  
-  <div>
-    <p className="text-xs text-gray-400 uppercase tracking-wider">Track Type</p>
-    <p className="text-sm font-medium text-gray-200">{metadata.trackType || metadata.releaseType || 'Original'}</p>
-  </div>
-  <div>
-    <p className="text-xs text-gray-400 uppercase tracking-wider">Production Date</p>
-    <p className="text-sm font-medium text-gray-200">
-      {metadata.trackDate || metadata.releaseDate ? new Date(metadata.trackDate || metadata.releaseDate).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'}) : 'Not set'}
-    </p>
-  </div>
-  <div>
-    <p className="text-xs text-gray-400 uppercase tracking-wider">Track ID</p>
-    <p className="text-xs font-mono text-gray-500 break-all">{metadata.releaseId || 'Not set'}</p>
-  </div>
-</div>
-
-
+              <div className="space-y-3">
+                {/* Genre - Styled Tag */}
+                {metadata.genre && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Genre</p>
+                    <span className="inline-block px-3 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/50 rounded-full text-sm font-medium ring-1 ring-purple-500/20">
+                      {metadata.genre}
+                    </span>
+                  </div>
+                )}
+                
+                {/* BPM & Key - Subtle Display */}
+                {(metadata.bpm || metadata.key) && (
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      {metadata.bpm && (
+                        <div>
+                          <p className="text-xs text-purple-300 uppercase tracking-wider">BPM</p>
+                          <p className="text-sm font-medium text-gray-200">{metadata.bpm}</p>
+                        </div>
+                      )}
+                      {metadata.key && (
+                        <div>
+                          <p className="text-xs text-purple-300 uppercase tracking-wider">Key</p>
+                          <p className="text-sm font-medium text-gray-200">{metadata.key}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Track Type</p>
+                  <p className="text-sm font-medium text-gray-200">{metadata.trackType || metadata.releaseType || 'Original'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Production Date</p>
+                  <p className="text-sm font-medium text-gray-200">
+                    {metadata.trackDate || metadata.releaseDate ? new Date(metadata.trackDate || metadata.releaseDate).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'}) : 'Not set'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Track ID</p>
+                  <p className="text-xs font-mono text-gray-500 break-all">{metadata.releaseId || 'Not set'}</p>
+                </div>
+              </div>
 
               {/* Files */}
               <div className="mt-6 pt-6 border-t border-gray-700">
@@ -435,43 +408,45 @@ export default function TrackDetailPage({ params }) {
                 </div>
               </div>
 
-
               {/* Label Deal Info */}
               {isSigned && metadata.labelInfo && (
-  <div className="mt-6 pt-6 border-t border-gray-700">
-    <h3 className="font-semibold text-gray-100 mb-3">Label Deal</h3>
-    <div className="space-y-3 text-sm">
-      <div>
-        <p className="text-xs text-gray-400 uppercase tracking-wider">Label</p>
-        <p className="text-sm font-medium text-gray-200">{signedLabel || 'Not set'}</p>
-      </div>
-      <div>
-        <p className="text-xs text-gray-400 uppercase tracking-wider">Format</p>
-        <p className="text-sm font-medium text-gray-200">{metadata.releaseFormat || metadata.releaseType || 'Single'}</p>
-      </div>
-      <div>
-        <p className="text-xs text-gray-400 uppercase tracking-wider">Signed Date</p>
-        <p className="text-sm text-gray-300">
-          {metadata.labelInfo.signedDate ? new Date(metadata.labelInfo.signedDate).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'}) : 'Not set'}
-        </p>
-      </div>
-      <Link
-        href={`/releases/${trackId}/label-deal`}
-        className="block mt-4 text-center bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-300 px-4 py-2 rounded-lg transition-all font-medium text-sm"
-      >
-        Label Deal Details →
-      </Link>
-    </div>
-  </div>
-)}
-
-
+                <div className="mt-6 pt-6 border-t border-gray-700">
+                  <h3 className="font-semibold text-gray-100 mb-3">Label Deal</h3>
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider">Label</p>
+                      <p className="text-sm font-medium text-gray-200">{signedLabel || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider">Format</p>
+                      <p className="text-sm font-medium text-gray-200">{metadata.releaseFormat || metadata.releaseType || 'Single'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider">Signed Date</p>
+                      <p className="text-sm text-gray-300">
+                        {metadata.labelInfo.signedDate ? new Date(metadata.labelInfo.signedDate).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'}) : 'Not set'}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/releases/${trackId}/label-deal`}
+                      className="block mt-4 text-center bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-300 px-4 py-2 rounded-lg transition-all font-medium text-sm"
+                    >
+                      Label Deal Details →
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-
           {/* Right Content */}
           <div className="lg:col-span-2 space-y-8">
+            {/* Song Links - NEW SECTION AT THE TOP */}
+            <SongLinks 
+              releaseId={trackId}
+              initialLinks={track.songLinks || []}
+            />
+
             {/* Label Submissions */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
@@ -532,7 +507,6 @@ export default function TrackDetailPage({ params }) {
               </div>
             </div>
 
-
             {/* Platform Distribution */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
@@ -586,7 +560,6 @@ export default function TrackDetailPage({ params }) {
               </div>
             </div>
 
-
             {/* Marketing Content */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
@@ -612,7 +585,6 @@ export default function TrackDetailPage({ params }) {
               </div>
             </div>
 
-
             {/* Delete Track Button */}
             <div className="flex justify-end">
               <button
@@ -626,9 +598,6 @@ export default function TrackDetailPage({ params }) {
           </div>
         </div>
       </div>
-
-
-
 
       {/* Platform Modal - Add or Edit */}
       <Modal 
@@ -655,7 +624,6 @@ export default function TrackDetailPage({ params }) {
         />
       </Modal>
 
-
       {/* Submission Modal - Add or Edit */}
       <Modal 
         isOpen={showSubmissionModal || (editingEntry?.pathType === 'submit')} 
@@ -680,7 +648,6 @@ export default function TrackDetailPage({ params }) {
           existingEntry={editingEntry}
         />
       </Modal>
-
 
       {/* Mark as Signed Modal */}
       <Modal
@@ -716,7 +683,6 @@ export default function TrackDetailPage({ params }) {
         </div>
       </Modal>
 
-
       {/* Delete Entry Confirmation Modal */}
       <Modal
         isOpen={showDeleteConfirm}
@@ -749,7 +715,6 @@ export default function TrackDetailPage({ params }) {
         </div>
       </Modal>
 
-
       {/* Download Modal */}
       <DownloadModal
         isOpen={showDownloadModal}
@@ -758,7 +723,6 @@ export default function TrackDetailPage({ params }) {
         releaseId={trackId}
         fileType={downloadFileType}
       />
-
 
       {/* Delete Track Modal */}
       <DeleteTrackModal

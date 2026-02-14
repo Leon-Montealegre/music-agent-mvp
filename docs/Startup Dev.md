@@ -12,7 +12,8 @@ node server.js
 Keep this terminal open while you work. This is your API server.
 
 Terminal 2: Start Frontend
-bashcd ~/Documents/music-agent-mvp/frontend
+bash
+cd ~/Documents/music-agent-mvp/frontend
 npm run dev
 ```
 
