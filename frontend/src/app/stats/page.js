@@ -226,30 +226,31 @@ export default function StatsPage() {
             </div>
 
             {/* BPM Stats Card */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-100 mb-4">🎵 BPM Analysis</h2>
-              {stats.avgBpm > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Average BPM:</span>
-                    <span className="text-2xl font-bold text-purple-400">{stats.avgBpm}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Range:</span>
-                    <span className="text-lg font-semibold text-gray-300">
-                      {stats.bpmRange.min} - {stats.bpmRange.max}
-                    </span>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-700">
-                    <p className="text-sm text-gray-500">
-                      Based on {Object.values(releases).filter(r => r.metadata.bpm).length} tracks with BPM data
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-gray-500">No BPM data available yet. Add BPM to your tracks!</p>
-              )}
-            </div>
+<div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+  <h2 className="text-xl font-bold text-gray-100 mb-4">🎵 BPM Analysis</h2>
+  {stats.avgBpm > 0 ? (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <span className="text-gray-400">Average BPM:</span>
+        <span className="text-2xl font-bold text-purple-400">{stats.avgBpm}</span>
+      </div>
+      <div className="flex justify-between items-center">
+        <span className="text-gray-400">Range:</span>
+        <span className="text-lg font-semibold text-gray-300">
+          {stats.bpmRange.min} - {stats.bpmRange.max}
+        </span>
+      </div>
+      <div className="mt-4 pt-4 border-t border-gray-700">
+        <p className="text-sm text-gray-500">
+          Based on {releases.filter(r => r.bpm).length} tracks with BPM data
+        </p>
+      </div>
+    </div>
+  ) : (
+    <p className="text-gray-500">No BPM data available yet. Add BPM to your tracks!</p>
+  )}
+</div>
+
 
             {/* Top Genres Card */}
             <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">

@@ -247,48 +247,53 @@ export default function TrackDetailPage({ params }) {
       {/* Header */}
 <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
   <div className="max-w-7xl mx-auto px-4 py-6">
-    <div className="flex items-center justify-between mb-4">
+    <div className="flex items-start justify-between mb-4 gap-4">
+      {/* Left side: Title and badges */}
+      <div className="flex-1">
+        <div className="flex items-center gap-3 flex-wrap mb-2">
+          <h1 className="text-4xl font-bold text-gray-100">
+            {metadata.title || track.title}
+          </h1>
+          
+          {showBadge && (
+            <div className={`px-3 py-1 rounded-md text-sm font-semibold ${
+              isSigned 
+                ? 'bg-green-500/20 border border-green-500/50 text-green-300' 
+                : 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-300'
+            }`}>
+              {isSigned ? '✓ Signed' : '📤 Submitted'}
+            </div>
+          )}
+          
+          {isReleased && (
+            <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">
+              🔴 Released
+            </div>
+          )}
+          
+          {isSigned && displayLabel && (
+            <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">
+              {displayLabel}
+            </div>
+          )}
+        </div>
+        
+        <p className="text-xl text-gray-300">
+          {metadata.artist || track.artist}
+        </p>
+      </div>
+
+      {/* Right side: Back button */}
       <Link
         href="/"
-        className="text-purple-400 hover:text-purple-300 transition-colors whitespace-nowrap"
+        className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
       >
         ← Back to Catalogue
       </Link>
     </div>
-    
-    <div className="flex items-center gap-3 flex-wrap">
-      <h1 className="text-4xl font-bold text-gray-100">
-        {metadata.title || track.title}
-      </h1>
-      
-      {showBadge && (
-        <div className={`px-3 py-1 rounded-md text-sm font-semibold ${
-          isSigned 
-            ? 'bg-green-500/20 border border-green-500/50 text-green-300' 
-            : 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-300'
-        }`}>
-          {isSigned ? '✓ Signed' : '📤 Submitted'}
-        </div>
-      )}
-      
-      {isReleased && (
-        <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">
-          🔴 Released
-        </div>
-      )}
-      
-      {isSigned && displayLabel && (
-        <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">
-          {displayLabel}
-        </div>
-      )}
-    </div>
-    
-    <p className="text-xl text-gray-300 mt-2">
-      {metadata.artist || track.artist}
-    </p>
   </div>
 </div>
+
 
 
 

@@ -158,6 +158,7 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
         >
           <option value="">Choose role</option>
           <option value="A&R">A&R</option>
+          <option value="Label Owner">Label Owner</option>
           <option value="Label Manager">Label Manager</option>
           <option value="Marketing">Marketing</option>
           <option value="Booking Agent">Booking Agent</option>
