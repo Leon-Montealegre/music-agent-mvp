@@ -10,6 +10,8 @@ import LogSubmissionForm from '@/components/LogSubmissionForm'
 import DownloadModal from '@/components/DownloadModal'
 import DeleteTrackModal from '@/components/DeleteTrackModal'
 import SongLinks from '@/components/SongLinks'
+import TrackNotes from '@/components/TrackNotes';
+
 
 export default function TrackDetailPage({ params }) {
   const unwrappedParams = use(params)
@@ -39,12 +41,14 @@ export default function TrackDetailPage({ params }) {
   const [showDeleteTrackModal, setShowDeleteTrackModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Load track data
   async function loadTrack() {
     try {
       setLoading(true)
       const data = await fetchRelease(trackId)
+      console.log('🔍 Full API response:', data);
       const actualTrack = data.release || data
+      console.log('🔍 Actual track:', actualTrack);
+      console.log('🔍 Track notes:', actualTrack.notes);
       setTrack(actualTrack)
       setError(null)
     } catch (err) {
@@ -54,6 +58,7 @@ export default function TrackDetailPage({ params }) {
       setLoading(false)
     }
   }
+  
 
   useEffect(() => {
     loadTrack()
@@ -584,6 +589,21 @@ export default function TrackDetailPage({ params }) {
                 </button>
               </div>
             </div>
+          {/* Right Content */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* ... Song Links, Label Submissions, Platform Distribution, Marketing Content ... */}
+
+            {/* NOTES SECTION - ADD THIS */}
+            <TrackNotes 
+              releaseId={trackId}
+              initialNotes={track.notes?.text || ''}
+              initialDocuments={track.notes?.documents || []}
+              onUpdate={loadTrack}
+            />
+
+           
+          </div>
+
 
             {/* Delete Track Button */}
             <div className="flex justify-end">

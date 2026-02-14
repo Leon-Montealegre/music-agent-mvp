@@ -917,13 +917,16 @@ app.get('/releases/:releaseId/', async (req, res) => {
       artist: metadata.artist,
       title: metadata.title,
       genre: metadata.genre,
-      bpm: metadata.bpm,           // ← ADD THIS
-      key: metadata.key,           // ← ADD THIS
+      bpm: metadata.bpm,
+      key: metadata.key,
       releaseDate: metadata.releaseDate || metadata.trackDate,
       releaseType: metadata.releaseType || metadata.releaseFormat,
+      trackType: metadata.trackType,
+      trackDate: metadata.trackDate,
       createdAt: metadata.createdAt,
       updatedAt: parsed.updatedAt,
       versions: versions,
+      files: metadata.files,
       distribution: metadata.distribution || {
         release: [],
         submit: [],
@@ -934,9 +937,15 @@ app.get('/releases/:releaseId/', async (req, res) => {
         label: null,
         signedDate: null,
         contractDocuments: []
-      }
-    }
-    ;
+      },
+      notes: parsed.notes || {
+        text: '',
+        documents: []
+      },
+      songLinks: parsed.songLinks || []
+      
+    };
+    
     
     res.json({
       success: true,
@@ -1477,6 +1486,141 @@ app.delete('/releases/:releaseId/song-links/:linkId', async (req, res) => {
   } catch (error) {
     console.error('Error deleting song link:', error);
     res.status(500).json({ error: 'Failed to delete song link' });
+  }
+});
+
+// ========================================
+// NOTES ENDPOINTS
+// ========================================
+
+// Update notes text
+app.patch('/releases/:releaseId/notes', async (req, res) => {
+  const { releaseId } = req.params;
+  const { notes } = req.body;
+
+  try {
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json');
+    
+    try {
+      await fs.access(metadataPath);
+    } catch {
+      return res.status(404).json({ error: 'Release not found' });
+    }
+
+    const metadataContent = await fs.readFile(metadataPath, 'utf8');
+    const metadata = JSON.parse(metadataContent);
+    
+    // Initialize notes object if it doesn't exist
+    if (!metadata.notes) {
+      metadata.notes = { text: '', documents: [] };
+    }
+
+    // Update notes text
+    metadata.notes.text = notes;
+
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+
+    console.log(`✅ Updated notes for ${releaseId}`);
+    res.json(metadata);
+  } catch (error) {
+    console.error('Error updating notes:', error);
+    res.status(500).json({ error: 'Failed to update notes' });
+  }
+});
+
+// Upload document to notes
+app.post('/releases/:releaseId/notes/files', upload.single('file'), async (req, res) => {
+  const { releaseId } = req.params;
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const releasePath = path.join(RELEASES_DIR, releaseId);
+    const notesDir = path.join(releasePath, 'notes');
+    
+    // Create notes directory if it doesn't exist
+    await fs.mkdir(notesDir, { recursive: true });
+
+    // Move file to notes directory
+    const targetPath = path.join(notesDir, req.file.originalname);
+    await fs.rename(req.file.path, targetPath);
+
+    // Update metadata
+    const metadataPath = path.join(releasePath, 'metadata.json');
+    const metadataContent = await fs.readFile(metadataPath, 'utf8');
+    const metadata = JSON.parse(metadataContent);
+
+    if (!metadata.notes) {
+      metadata.notes = { text: '', documents: [] };
+    }
+
+    // Add document info
+    metadata.notes.documents.push({
+      filename: req.file.originalname,
+      size: req.file.size,
+      uploadedAt: new Date().toISOString()
+    });
+
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+
+    console.log(`✅ Uploaded document to notes: ${req.file.originalname}`);
+    res.json({ documents: metadata.notes.documents });
+  } catch (error) {
+    console.error('Error uploading note document:', error);
+    res.status(500).json({ error: 'Failed to upload document' });
+  }
+});
+
+// Download document from notes
+app.get('/releases/:releaseId/notes/files/:filename', async (req, res) => {
+  const { releaseId, filename } = req.params;
+
+  try {
+    const filePath = path.join(RELEASES_DIR, releaseId, 'notes', filename);
+    
+    try {
+      await fs.access(filePath);
+    } catch {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    res.download(filePath);
+  } catch (error) {
+    console.error('Error downloading note document:', error);
+    res.status(500).json({ error: 'Failed to download document' });
+  }
+});
+
+// Delete document from notes
+app.delete('/releases/:releaseId/notes/files/:filename', async (req, res) => {
+  const { releaseId, filename } = req.params;
+
+  try {
+    const filePath = path.join(RELEASES_DIR, releaseId, 'notes', filename);
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json');
+
+    // Delete file
+    await fs.unlink(filePath);
+
+    // Update metadata
+    const metadataContent = await fs.readFile(metadataPath, 'utf8');
+    const metadata = JSON.parse(metadataContent);
+
+    if (metadata.notes && metadata.notes.documents) {
+      metadata.notes.documents = metadata.notes.documents.filter(
+        doc => doc.filename !== filename
+      );
+    }
+
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+
+    console.log(`✅ Deleted note document: ${filename}`);
+    res.json({ documents: metadata.notes?.documents || [] });
+  } catch (error) {
+    console.error('Error deleting note document:', error);
+    res.status(500).json({ error: 'Failed to delete document' });
   }
 });
 
