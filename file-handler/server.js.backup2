@@ -29,7 +29,7 @@ app.use(express.json());
 
 const os = require('os');
 const RELEASES_BASE = path.join(os.homedir(), 'Documents', 'Music Agent');
-const RELEASES_DIR = path.join(RELEASES_BASE, 'Releases');
+const RELEASES_DIR = path.join(RELEASES_DIR, 'Releases');
 app.use('/releases', express.static(RELEASES_BASE));
 
 // =============================================================================
