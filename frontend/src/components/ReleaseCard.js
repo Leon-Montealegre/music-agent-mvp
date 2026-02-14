@@ -73,6 +73,25 @@ export default function ReleaseCard({ release }) {
             {release.artist}
           </p>
 
+          {/* NEW: Metadata Row (Genre, BPM, Key) */}
+          <div className="mb-3 flex gap-2 flex-wrap items-center">
+            {release.genre && (
+              <span className="inline-block px-2 py-1 rounded-md text-xs font-medium bg-purple-600/30 text-purple-300 border border-purple-500/50">
+                {release.genre}
+              </span>
+            )}
+            {release.bpm && (
+              <span className="text-xs text-gray-400">
+                ⚡ {release.bpm} BPM
+              </span>
+            )}
+            {release.key && (
+              <span className="text-xs text-gray-400">
+                🎹 {release.key}
+              </span>
+            )}
+          </div>
+
           {/* Badges Row */}
           {(showBadge || isReleased) && (
             <div className="mb-3 flex gap-2 flex-wrap">
