@@ -11,8 +11,12 @@ export default function ReleaseCard({ release }) {
   const hasSubmissions = release.distribution?.submit?.length > 0
   const submittedLabel = hasSubmissions ? release.distribution.submit[0].label : null
   
+  // Released badge logic
+  const isReleased = release.distribution?.release?.some(
+    entry => entry.status?.toLowerCase() === 'live'
+  )
+  
   const showBadge = isSigned || hasSubmissions
-  const badgeLabel = signedLabel || submittedLabel
 
   return (
     <Link href={`/releases/${release.releaseId}`}>
@@ -67,15 +71,23 @@ export default function ReleaseCard({ release }) {
           </p>
 
           {/* Badges Row - ABOVE genre */}
-          {showBadge && (
-            <div className="mb-2">
-              <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ring-1 ${
-                isSigned 
-                  ? 'bg-green-500/20 text-green-300 border border-green-500/50 ring-green-500/20' 
-                  : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 ring-yellow-500/20'
-              }`}>
-                {isSigned ? '✓ Signed' : '📤 Submitted'}
-              </span>
+          {(showBadge || isReleased) && (
+            <div className="mb-2 flex gap-2 flex-wrap">
+              {showBadge && (
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ring-1 ${
+                  isSigned 
+                    ? 'bg-green-500/20 text-green-300 border border-green-500/50 ring-green-500/20' 
+                    : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 ring-yellow-500/20'
+                }`}>
+                  {isSigned ? '✓ Signed' : '📤 Submitted'}
+                </span>
+              )}
+              
+              {isReleased && (
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-blue-600/30 text-blue-300 border border-blue-500/50 ring-1 ring-blue-500/20">
+                  🔴 Released
+                </span>
+              )}
             </div>
           )}
 
