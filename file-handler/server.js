@@ -1401,6 +1401,85 @@ app.use((err, req, res, next) => {
 // =============================================================================
 // START SERVER
 // =============================================================================
+// ========================================
+// ========================================
+// SONG LINKS ENDPOINTS
+// ========================================
+
+// Add a song link
+app.post('/releases/:releaseId/song-links', async (req, res) => {
+  const { releaseId } = req.params;
+  const newLink = req.body;
+
+  try {
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json');
+    
+    // Check if file exists (async way)
+    try {
+      await fs.access(metadataPath);
+    } catch {
+      return res.status(404).json({ error: 'Release not found' });
+    }
+
+    // Read metadata
+    const metadataContent = await fs.readFile(metadataPath, 'utf8');
+    const metadata = JSON.parse(metadataContent);
+    
+    // Initialize songLinks array if it doesn't exist
+    if (!metadata.songLinks) {
+      metadata.songLinks = [];
+    }
+
+    // Add the new link
+    metadata.songLinks.push(newLink);
+
+    // Save updated metadata
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+
+    console.log(`✅ Added song link to ${releaseId}:`, newLink.title);
+    res.json(metadata);
+  } catch (error) {
+    console.error('Error adding song link:', error);
+    res.status(500).json({ error: 'Failed to add song link' });
+  }
+});
+
+// Delete a song link
+app.delete('/releases/:releaseId/song-links/:linkId', async (req, res) => {
+  const { releaseId, linkId } = req.params;
+
+  try {
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json');
+    
+    // Check if file exists (async way)
+    try {
+      await fs.access(metadataPath);
+    } catch {
+      return res.status(404).json({ error: 'Release not found' });
+    }
+
+    // Read metadata
+    const metadataContent = await fs.readFile(metadataPath, 'utf8');
+    const metadata = JSON.parse(metadataContent);
+    
+    if (!metadata.songLinks) {
+      return res.status(404).json({ error: 'No song links found' });
+    }
+
+    // Filter out the link to delete
+    metadata.songLinks = metadata.songLinks.filter(link => link.id !== linkId);
+
+    // Save updated metadata
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+
+    console.log(`✅ Deleted song link ${linkId} from ${releaseId}`);
+    res.json(metadata);
+  } catch (error) {
+    console.error('Error deleting song link:', error);
+    res.status(500).json({ error: 'Failed to delete song link' });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`✅ Release Management API running on http://localhost:${PORT}`);
