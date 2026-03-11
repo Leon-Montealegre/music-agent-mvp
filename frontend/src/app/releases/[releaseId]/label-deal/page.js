@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { fetchRelease, uploadLabelDealFile, deleteLabelDealFile } from '@/lib/api'
 import Modal from '@/components/Modal'
+import BackButton from '@/components/BackButton'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 
@@ -173,12 +174,7 @@ export default function LabelDealPage({ params }) {
       </div>
       
       {/* Right side: Back button */}
-      <Link
-        href={`/releases/${releaseId}`}
-        className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
-      >
-        ← Back to Track
-      </Link>
+      <BackButton href={`/releases/${releaseId}`} label="Back to Track" />
     </div>
   </div>
 </div>

@@ -3,10 +3,12 @@ import Link from 'next/link'
 import ScrollToTop from '@/components/ScrollToTop'
 import FeedbackButton from '@/components/FeedbackButton'
 
+
 export const metadata = {
   title: 'Music Agent',
   description: 'Manage your music catalogue',
 }
+
 
 export default function RootLayout({ children }) {
   return (
@@ -27,6 +29,15 @@ export default function RootLayout({ children }) {
               
               <div className="flex items-center gap-3">
                 <FeedbackButton />
+
+                {/* ✅ NEW: Settings link */}
+                <Link
+                  href="/settings"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg transition-colors font-medium text-sm shadow-md border border-gray-600/50"
+                >
+                  <span className="text-base">⚙️</span>
+                  <span>Settings</span>
+                </Link>
                 
                 <a
                   href="https://www.buymeacoffee.com/musicagent"
@@ -41,6 +52,7 @@ export default function RootLayout({ children }) {
             </div>
           </div>
         </header>
+
 
         {children}
       </body>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { fetchRelease, updateDistribution, deleteDistributionEntry, updateDistributionEntry, deleteRelease } from '@/lib/api'
 import Modal from '@/components/Modal'
+import BackButton from '@/components/BackButton'
 import LogPlatformForm from '@/components/LogPlatformForm'
 import LogSubmissionForm from '@/components/LogSubmissionForm'
 import DownloadModal from '@/components/DownloadModal'
@@ -268,12 +269,8 @@ export default function TrackDetailPage({ params }) {
             </div>
 
             {/* Right side: Back button */}
-            <Link
-              href="/"
-              className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
-            >
-              ← Back to Catalogue
-            </Link>
+            <BackButton />
+            
           </div>
         </div>
       </div>
@@ -456,7 +453,7 @@ export default function TrackDetailPage({ params }) {
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
                 <h2 className="text-xl font-semibold text-gray-100">Label Submissions</h2>
-                <p className="text-sm text-gray-400 mt-1">Track where you've submitted this track to labels</p>
+                <p className="text-sm text-gray-400 mt-1">Track where you&apos;ve submitted this track to labels</p>
               </div>
               <div className="p-6">
                 {track.distribution?.submit?.length > 0 ? (
@@ -467,7 +464,7 @@ export default function TrackDetailPage({ params }) {
                           <div className="flex-1">
                             <p className="font-medium text-lg text-gray-100">{entry.label}</p>
                             <p className="text-sm text-gray-400 mt-1">via {entry.platform} • <span className="font-medium text-gray-300">{entry.status}</span></p>
-                            {entry.notes && <p className="text-sm text-gray-500 mt-2 italic">"{entry.notes}"</p>}
+                            {entry.notes && <p className="text-sm text-gray-500 mt-2 italic">&quot;{entry.notes}&quot;</p>}
                           </div>
                           <div className="flex items-center gap-2 ml-4">
                             <span className="text-xs text-gray-500">

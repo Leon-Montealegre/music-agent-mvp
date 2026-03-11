@@ -1628,3 +1628,30 @@ app.delete('/releases/:releaseId/notes/files/:filename', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Release Management API running on http://localhost:${PORT}`);
 });
+
+// Adding Default Settings Endpoint
+const SETTINGS_PATH = path.join(os.homedir(), 'Documents', 'Music Agent', 'settings.json')
+
+// Helper to read settings
+async function readSettings() {
+  try {
+    const data = await fs.readFile(SETTINGS_PATH, 'utf8')
+    return JSON.parse(data)
+  } catch {
+    return {} // Return empty object if file doesn't exist yet
+  }
+}
+
+// GET /settings — Read current settings
+app.get('/settings', async (req, res) => {
+  const settings = await readSettings()
+  res.json({ success: true, settings })
+})
+
+// PATCH /settings — Update settings
+app.patch('/settings', async (req, res) => {
+  const currentSettings = await readSettings()
+  const updatedSettings = { ...currentSettings, ...req.body }
+  await fs.writeFile(SETTINGS_PATH, JSON.stringify(updatedSettings, null, 2))
+  res.json({ success: true, settings: updatedSettings })
+})

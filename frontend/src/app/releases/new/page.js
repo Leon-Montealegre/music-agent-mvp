@@ -1,7 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
 
 export default function CreateTrackPage() {
   const router = useRouter()
@@ -13,7 +14,6 @@ export default function CreateTrackPage() {
   const [trackDate, setTrackDate] = useState(new Date().toISOString().split('T')[0])
   const [releaseFormat, setReleaseFormat] = useState('')
   
-  // NEW: BPM and Key fields
   const [bpm, setBpm] = useState('')
   const [key, setKey] = useState('')
   
@@ -21,10 +21,25 @@ export default function CreateTrackPage() {
   const [artworkFile, setArtworkFile] = useState(null)
   const [videoFile, setVideoFile] = useState(null)
 
+  useEffect(() => {
+    async function loadDefaults() {
+      try {
+        const res = await fetch('http://localhost:3001/settings')
+        const data = await res.json()
+        if (data.settings?.defaultArtistName) {
+          setArtist(data.settings.defaultArtistName)
+        }
+      } catch (err) {
+        console.error('Could not load default artist name:', err)
+      }
+    }
+    loadDefaults()
+  }, [])
+
+  // ✅ ONLY ONE genres line — the duplicate "const genres = ['Ambient', 'Deep House', ..." is deleted
   const genres = ['Ambient', 'Deep House', 'House', 'Indie Dance', 'Melodic House and Techno', 'Progressive House', 'Tech House', 'Techno', 'Trance', 'Other']
   const releaseFormats = ['Single', 'EP', 'Album', 'Remix']
   
-  // NEW: All 24 musical keys
   const keys = [
     'A minor', 'A major',
     'A# minor', 'A# major',
@@ -40,11 +55,13 @@ export default function CreateTrackPage() {
     'G# minor', 'G# major'
   ]
 
+
   const generateTrackId = (date, artistName, trackTitle) => {
     const cleanArtist = artistName.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')
     const cleanTitle = trackTitle.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')
     return `${date}_${cleanArtist}_${cleanTitle}`
   }
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -63,23 +80,16 @@ export default function CreateTrackPage() {
       if (artworkFile) formData.append('artwork', artworkFile)
       if (videoFile) formData.append('video', videoFile)
 
-      // Build upload URL with all metadata (including optional BPM and Key)
       let uploadUrl = `http://localhost:3001/upload?releaseId=${encodeURIComponent(trackId)}&artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&genre=${encodeURIComponent(genre)}`
       
-      // NEW: Add BPM and Key if provided
-      if (bpm) {
-        uploadUrl += `&bpm=${encodeURIComponent(bpm)}`
-      }
-      if (key) {
-        uploadUrl += `&key=${encodeURIComponent(key)}`
-      }
+      if (bpm) uploadUrl += `&bpm=${encodeURIComponent(bpm)}`
+      if (key) uploadUrl += `&key=${encodeURIComponent(key)}`
       
       const uploadResponse = await fetch(uploadUrl, { method: 'POST', body: formData })
       if (!uploadResponse.ok) throw new Error((await uploadResponse.json()).error || 'Upload failed')
 
       const uploadData = await uploadResponse.json()
       
-      // Build metadata payload with optional BPM and Key
       const metadataPayload = {
         releaseId: trackId,
         metadata: {
@@ -91,7 +101,6 @@ export default function CreateTrackPage() {
           releaseType: releaseFormat, 
           trackDate, 
           releaseDate: trackDate,
-          // NEW: Add BPM and Key if provided
           ...(bpm && { bpm: parseInt(bpm) }),
           ...(key && { key }),
           createdAt: new Date().toISOString(), 
@@ -115,7 +124,9 @@ export default function CreateTrackPage() {
     }
   }
 
+
   const fileInputClasses = "w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-600 file:text-white hover:file:bg-purple-500 file:cursor-pointer"
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black py-8 px-4">
@@ -166,7 +177,7 @@ export default function CreateTrackPage() {
             </div>
           </div>
 
-          {/* NEW: Optional Details Section */}
+          {/* Optional Details Section */}
           <div className="space-y-6 pt-6 border-t border-gray-600">
             <h2 className="text-lg font-semibold text-gray-200 border-b border-gray-600 pb-2">Optional Details</h2>
             

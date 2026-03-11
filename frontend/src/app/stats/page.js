@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { fetchReleases } from '@/lib/api'
 import Link from 'next/link'
+import BackButton from '@/components/BackButton'
 
 export default function StatsPage() {
   const [releases, setReleases] = useState([])
@@ -172,12 +173,7 @@ export default function StatsPage() {
             </h1>
             <p className="text-gray-400">Analytics for {stats.total} tracks</p>
           </div>
-          <Link
-            href="/"
-            className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium"
-          >
-            ← Back to Catalogue
-          </Link>
+          <BackButton />  
         </div>
 
         {releases.length === 0 ? (
