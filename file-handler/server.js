@@ -160,6 +160,20 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+// ✅ Separate multer instance for collections (uses collectionId, not releaseId)
+const collectionStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const { collectionId } = req.params
+    const artworkDir = path.join(COLLECTIONS_PATH, collectionId, 'artwork')
+    fsSync.mkdirSync(artworkDir, { recursive: true })
+    cb(null, artworkDir)
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname)
+    cb(null, `artwork${ext}`)
+  }
+})
+const collectionUpload = multer({ storage: collectionStorage })
 
 // =============================================================================
 // API ROUTES
@@ -383,6 +397,9 @@ app.get('/releases/', async (req, res) => {
           key: metadata.key,           // ← ADD THIS
           releaseDate: metadata.releaseDate || metadata.trackDate,
           releaseType: metadata.releaseType || metadata.releaseFormat,
+          releaseFormat: metadata.releaseFormat || metadata.releaseType,
+          collectionId: metadata.collectionId || null,
+
           createdAt: metadata.createdAt,
           versionCount: Object.keys(versions).length,
           fileCounts: {
@@ -921,6 +938,9 @@ app.get('/releases/:releaseId/', async (req, res) => {
       key: metadata.key,
       releaseDate: metadata.releaseDate || metadata.trackDate,
       releaseType: metadata.releaseType || metadata.releaseFormat,
+      releaseFormat: metadata.releaseFormat || metadata.releaseType,
+      collectionId: metadata.collectionId || null,
+
       trackType: metadata.trackType,
       trackDate: metadata.trackDate,
       createdAt: metadata.createdAt,
@@ -1630,7 +1650,7 @@ app.listen(PORT, () => {
 });
 
 // Adding Default Settings Endpoint
-const SETTINGS_PATH = path.join(os.homedir(), 'Documents', 'Music Agent', 'settings.json')
+const SETTINGS_PATH = path.join(os.homedir(), 'Documents', 'music-agent-mvp', 'file-handler', 'settings.json')
 
 // Helper to read settings
 async function readSettings() {
@@ -1655,3 +1675,257 @@ app.patch('/settings', async (req, res) => {
   await fs.writeFile(SETTINGS_PATH, JSON.stringify(updatedSettings, null, 2))
   res.json({ success: true, settings: updatedSettings })
 })
+
+// PATCH /releases/:releaseId/metadata — Edit track metadata
+app.patch('/releases/:releaseId/metadata', async (req, res) => {
+  try {
+    const { releaseId } = req.params
+    const updates = req.body
+
+    const metadataPath = path.join(
+      os.homedir(), 'Documents', 'Music Agent', 'Releases', releaseId, 'metadata.json'
+    )
+
+    const fileExists = await fs.access(metadataPath).then(() => true).catch(() => false)
+    if (!fileExists) {
+      return res.status(404).json({ success: false, error: 'Release not found' })
+    }
+
+    const existing = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
+
+    if (existing.metadata) {
+      // Nested structure — merge into nested metadata object
+      existing.metadata = {
+        ...existing.metadata,
+        ...updates,
+        releaseId: existing.metadata.releaseId  // lock releaseId
+      }
+
+      // ✅ Clean up any duplicate root-level fields left from previous tests
+      const metadataFields = ['genre', 'artist', 'title', 'bpm', 'key', 'trackDate', 'releaseDate', 'releaseFormat', 'releaseType']
+      metadataFields.forEach(field => {
+        if (existing[field] !== undefined && existing.metadata[field] !== undefined) {
+          delete existing[field]
+        }
+      })
+    } else {
+      // Flat structure — merge at root level
+      Object.assign(existing, updates)
+      existing.releaseId = releaseId
+    }
+
+    existing.updatedAt = new Date().toISOString()
+
+    await fs.writeFile(metadataPath, JSON.stringify(existing, null, 2))
+
+    res.json({ success: true, release: existing })
+  } catch (err) {
+    console.error('Error updating metadata:', err)
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// ── COLLECTIONS (EP / Album) ──────────────────────────────────────────
+
+const COLLECTIONS_PATH = path.join(os.homedir(), 'Documents', 'Music Agent', 'Collections')
+
+// Helper: read a collection's metadata.json
+async function readCollection(collectionId) {
+  const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
+  const data = await fs.readFile(filePath, 'utf8')
+  return JSON.parse(data)
+}
+
+// POST /collections — Create new EP or Album
+app.post('/collections', async (req, res) => {
+  try {
+    const { title, artist, genre, releaseDate, collectionType } = req.body
+
+    if (!title || !artist || !collectionType) {
+      return res.status(400).json({ success: false, error: 'title, artist and collectionType are required' })
+    }
+
+    const cleanArtist = artist.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')
+    const cleanTitle = title.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')
+    const date = releaseDate || new Date().toISOString().split('T')[0]
+    const collectionId = `${date}_${cleanArtist}_${cleanTitle}`
+
+    const collectionDir = path.join(COLLECTIONS_PATH, collectionId)
+    await fs.mkdir(collectionDir, { recursive: true })
+    await fs.mkdir(path.join(collectionDir, 'artwork'), { recursive: true })
+
+    const metadata = {
+      releaseId: collectionId,
+      collectionType,   // "EP" or "Album"
+      title,
+      artist,
+      genre: genre || '',
+      releaseDate: date,
+      createdAt: new Date().toISOString(),
+      tracks: [],
+      fileCounts: { artwork: 0 },
+      distribution: { submit: [], release: [], promote: [] }
+    }
+
+    await fs.writeFile(
+      path.join(collectionDir, 'metadata.json'),
+      JSON.stringify(metadata, null, 2)
+    )
+
+    res.json({ success: true, collection: metadata })
+  } catch (err) {
+    console.error('Error creating collection:', err)
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// GET /collections — List all EPs and Albums
+app.get('/collections', async (req, res) => {
+  try {
+    const entries = await fs.readdir(COLLECTIONS_PATH, { withFileTypes: true })
+    const collections = []
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      try {
+        const metadata = await readCollection(entry.name)
+        // Only return items that have collectionType (EP or Album)
+        if (metadata.collectionType) {
+          collections.push(metadata)
+        }
+      } catch {
+        // Skip folders without valid metadata
+      }
+    }
+
+    res.json({ success: true, collections })
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// GET /collections/:collectionId — Get single collection
+app.get('/collections/:collectionId', async (req, res) => {
+  try {
+    const metadata = await readCollection(req.params.collectionId)
+    res.json({ success: true, collection: metadata })
+  } catch (err) {
+    res.status(404).json({ success: false, error: 'Collection not found' })
+  }
+})
+
+// PATCH /collections/:collectionId — Update collection metadata
+app.patch('/collections/:collectionId', async (req, res) => {
+  try {
+    const filePath = path.join(COLLECTIONS_PATH, req.params.collectionId, 'metadata.json')
+    const existing = await readCollection(req.params.collectionId)
+
+    const updated = {
+      ...existing,
+      ...req.body,
+      releaseId: existing.releaseId,  // lock ID
+      tracks: existing.tracks          // never overwrite tracks via this endpoint
+    }
+
+    await fs.writeFile(filePath, JSON.stringify(updated, null, 2))
+    res.json({ success: true, collection: updated })
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// POST /collections/:collectionId/tracks — Add a track to a collection
+app.post('/collections/:collectionId/tracks', async (req, res) => {
+  try {
+    const { trackReleaseId, trackOrder, title } = req.body
+    if (!trackReleaseId) {
+      return res.status(400).json({ success: false, error: 'trackReleaseId is required' })
+    }
+
+    const filePath = path.join(COLLECTIONS_PATH, req.params.collectionId, 'metadata.json')
+    const collection = await readCollection(req.params.collectionId)
+
+    // Prevent duplicates
+    const alreadyAdded = collection.tracks.some(t => t.trackReleaseId === trackReleaseId)
+    if (alreadyAdded) {
+      return res.status(400).json({ success: false, error: 'Track already in this collection' })
+    }
+
+    collection.tracks.push({
+      trackReleaseId,
+      trackOrder: trackOrder || collection.tracks.length + 1,
+      title: title || trackReleaseId
+    })
+
+    await fs.writeFile(filePath, JSON.stringify(collection, null, 2))
+    res.json({ success: true, collection })
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// DELETE /collections/:collectionId/tracks/:trackReleaseId — Remove track from collection
+app.delete('/collections/:collectionId/tracks/:trackReleaseId', async (req, res) => {
+  try {
+    const filePath = path.join(COLLECTIONS_PATH, req.params.collectionId, 'metadata.json')
+    const collection = await readCollection(req.params.collectionId)
+
+    collection.tracks = collection.tracks.filter(
+      t => t.trackReleaseId !== req.params.trackReleaseId
+    )
+
+    await fs.writeFile(filePath, JSON.stringify(collection, null, 2))
+    res.json({ success: true, collection })
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// DELETE /collections/:collectionId — Delete entire collection
+app.delete('/collections/:collectionId', async (req, res) => {
+  try {
+    const collectionDir = path.join(COLLECTIONS_PATH, req.params.collectionId)
+    await fs.rm(collectionDir, { recursive: true, force: true })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// POST /collections/:collectionId/artwork — Upload collection artwork
+app.post('/collections/:collectionId/artwork', collectionUpload.single('artwork'), async (req, res) => {
+  try {
+    const { collectionId } = req.params
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' })
+
+    // ✅ File already saved to correct location by collectionUpload
+    // Just update metadata fileCounts
+    const metadataPath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
+    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
+    metadata.fileCounts = { artwork: 1 }
+    metadata.artworkFilename = req.file.filename
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    console.log(`✅ Uploaded artwork for collection: ${collectionId}`)
+    res.json({ success: true })
+  } catch (err) {
+    console.error('Error uploading collection artwork:', err)
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+
+// GET /collections/:collectionId/artwork — Serve collection artwork
+app.get('/collections/:collectionId/artwork', async (req, res) => {
+  try {
+    const { collectionId } = req.params
+    const artworkDir = path.join(COLLECTIONS_PATH, collectionId, 'artwork')
+    const files = await fs.readdir(artworkDir)
+    const imageFile = files.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+    if (!imageFile) return res.status(404).json({ error: 'No artwork found' })
+    res.sendFile(path.join(artworkDir, imageFile))
+  } catch {
+    res.status(404).json({ error: 'No artwork found' })
+  }
+})
+
