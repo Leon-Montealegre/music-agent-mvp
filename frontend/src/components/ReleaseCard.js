@@ -5,10 +5,11 @@ export default function ReleaseCard({ release }) {
   const artworkUrl = `http://localhost:3001/releases/${release.releaseId}/artwork/`
   const [artworkError, setArtworkError] = useState(false)
 
-  const signedSubmission = release.distribution?.submit?.find(s => s.status?.toLowerCase() === 'signed')
-  const isSigned      = !!signedSubmission
-  const hasSubmissions = release.distribution?.submit?.length > 0
-  const isReleased    = release.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
+const signedSubmission = release.distribution?.submit?.find(s => s.status?.toLowerCase() === 'signed')
+const isSigned      = !!signedSubmission
+const hasSubmissions = release.distribution?.submit?.length > 0
+const isReleased    = release.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
+const isPromoted    = release.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live')
 
   const collectionName = release.collectionId
   ? release.collectionId.replace(/^\d{4}-\d{2}-\d{2}_[^_]+_/, '').replace(/_/g, ' ')
@@ -80,23 +81,28 @@ export default function ReleaseCard({ release }) {
             {release.key && <span className="text-xs text-gray-400">🎹 {release.key}</span>}
           </div>
 
-          <div className="flex gap-2 flex-wrap min-h-[28px] mb-3">
-            {isSigned && (
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-300 border border-green-500/50">
-                Signed
-              </span>
-            )}
-            {!isSigned && hasSubmissions && (
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-300 border border-yellow-500/50">
-                Submitted
-              </span>
-            )}
-            {isReleased && (
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-600/30 text-blue-300 border border-blue-500/50">
-                Released
-              </span>
-            )}
-          </div>
+        <div className="flex gap-2 flex-wrap min-h-[28px] mb-3">
+          {isSigned && (
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-300 border border-green-500/50">
+              Signed
+            </span>
+          )}
+          {!isSigned && hasSubmissions && (
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-300 border border-yellow-500/50">
+              Submitted
+            </span>
+          )}
+          {isReleased && (
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-600/30 text-blue-300 border border-blue-500/50">
+              Released
+            </span>
+          )}
+          {isPromoted && (
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-pink-500/30 via-rose-500/30 to-orange-400/30 text-pink-200 border border-pink-400/60">
+              Promoted
+            </span>
+          )}
+        </div>
 
           <div className="mt-auto pt-3 border-t border-gray-700 flex items-center justify-between text-xs text-gray-400">
             <span>{release.distribution?.release?.length || 0} platforms</span>

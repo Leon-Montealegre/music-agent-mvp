@@ -58,6 +58,17 @@ export default function TrackDetailPage({ params }) {
   const [newLinkLabel, setNewLinkLabel] = useState('')
   const [newLinkUrl, setNewLinkUrl]     = useState('')
 
+  // Promo deals
+  const [showPromoForm, setShowPromoForm] = useState(false)
+  const [promoForm, setPromoForm] = useState({
+    promoName: '',
+    status: 'Not Started',
+    scheduledDate: '',
+    liveDate: '',
+    notes: ''
+  })
+  const [editingPromo, setEditingPromo] = useState(null)
+
   // Hidden file inputs
   const audioInputRef   = useRef(null)
   const artworkInputRef = useRef(null)
@@ -355,6 +366,8 @@ export default function TrackDetailPage({ params }) {
     ? metadata.distribution.submit.find(s => s.status !== 'signed')?.label || metadata.distribution.submit[0].label
     : null
   const isReleased     = metadata.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
+  const isPromoted     = metadata.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live')
+  const hasPromoDeals  = metadata.distribution?.promote?.length > 0
   const displayLabel   = signedLabel || submittedLabel
   const collectionType = metadata.releaseFormat || metadata.releaseType || 'Single'
   const collectionName = metadata.collectionId
@@ -408,6 +421,11 @@ export default function TrackDetailPage({ params }) {
                 )}
                 {isReleased && (
                   <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">Released</div>
+                )}
+                {isPromoted && (
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-gradient-to-r from-pink-500/30 via-rose-500/30 to-orange-400/30 border border-pink-400/60 text-pink-200">
+                    Promoted
+                  </div>
                 )}
                 {isSigned && displayLabel && (
                   <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">{displayLabel}</div>
@@ -699,6 +717,45 @@ export default function TrackDetailPage({ params }) {
                   </Link>
                 </div>
               )}
+
+              {/* Promo Deals shortcut */}
+              {hasPromoDeals && (
+                <div className="mt-6 pt-6 border-t border-gray-700">
+                  <h3 className="font-semibold text-gray-100 mb-3">Promo Deals</h3>
+                  <div className="space-y-2 text-sm mb-4">
+                    {(metadata.distribution?.promote || [])
+                      .filter(entry => entry.status?.toLowerCase() === 'live')
+                      .map((entry, index) => (
+                        <div key={entry.timestamp || index} className="flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-200 truncate">
+                              {entry.promoName || entry.platform || 'Promo Deal'}
+                            </p>
+                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-pink-600/30 border border-pink-400/60 text-pink-200 flex-shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-pink-300" />
+                            Live
+                          </span>
+                          {entry.liveDate && (
+                            <span className="text-xs text-gray-400 flex-shrink-0">
+                              {new Date(entry.liveDate).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                  <Link
+                    href={`/releases/${trackId}/promo-deal`}
+                    className="block text-center bg-pink-600/20 hover:bg-pink-600/30 border border-pink-500/60 text-pink-200 px-4 py-2 rounded-lg transition-all font-medium text-sm"
+                  >
+                    Promo Deal Details →
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
 
@@ -781,28 +838,296 @@ export default function TrackDetailPage({ params }) {
               </div>
             </div>
 
-            {/* Marketing */}
+            {/* Promo Deals */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Marketing Content</h2>
-                <p className="text-sm text-gray-400 mt-1">Social media captions and promotional materials</p>
+                <h2 className="text-xl font-semibold text-gray-100">Promo Deals</h2>
+                <p className="text-sm text-gray-400 mt-1">Track promotional campaigns and deals for this release</p>
               </div>
               <div className="p-6">
                 {metadata.distribution?.promote?.length > 0 ? (
                   <div className="space-y-3">
                     {metadata.distribution.promote.map((entry, index) => (
-                      <div key={index} className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
-                        <p className="font-medium text-gray-100">{entry.platform}</p>
-                        <p className="text-sm text-gray-300 mt-1">{entry.content}</p>
+                      <div key={entry.timestamp || index} className="p-4 bg-gray-900/50 rounded-lg border-l-4 border-pink-500">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium text-lg text-gray-100">
+                              {entry.promoName || entry.platform || 'Promo Deal'}
+                            </p>
+                            <p className="text-sm text-gray-400 mt-1">
+                              Status:{' '}
+                              <span className="font-medium text-gray-300">
+                                {entry.status || 'Not Started'}
+                              </span>
+                            </p>
+                            {entry.scheduledDate && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                Scheduled:{' '}
+                                {new Date(entry.scheduledDate).toLocaleDateString()}
+                              </p>
+                            )}
+                            {entry.liveDate && (
+                              <p className="text-xs text-green-400 mt-1">
+                                Live:{' '}
+                                {new Date(entry.liveDate).toLocaleDateString()}
+                              </p>
+                            )}
+                            {entry.notes && (
+                              <p className="text-sm text-gray-500 mt-2 italic">
+                                {entry.notes}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 ml-4">
+                            <span className="text-xs text-gray-500">
+                              {entry.timestamp
+                                ? new Date(entry.timestamp).toLocaleDateString()
+                                : ''}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setEditingPromo(entry)
+                                setPromoForm({
+                                  promoName: entry.promoName || '',
+                                  status: entry.status || 'Not Started',
+                                  scheduledDate: entry.scheduledDate
+                                    ? entry.scheduledDate.slice(0, 10)
+                                    : '',
+                                  liveDate: entry.liveDate
+                                    ? entry.liveDate.slice(0, 10)
+                                    : '',
+                                  notes: entry.notes || ''
+                                })
+                                setShowPromoForm(true)
+                              }}
+                              className="text-blue-400 hover:text-blue-300 text-sm p-1"
+                              title="Edit promo deal"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() =>
+                                confirmDelete(
+                                  'promote',
+                                  entry.timestamp,
+                                  entry.promoName || entry.platform || 'Promo deal'
+                                )
+                              }
+                              className="text-red-400 hover:text-red-300 text-sm p-1"
+                              title="Delete promo deal"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-8">No promotional content yet</p>
+                  <p className="text-gray-500 text-center py-8">
+                    No promo deals logged yet
+                  </p>
                 )}
-                <button disabled className="mt-4 w-full bg-gray-700 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed">
-                  Generate Captions (Coming Soon)
-                </button>
+
+                <div className="mt-6 pt-4 border-t border-gray-700">
+                  {showPromoForm ? (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault()
+                        const name = promoForm.promoName.trim()
+                        if (!name) {
+                          alert('Promo name is required.')
+                          return
+                        }
+
+                        const basePayload = {
+                          promoName: name,
+                          status: promoForm.status,
+                          notes: promoForm.notes?.trim() || ''
+                        }
+
+                        if (promoForm.status === 'Scheduled' && promoForm.scheduledDate) {
+                          basePayload.scheduledDate = promoForm.scheduledDate
+                        }
+                        if (promoForm.status === 'Live' && promoForm.liveDate) {
+                          basePayload.liveDate = promoForm.liveDate
+                        }
+
+                        try {
+                          if (editingPromo && editingPromo.timestamp) {
+                            const updatedData = {
+                              ...editingPromo,
+                              ...basePayload
+                            }
+                            await updateDistributionEntry(
+                              trackId,
+                              'promote',
+                              editingPromo.timestamp,
+                              updatedData
+                            )
+                          } else {
+                            const entry = {
+                              ...basePayload,
+                              timestamp: new Date().toISOString()
+                            }
+                            await updateDistribution(trackId, 'promote', entry)
+                          }
+                          await loadTrack()
+                          setShowPromoForm(false)
+                          setEditingPromo(null)
+                          setPromoForm({
+                            promoName: '',
+                            status: 'Not Started',
+                            scheduledDate: '',
+                            liveDate: '',
+                            notes: ''
+                          })
+                        } catch (err) {
+                          alert(`Failed to save promo deal: ${err.message}`)
+                        }
+                      }}
+                      className="space-y-4 bg-gray-900/60 border border-gray-700 rounded-lg p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-md font-semibold text-gray-100">
+                          {editingPromo ? 'Edit Promo Deal' : 'Add Promo Deal'}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPromoForm(false)
+                            setEditingPromo(null)
+                            setPromoForm({
+                              promoName: '',
+                              status: 'Not Started',
+                              scheduledDate: '',
+                              liveDate: '',
+                              notes: ''
+                            })
+                          }}
+                          className="text-xs text-gray-400 hover:text-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-gray-300 mb-1">
+                          Promo name <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={promoForm.promoName}
+                          onChange={e =>
+                            setPromoForm(prev => ({ ...prev, promoName: e.target.value }))
+                          }
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
+                          placeholder="e.g. TikTok Influencer Campaign"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-gray-300 mb-1">
+                          Status
+                        </label>
+                        <select
+                          value={promoForm.status}
+                          onChange={e =>
+                            setPromoForm(prev => ({
+                              ...prev,
+                              status: e.target.value
+                            }))
+                          }
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        >
+                          <option>Not Started</option>
+                          <option>Scheduled</option>
+                          <option>Live</option>
+                          <option>Completed</option>
+                          <option>Cancelled</option>
+                        </select>
+                      </div>
+
+                      {promoForm.status === 'Scheduled' && (
+                        <div>
+                          <label className="block text-sm text-gray-300 mb-1">
+                            Scheduled date
+                          </label>
+                          <input
+                            type="date"
+                            value={promoForm.scheduledDate}
+                            onChange={e =>
+                              setPromoForm(prev => ({
+                                ...prev,
+                                scheduledDate: e.target.value
+                              }))
+                            }
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
+                          />
+                        </div>
+                      )}
+
+                      {promoForm.status === 'Live' && (
+                        <div>
+                          <label className="block text-sm text-gray-300 mb-1">
+                            Live date
+                          </label>
+                          <input
+                            type="date"
+                            value={promoForm.liveDate}
+                            onChange={e =>
+                              setPromoForm(prev => ({
+                                ...prev,
+                                liveDate: e.target.value
+                              }))
+                            }
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm text-gray-300 mb-1">
+                          Notes
+                        </label>
+                        <textarea
+                          value={promoForm.notes}
+                          onChange={e =>
+                            setPromoForm(prev => ({ ...prev, notes: e.target.value }))
+                          }
+                          rows={3}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
+                          placeholder="Optional notes about this promo deal"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded-lg transition-all font-medium"
+                      >
+                        {editingPromo ? 'Save Changes' : 'Add Promo Deal'}
+                      </button>
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingPromo(null)
+                        setPromoForm({
+                          promoName: '',
+                          status: 'Not Started',
+                          scheduledDate: '',
+                          liveDate: '',
+                          notes: ''
+                        })
+                        setShowPromoForm(true)
+                      }}
+                      className="w-full bg-pink-600 hover:bg-pink-500 hover:shadow-lg hover:shadow-pink-500/40 text-white px-4 py-2 rounded-lg transition-all font-medium"
+                    >
+                      + Add Promo Deal
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 

@@ -55,12 +55,14 @@ export default function HomePage() {
     if (statusFilter === 'all') return true
     const isSigned       = dist?.submit?.some(e => e.status?.toLowerCase() === 'signed')
     const isReleased     = dist?.release?.some(e => e.status?.toLowerCase() === 'live')
+    const isPromoted     = dist?.promote?.some(e => e.status?.toLowerCase() === 'live')
     const hasSubmissions = dist?.submit?.length > 0
     const hasNonSigned   = dist?.submit?.some(e => e.status?.toLowerCase() !== 'signed')
     if (statusFilter === 'not-submitted') return !hasSubmissions
     if (statusFilter === 'submitted')     return hasNonSigned && !isSigned && !isReleased
     if (statusFilter === 'signed')        return isSigned
     if (statusFilter === 'released')      return isReleased
+    if (statusFilter === 'promoted')      return isPromoted
     return true
   }
 
@@ -205,6 +207,9 @@ export default function HomePage() {
                !item.distribution.release?.some(e => e.status?.toLowerCase() === 'live') && (
                 <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-900/60 text-blue-300 border border-blue-700/50">Submitted</span>
               )}
+              {item.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live') && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-pink-500/30 via-rose-500/30 to-orange-400/30 text-pink-200 border border-pink-400/60">Promoted</span>
+              )}
             </div>
             <div className="mt-auto pt-3 border-t border-indigo-500/20 flex items-center justify-between text-xs">
               <span className="text-indigo-400 font-medium">View {item.collectionType}</span>
@@ -317,6 +322,7 @@ export default function HomePage() {
                   { value: 'submitted',     label: 'Submitted' },
                   { value: 'signed',        label: 'Signed' },
                   { value: 'released',      label: 'Released' },
+                  { value: 'promoted',      label: 'Promoted' },
                 ].map(({ value, label }) => (
                   <button
                     key={value}

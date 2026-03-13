@@ -8,7 +8,8 @@ export default function LabelContactForm({
   existingContact,
   onSuccess,
   onCancel,
-  baseUrl // optional — if not provided, falls back to release endpoint
+  baseUrl, // optional — if not provided, falls back to release endpoint
+  contactPath = 'label-deal/contacts'
 }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -44,8 +45,8 @@ export default function LabelContactForm({
     setSubmitting(true)
     try {
       const url = existingContact?.id
-        ? `${apiBase}/label-deal/contacts/${existingContact.id}`
-        : `${apiBase}/label-deal/contacts`
+        ? `${apiBase}/${contactPath}/${existingContact.id}`
+        : `${apiBase}/${contactPath}`
 
       const response = await fetch(url, {
         method: existingContact?.id ? 'PATCH' : 'POST',
