@@ -154,11 +154,9 @@ export default function LabelContactForm({
           <option value="Marketing">Marketing</option>
           <option value="Blog Owner">Blog Owner</option>
           <option value="Playlist Curator">Playlist Curator</option>
-          <option value="Podcast Host">Podcast Host</option>
           <option value="Channel Owner">Channel Owner</option>
           <option value="PR Manager">PR Manager</option>
           <option value="Booking Agent">Booking Agent</option>
-          <option value="Manager">Manager</option>
           <option value="Artist">Artist</option>
           <option value="Other">Other</option>
         </select>

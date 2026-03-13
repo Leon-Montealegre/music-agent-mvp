@@ -61,6 +61,44 @@ export async function fetchRelease(releaseId) {
 }
 
 /**
+ * Fetch a single promo entry for a release
+ * @param {string} releaseId
+ * @param {string} promoId
+ */
+export async function fetchPromoEntry(releaseId, promoId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/promo/${promoId}`);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Error fetching promo entry ${promoId} for ${releaseId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch a single label/submit entry for a release
+ * @param {string} releaseId
+ * @param {string} labelId
+ */
+export async function fetchLabelEntry(releaseId, labelId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/label/${labelId}`);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Error fetching label entry ${labelId} for ${releaseId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Update distribution tracking for a release
  * @param {string} releaseId - The release ID
  * @param {string} path - Distribution path: "release", "submit", or "promote"
@@ -180,87 +218,6 @@ export async function deleteRelease(releaseId) {
     return response.json()
   } catch (error) {
     console.error(`Error deleting release:`, error)
-    throw error
-  }
-}
-/**
- * Upload label deal file
- * @param {string} releaseId - The release ID
- * @param {File} file - The file to upload
- */
-export async function uploadLabelDealFile(releaseId, file) {
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-    
-    const response = await fetch(
-      `${API_BASE_URL}/releases/${releaseId}/label-deal/files`,
-      {
-        method: 'POST',
-        body: formData
-      }
-    )
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to upload file')
-    }
-    
-    return response.json()
-  } catch (error) {
-    console.error('Error uploading label deal file:', error)
-    throw error
-  }
-}
-
-/**
- * Delete label deal file
- * @param {string} releaseId - The release ID
- * @param {string} filename - The filename to delete
- */
-export async function deleteLabelDealFile(releaseId, filename) {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/releases/${releaseId}/label-deal/files/${encodeURIComponent(filename)}`,
-      { method: 'DELETE' }
-    )
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to delete file')
-    }
-    
-    return response.json()
-  } catch (error) {
-    console.error('Error deleting label deal file:', error)
-    throw error
-  }
-}
-
-/**
- * Save label contact
- * @param {string} releaseId - The release ID
- * @param {object} contactData - Contact information
- */
-export async function saveLabelContact(releaseId, contactData) {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/releases/${releaseId}/label-deal/contact`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contactData)
-      }
-    )
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to save contact')
-    }
-    
-    return response.json()
-  } catch (error) {
-    console.error('Error saving label contact:', error)
     throw error
   }
 }

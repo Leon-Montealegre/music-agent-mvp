@@ -174,6 +174,30 @@ const releaseLabelDealUpload = multer({
   })
 })
 
+// Per-promo-entry files
+const promoEntryUpload = multer({
+  storage: multer.diskStorage({
+    destination(req, file, cb) {
+      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'promo', req.params.promoId)
+      fsSync.mkdirSync(dir, { recursive: true })
+      cb(null, dir)
+    },
+    filename(req, file, cb) { cb(null, file.originalname) }
+  })
+})
+
+// Per-label-entry files
+const labelEntryUpload = multer({
+  storage: multer.diskStorage({
+    destination(req, file, cb) {
+      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'label', req.params.labelId)
+      fsSync.mkdirSync(dir, { recursive: true })
+      cb(null, dir)
+    },
+    filename(req, file, cb) { cb(null, file.originalname) }
+  })
+})
+
 // Release promo-deal files
 const releasePromoDealUpload = multer({
   storage: multer.diskStorage({
@@ -476,8 +500,6 @@ app.get('/releases/:releaseId/', async (req, res) => {
         versions,
         files:            metadata.files,
         distribution:     metadata.distribution || { release: [], submit: [], promote: [] },
-        labelInfo:        metadata.labelInfo || { isSigned: false, label: null, signedDate: null, contractDocuments: [] },
-        promoInfo:        parsed.metadata?.promoInfo || { contacts: [], contractDocuments: [] },
         notes:            parsed.notes || { text: '', documents: [] },
         songLinks:        parsed.songLinks || []
       }
@@ -783,6 +805,13 @@ app.patch('/releases/:releaseId/distribution', async (req, res) => {
     if (!parsed.metadata.distribution) parsed.metadata.distribution = { release: [], submit: [], promote: [] }
     if (!parsed.metadata.distribution[distPath]) parsed.metadata.distribution[distPath] = []
 
+    if (['submit', 'promote'].includes(distPath)) {
+      if (!entry.id) entry.id = randomUUID().slice(0, 8)
+      if (!entry.contacts) entry.contacts = []
+      if (!entry.documents) entry.documents = []
+      if (entry.pageNotes === undefined) entry.pageNotes = ''
+    }
+
     entry.timestamp = entry.timestamp || new Date().toISOString()
     parsed.metadata.distribution[distPath].push(entry)
     parsed.updatedAt = new Date().toISOString()
@@ -887,6 +916,627 @@ app.patch('/releases/:releaseId/sign', async (req, res) => {
 
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
     res.json({ success: true, message: `Marked as signed by ${labelName}`, submission })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// =============================================================================
+// RELEASES — PROMO / LABEL ENTRY DETAILS
+// =============================================================================
+
+function ensureDistributionStructure(metadata) {
+  if (!metadata.metadata) metadata.metadata = {}
+  if (!metadata.metadata.distribution) metadata.metadata.distribution = { release: [], submit: [], promote: [] }
+  if (!metadata.metadata.distribution.release) metadata.metadata.distribution.release = []
+  if (!metadata.metadata.distribution.submit) metadata.metadata.distribution.submit = []
+  if (!metadata.metadata.distribution.promote) metadata.metadata.distribution.promote = []
+}
+
+function ensurePromoEntryDefaults(entry) {
+  if (!entry.contacts) entry.contacts = []
+  if (!entry.documents) entry.documents = []
+  if (entry.pageNotes === undefined) entry.pageNotes = ''
+}
+
+function ensureLabelEntryDefaults(entry) {
+  if (!entry.contacts) entry.contacts = []
+  if (!entry.documents) entry.documents = []
+  if (entry.pageNotes === undefined) entry.pageNotes = ''
+}
+
+// -- Promo entry: GET one -----------------------------------------------------
+app.get('/releases/:releaseId/promo/:promoId', async (req, res) => {
+  try {
+    const { releaseId, promoId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.promote || []
+    const entry = entries.find(e => e.id === promoId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Promo entry not found' })
+
+    ensurePromoEntryDefaults(entry)
+    res.json({ success: true, entry, releaseId })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Promo entry: PATCH top-level fields -------------------------------------
+app.patch('/releases/:releaseId/promo/:promoId', async (req, res) => {
+  try {
+    const { releaseId, promoId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.promote || []
+    const idx = entries.findIndex(e => e.id === promoId)
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Promo entry not found' })
+
+    const existing = entries[idx]
+    ensurePromoEntryDefaults(existing)
+
+    const allowed = ['promoName', 'status', 'liveDate', 'notes', 'platform']
+    const updates = {}
+    for (const key of allowed) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        updates[key] = req.body[key]
+      }
+    }
+
+    const updated = {
+      ...existing,
+      ...updates,
+      id: existing.id,
+      timestamp: existing.timestamp,
+      contacts: existing.contacts,
+      documents: existing.documents,
+      pageNotes: existing.pageNotes
+    }
+
+    metadata.metadata.distribution.promote[idx] = updated
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, entry: updated })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Promo entry: DELETE ------------------------------------------------------
+app.delete('/releases/:releaseId/promo/:promoId', async (req, res) => {
+  try {
+    const { releaseId, promoId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.promote || []
+    const originalLength = entries.length
+    metadata.metadata.distribution.promote = entries.filter(e => e.id !== promoId)
+    if (metadata.metadata.distribution.promote.length === originalLength)
+      return res.status(404).json({ success: false, error: 'Promo entry not found' })
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    const folderPath = path.join(RELEASES_DIR, releaseId, 'promo', promoId)
+    try {
+      await fs.rm(folderPath, { recursive: true, force: true })
+    } catch {}
+
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Promo entry: contacts ----------------------------------------------------
+app.post('/releases/:releaseId/promo/:promoId/contacts', async (req, res) => {
+  try {
+    const { releaseId, promoId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.promote || []
+    const idx = entries.findIndex(e => e.id === promoId)
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Promo entry not found' })
+
+    const entry = entries[idx]
+    ensurePromoEntryDefaults(entry)
+
+    const newContact = {
+      id: randomUUID(),
+      name,
+      label: label || '',
+      email: email || '',
+      phone: phone || '',
+      location: location || '',
+      role: role || '',
+      notes: notes || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+
+    entry.contacts.push(newContact)
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, contact: newContact })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.patch('/releases/:releaseId/promo/:promoId/contacts/:contactId', async (req, res) => {
+  try {
+    const { releaseId, promoId, contactId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.promote || []
+    const entry = entries.find(e => e.id === promoId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Promo entry not found' })
+
+    ensurePromoEntryDefaults(entry)
+    const idx = entry.contacts.findIndex(c => c.id === contactId)
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Contact not found' })
+
+    entry.contacts[idx] = {
+      ...entry.contacts[idx],
+      name,
+      label: label || '',
+      email: email || '',
+      phone: phone || '',
+      location: location || '',
+      role: role || '',
+      notes: notes || '',
+      updatedAt: new Date().toISOString()
+    }
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, contact: entry.contacts[idx] })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.delete('/releases/:releaseId/promo/:promoId/contacts/:contactId', async (req, res) => {
+  try {
+    const { releaseId, promoId, contactId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.promote || []
+    const entry = entries.find(e => e.id === promoId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Promo entry not found' })
+
+    ensurePromoEntryDefaults(entry)
+    const original = entry.contacts.length
+    entry.contacts = entry.contacts.filter(c => c.id !== contactId)
+    if (entry.contacts.length === original)
+      return res.status(404).json({ success: false, error: 'Contact not found' })
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Promo entry: documents ---------------------------------------------------
+app.post('/releases/:releaseId/promo/:promoId/files', promoEntryUpload.single('file'), async (req, res) => {
+  try {
+    const { releaseId, promoId } = req.params
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' })
+
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.promote || []
+    const entry = entries.find(e => e.id === promoId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Promo entry not found' })
+
+    ensurePromoEntryDefaults(entry)
+
+    entry.documents.push({
+      filename: req.file.originalname,
+      size: req.file.size,
+      uploadedAt: new Date().toISOString()
+    })
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, documents: entry.documents })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.get('/releases/:releaseId/promo/:promoId/files/:filename', async (req, res) => {
+  try {
+    const { releaseId, promoId, filename } = req.params
+    const filePath = path.join(RELEASES_DIR, releaseId, 'promo', promoId, filename)
+    try { await fs.access(filePath) }
+    catch { return res.status(404).json({ success: false, error: 'File not found' }) }
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    fsSync.createReadStream(filePath).pipe(res)
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.delete('/releases/:releaseId/promo/:promoId/files/:filename', async (req, res) => {
+  try {
+    const { releaseId, promoId, filename } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.promote || []
+    const entry = entries.find(e => e.id === promoId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Promo entry not found' })
+
+    ensurePromoEntryDefaults(entry)
+
+    const filePath = path.join(RELEASES_DIR, releaseId, 'promo', promoId, filename)
+    try { await fs.unlink(filePath) }
+    catch { return res.status(404).json({ success: false, error: 'File not found' }) }
+
+    entry.documents = entry.documents.filter(d => d.filename !== filename)
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, documents: entry.documents })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Promo entry: page notes --------------------------------------------------
+app.patch('/releases/:releaseId/promo/:promoId/notes', async (req, res) => {
+  try {
+    const { releaseId, promoId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.promote || []
+    const entry = entries.find(e => e.id === promoId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Promo entry not found' })
+
+    ensurePromoEntryDefaults(entry)
+    entry.pageNotes = req.body.notes || ''
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, notes: entry.pageNotes })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Label/submit entry: GET one ---------------------------------------------
+app.get('/releases/:releaseId/label/:labelId', async (req, res) => {
+  try {
+    const { releaseId, labelId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.submit || []
+    const entry = entries.find(e => e.id === labelId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Label submission not found' })
+
+    ensureLabelEntryDefaults(entry)
+    res.json({ success: true, entry, releaseId })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Label/submit entry: PATCH top-level fields ------------------------------
+app.patch('/releases/:releaseId/label/:labelId', async (req, res) => {
+  try {
+    const { releaseId, labelId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.submit || []
+    const idx = entries.findIndex(e => e.id === labelId)
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Label submission not found' })
+
+    const existing = entries[idx]
+    ensureLabelEntryDefaults(existing)
+
+    const allowed = ['label', 'status', 'signedDate', 'notes', 'platform']
+    const updates = {}
+    for (const key of allowed) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        updates[key] = req.body[key]
+      }
+    }
+
+    const updated = {
+      ...existing,
+      ...updates,
+      id: existing.id,
+      timestamp: existing.timestamp,
+      contacts: existing.contacts,
+      documents: existing.documents,
+      pageNotes: existing.pageNotes
+    }
+
+    metadata.metadata.distribution.submit[idx] = updated
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, entry: updated })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Label/submit entry: DELETE ----------------------------------------------
+app.delete('/releases/:releaseId/label/:labelId', async (req, res) => {
+  try {
+    const { releaseId, labelId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.submit || []
+    const originalLength = entries.length
+    metadata.metadata.distribution.submit = entries.filter(e => e.id !== labelId)
+    if (metadata.metadata.distribution.submit.length === originalLength)
+      return res.status(404).json({ success: false, error: 'Label submission not found' })
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    const folderPath = path.join(RELEASES_DIR, releaseId, 'label', labelId)
+    try {
+      await fs.rm(folderPath, { recursive: true, force: true })
+    } catch {}
+
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Label/submit entry: contacts --------------------------------------------
+app.post('/releases/:releaseId/label/:labelId/contacts', async (req, res) => {
+  try {
+    const { releaseId, labelId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.submit || []
+    const entry = entries.find(e => e.id === labelId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Label submission not found' })
+
+    ensureLabelEntryDefaults(entry)
+
+    const newContact = {
+      id: randomUUID(),
+      name,
+      label: label || '',
+      email: email || '',
+      phone: phone || '',
+      location: location || '',
+      role: role || '',
+      notes: notes || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+
+    entry.contacts.push(newContact)
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, contact: newContact })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.patch('/releases/:releaseId/label/:labelId/contacts/:contactId', async (req, res) => {
+  try {
+    const { releaseId, labelId, contactId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.submit || []
+    const entry = entries.find(e => e.id === labelId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Label submission not found' })
+
+    ensureLabelEntryDefaults(entry)
+    const idx = entry.contacts.findIndex(c => c.id === contactId)
+    if (idx === -1) return res.status(404).json({ success: false, error: 'Contact not found' })
+
+    entry.contacts[idx] = {
+      ...entry.contacts[idx],
+      name,
+      label: label || '',
+      email: email || '',
+      phone: phone || '',
+      location: location || '',
+      role: role || '',
+      notes: notes || '',
+      updatedAt: new Date().toISOString()
+    }
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, contact: entry.contacts[idx] })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.delete('/releases/:releaseId/label/:labelId/contacts/:contactId', async (req, res) => {
+  try {
+    const { releaseId, labelId, contactId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.submit || []
+    const entry = entries.find(e => e.id === labelId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Label submission not found' })
+
+    ensureLabelEntryDefaults(entry)
+    const original = entry.contacts.length
+    entry.contacts = entry.contacts.filter(c => c.id !== contactId)
+    if (entry.contacts.length === original)
+      return res.status(404).json({ success: false, error: 'Contact not found' })
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Label/submit entry: documents -------------------------------------------
+app.post('/releases/:releaseId/label/:labelId/files', labelEntryUpload.single('file'), async (req, res) => {
+  try {
+    const { releaseId, labelId } = req.params
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' })
+
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.submit || []
+    const entry = entries.find(e => e.id === labelId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Label submission not found' })
+
+    ensureLabelEntryDefaults(entry)
+
+    entry.documents.push({
+      filename: req.file.originalname,
+      size: req.file.size,
+      uploadedAt: new Date().toISOString()
+    })
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, documents: entry.documents })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.get('/releases/:releaseId/label/:labelId/files/:filename', async (req, res) => {
+  try {
+    const { releaseId, labelId, filename } = req.params
+    const filePath = path.join(RELEASES_DIR, releaseId, 'label', labelId, filename)
+    try { await fs.access(filePath) }
+    catch { return res.status(404).json({ success: false, error: 'File not found' }) }
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    fsSync.createReadStream(filePath).pipe(res)
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.delete('/releases/:releaseId/label/:labelId/files/:filename', async (req, res) => {
+  try {
+    const { releaseId, labelId, filename } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.submit || []
+    const entry = entries.find(e => e.id === labelId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Label submission not found' })
+
+    ensureLabelEntryDefaults(entry)
+
+    const filePath = path.join(RELEASES_DIR, releaseId, 'label', labelId, filename)
+    try { await fs.unlink(filePath) }
+    catch { return res.status(404).json({ success: false, error: 'File not found' }) }
+
+    entry.documents = entry.documents.filter(d => d.filename !== filename)
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, documents: entry.documents })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// -- Label/submit entry: page notes ------------------------------------------
+app.patch('/releases/:releaseId/label/:labelId/notes', async (req, res) => {
+  try {
+    const { releaseId, labelId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const raw = await fs.readFile(metadataPath, 'utf8')
+    const metadata = JSON.parse(raw)
+
+    ensureDistributionStructure(metadata)
+    const entries = metadata.metadata.distribution.submit || []
+    const entry = entries.find(e => e.id === labelId)
+    if (!entry) return res.status(404).json({ success: false, error: 'Label submission not found' })
+
+    ensureLabelEntryDefaults(entry)
+    entry.pageNotes = req.body.notes || ''
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, notes: entry.pageNotes })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }

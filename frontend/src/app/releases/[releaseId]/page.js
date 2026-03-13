@@ -699,63 +699,6 @@ export default function TrackDetailPage({ params }) {
                 </div>
               </div>
 
-              {/* Label Deal shortcut */}
-              {isSigned && (
-                <div className="mt-6 pt-6 border-t border-gray-700">
-                  <h3 className="font-semibold text-gray-100 mb-3">Label Deal</h3>
-                  <div className="space-y-2 text-sm mb-4">
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider">Label</p>
-                      <p className="text-sm font-medium text-gray-200">{signedLabel || 'Not set'}</p>
-                    </div>
-                  </div>
-                  <Link
-                    href={`/releases/${trackId}/label-deal`}
-                    className="block text-center bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-300 px-4 py-2 rounded-lg transition-all font-medium text-sm"
-                  >
-                    Label Deal Details →
-                  </Link>
-                </div>
-              )}
-
-              {/* Promo Deals shortcut */}
-              {hasPromoDeals && (
-                <div className="mt-6 pt-6 border-t border-gray-700">
-                  <h3 className="font-semibold text-gray-100 mb-3">Promo Deals</h3>
-                  <div className="space-y-2 text-sm mb-4">
-                    {(metadata.distribution?.promote || [])
-                      .filter(entry => entry.status?.toLowerCase() === 'live')
-                      .map((entry, index) => (
-                        <div key={entry.timestamp || index} className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-200 truncate">
-                              {entry.promoName || entry.platform || 'Promo Deal'}
-                            </p>
-                          </div>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-pink-600/30 border border-pink-400/60 text-pink-200 flex-shrink-0">
-                            <span className="w-1.5 h-1.5 rounded-full bg-pink-300" />
-                            Live
-                          </span>
-                          {entry.liveDate && (
-                            <span className="text-xs text-gray-400 flex-shrink-0">
-                              {new Date(entry.liveDate).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                  <Link
-                    href={`/releases/${trackId}/promo-deal`}
-                    className="block text-center bg-pink-600/20 hover:bg-pink-600/30 border border-pink-500/60 text-pink-200 px-4 py-2 rounded-lg transition-all font-medium text-sm"
-                  >
-                    Promo Deal Details →
-                  </Link>
-                </div>
-              )}
             </div>
           </div>
 
@@ -772,18 +715,37 @@ export default function TrackDetailPage({ params }) {
                 {metadata.distribution?.submit?.length > 0 ? (
                   <div className="space-y-3">
                     {metadata.distribution.submit.map((entry, index) => (
-                      <div key={index} className="p-4 bg-gray-900/50 rounded-lg border-l-4 border-purple-500">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium text-lg text-gray-100">{entry.label}</p>
-                            <p className="text-sm text-gray-400 mt-1">via {entry.platform} • <span className="font-medium text-gray-300">{entry.status}</span></p>
-                            {entry.notes && <p className="text-sm text-gray-500 mt-2 italic">&quot;{entry.notes}&quot;</p>}
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
-                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'submit', index })} className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
-                            <button onClick={() => confirmDelete('submit', entry.timestamp, entry.label)} className="text-red-400 hover:text-red-300 text-sm p-1" title="Delete">🗑️</button>
-                          </div>
+                      <div
+                        key={index}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (entry.id) {
+                            router.push(`/releases/${trackId}/label/${entry.id}`)
+                          } else {
+                            alert('This entry was created before per-entry pages were added. Please delete and re-log it.')
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            if (entry.id) {
+                              router.push(`/releases/${trackId}/label/${entry.id}`)
+                            } else {
+                              alert('This entry was created before per-entry pages were added. Please delete and re-log it.')
+                            }
+                          }
+                        }}
+                        className="p-4 bg-gray-900/50 rounded-lg border-l-4 border-purple-500 cursor-pointer hover:bg-gray-900/80 transition-colors flex items-center justify-between gap-4"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-lg text-gray-100">{entry.label}</p>
+                          <p className="text-sm text-gray-400 mt-1">via {entry.platform} • <span className="font-medium text-gray-300">{entry.status}</span></p>
+                          {entry.notes && <p className="text-sm text-gray-500 mt-2 italic">&quot;{entry.notes}&quot;</p>}
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
+                          <span className="text-xl text-gray-400">›</span>
                         </div>
                       </div>
                     ))}
@@ -848,77 +810,64 @@ export default function TrackDetailPage({ params }) {
                 {metadata.distribution?.promote?.length > 0 ? (
                   <div className="space-y-3">
                     {metadata.distribution.promote.map((entry, index) => (
-                      <div key={entry.timestamp || index} className="p-4 bg-gray-900/50 rounded-lg border-l-4 border-pink-500">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium text-lg text-gray-100">
-                              {entry.promoName || entry.platform || 'Promo Deal'}
-                            </p>
-                            <p className="text-sm text-gray-400 mt-1">
-                              Status:{' '}
-                              <span className="font-medium text-gray-300">
-                                {entry.status || 'Not Started'}
-                              </span>
-                            </p>
-                            {entry.scheduledDate && (
-                              <p className="text-xs text-gray-400 mt-1">
-                                Scheduled:{' '}
-                                {new Date(entry.scheduledDate).toLocaleDateString()}
-                              </p>
-                            )}
-                            {entry.liveDate && (
-                              <p className="text-xs text-green-400 mt-1">
-                                Live:{' '}
-                                {new Date(entry.liveDate).toLocaleDateString()}
-                              </p>
-                            )}
-                            {entry.notes && (
-                              <p className="text-sm text-gray-500 mt-2 italic">
-                                {entry.notes}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <span className="text-xs text-gray-500">
-                              {entry.timestamp
-                                ? new Date(entry.timestamp).toLocaleDateString()
-                                : ''}
+                      <div
+                        key={entry.timestamp || index}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (entry.id) {
+                            router.push(`/releases/${trackId}/promo/${entry.id}`)
+                          } else {
+                            alert('This entry was created before per-entry pages were added. Please delete and re-log it.')
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            if (entry.id) {
+                              router.push(`/releases/${trackId}/promo/${entry.id}`)
+                            } else {
+                              alert('This entry was created before per-entry pages were added. Please delete and re-log it.')
+                            }
+                          }
+                        }}
+                        className="p-4 bg-gray-900/50 rounded-lg border-l-4 border-pink-500 cursor-pointer hover:bg-gray-900/80 transition-colors flex items-center justify-between gap-4"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-lg text-gray-100">
+                            {entry.promoName || entry.platform || 'Promo Deal'}
+                          </p>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Status:{' '}
+                            <span className="font-medium text-gray-300">
+                              {entry.status || 'Not Started'}
                             </span>
-                            <button
-                              onClick={() => {
-                                setEditingPromo(entry)
-                                setPromoForm({
-                                  promoName: entry.promoName || '',
-                                  status: entry.status || 'Not Started',
-                                  scheduledDate: entry.scheduledDate
-                                    ? entry.scheduledDate.slice(0, 10)
-                                    : '',
-                                  liveDate: entry.liveDate
-                                    ? entry.liveDate.slice(0, 10)
-                                    : '',
-                                  notes: entry.notes || ''
-                                })
-                                setShowPromoForm(true)
-                              }}
-                              className="text-blue-400 hover:text-blue-300 text-sm p-1"
-                              title="Edit promo deal"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() =>
-                                confirmDelete(
-                                  'promote',
-                                  entry.timestamp,
-                                  entry.promoName || entry.platform || 'Promo deal'
-                                )
-                              }
-                              className="text-red-400 hover:text-red-300 text-sm p-1"
-                              title="Delete promo deal"
-                            >
-                              🗑️
-                            </button>
-                          </div>
+                          </p>
+                          {entry.scheduledDate && (
+                            <p className="text-xs text-gray-400 mt-1">
+                              Scheduled:{' '}
+                              {new Date(entry.scheduledDate).toLocaleDateString()}
+                            </p>
+                          )}
+                          {entry.liveDate && (
+                            <p className="text-xs text-green-400 mt-1">
+                              Live:{' '}
+                              {new Date(entry.liveDate).toLocaleDateString()}
+                            </p>
+                          )}
+                          {entry.notes && (
+                            <p className="text-sm text-gray-500 mt-2 italic">
+                              {entry.notes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className="text-xs text-gray-500">
+                            {entry.timestamp
+                              ? new Date(entry.timestamp).toLocaleDateString()
+                              : ''}
+                          </span>
+                          <span className="text-xl text-gray-400">›</span>
                         </div>
                       </div>
                     ))}
@@ -1098,7 +1047,7 @@ export default function TrackDetailPage({ params }) {
                           }
                           rows={3}
                           className="w-full px-3 py-2 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
-                          placeholder="Optional notes about this promo deal"
+                          placeholder="They will write a blog post and promote it in their playlist for $50"
                         />
                       </div>
 
@@ -1136,6 +1085,7 @@ export default function TrackDetailPage({ params }) {
               initialNotes={track.notes?.text || ''}
               initialDocuments={track.notes?.documents || []}
               onUpdate={loadTrack}
+              notesPlaceholder="Personal reminders, creative notes, mastering feedback, or anything you want to remember about this track."
             />
 
             {/* Actions */}

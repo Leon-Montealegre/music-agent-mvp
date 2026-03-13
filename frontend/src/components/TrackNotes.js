@@ -7,7 +7,9 @@ export default function TrackNotes({
   initialNotes = '',
   initialDocuments = [],
   onUpdate,
-  baseUrl // optional override — if not provided, falls back to release endpoint
+  baseUrl, // optional override — if not provided, falls back to release endpoint
+  notesPlaceholder,
+  fileCardTitle
 }) {
   const [notes, setNotes]         = useState(initialNotes);
   const [documents, setDocuments] = useState(initialDocuments);
@@ -86,42 +88,48 @@ export default function TrackNotes({
   };
 
   return (
-    <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
-      <div className="p-6 border-b border-gray-700">
-        <h2 className="text-xl font-semibold text-gray-100 flex items-center">
-          Notes
-        </h2>
-        <p className="text-sm text-gray-400 mt-1">Add personal notes and documents</p>
-      </div>
-
-      <div className="p-6 space-y-6">
-
-        {/* Text Notes */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Notes</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add any notes about the track, e.g. collaborators..."
-            rows={6}
-            className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-          />
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-xs text-gray-500">{notes.length} characters</span>
-            <button
-              onClick={handleSaveNotes}
-              disabled={isSaving}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all font-medium text-sm"
-            >
-              {isSaving ? 'Saving...' : saveMessage || 'Save Notes'}
-            </button>
-          </div>
+    <>
+      <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
+        <div className="p-6 border-b border-gray-700">
+          <h2 className="text-xl font-semibold text-gray-100 flex items-center">
+            Notes
+          </h2>
+          <p className="text-sm text-gray-400 mt-1">Add personal notes</p>
         </div>
 
-        {/* Documents */}
-        <div className="pt-6 border-t border-gray-700">
-          <h3 className="text-sm font-medium text-gray-300 mb-3">Documents</h3>
+        <div className="p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={notesPlaceholder || 'Add any notes about the track, e.g. collaborators...'}
+              rows={6}
+              className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+            />
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-xs text-gray-500">{notes.length} characters</span>
+              <button
+                onClick={handleSaveNotes}
+                disabled={isSaving}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all font-medium text-sm"
+              >
+                {isSaving ? 'Saving...' : saveMessage || 'Save Notes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
+      <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
+        <div className="p-6 border-b border-gray-700">
+          <h2 className="text-xl font-semibold text-gray-100">
+            {fileCardTitle || 'Documents'}
+          </h2>
+          <p className="text-sm text-gray-400 mt-1">Upload and manage related files</p>
+        </div>
+
+        <div className="p-6">
           {documents.length > 0 ? (
             <div className="space-y-2 mb-4">
               {documents.map((doc, index) => (
@@ -155,7 +163,7 @@ export default function TrackNotes({
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-sm mb-4">No documents uploaded yet</p>
+            <p className="text-gray-500 text-sm mb-4">No files uploaded yet</p>
           )}
 
           <label className="block w-full">
@@ -166,7 +174,7 @@ export default function TrackNotes({
               className="hidden"
             />
             <div className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all font-medium text-sm text-center cursor-pointer border-2 border-dashed border-gray-600 hover:border-gray-500">
-              {isUploading ? '📤 Uploading...' : '+ Upload Document'}
+              {isUploading ? '📤 Uploading...' : '+ Upload File'}
             </div>
           </label>
           <p className="text-xs text-gray-500 mt-2">
@@ -174,6 +182,6 @@ export default function TrackNotes({
           </p>
         </div>
       </div>
-    </div>
+    </>
   );
 }
