@@ -238,7 +238,8 @@ export default function StatsPage() {
       </div>
       <div className="mt-4 pt-4 border-t border-gray-700">
         <p className="text-sm text-gray-500">
-          Based on {releases.filter(r => r.bpm).length} tracks with BPM data
+        Based on {releases.filter(r => (r.metadata || r).bpm).length} tracks with BPM data
+
         </p>
       </div>
     </div>

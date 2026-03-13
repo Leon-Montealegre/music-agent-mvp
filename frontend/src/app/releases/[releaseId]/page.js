@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useEffect, useState } from 'react'
+import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { fetchRelease, updateDistribution, deleteDistributionEntry, updateDistributionEntry, deleteRelease } from '@/lib/api'
@@ -10,38 +10,61 @@ import LogPlatformForm from '@/components/LogPlatformForm'
 import LogSubmissionForm from '@/components/LogSubmissionForm'
 import DownloadModal from '@/components/DownloadModal'
 import DeleteTrackModal from '@/components/DeleteTrackModal'
-import SongLinks from '@/components/SongLinks'
 import TrackNotes from '@/components/TrackNotes'
 import EditMetadataModal from '@/components/EditMetadataModal'
 
-const COLLECTION_BADGE_STYLES = {
-  Single: 'bg-gray-500/80 border-gray-400/50 text-gray-100',
-  EP:     'bg-indigo-600/90 border-indigo-400/50 text-white',
-  Album:  'bg-purple-600/90 border-purple-400/50 text-white',
+
+function CollectionThumb({ collectionId }) {
+  const [error, setError] = useState(false)
+  if (error) return null
+  return (
+    <img
+      src={`http://localhost:3001/collections/${collectionId}/artwork?t=${Date.now()}`}
+      alt=""
+      className="w-8 h-8 rounded object-cover border border-indigo-500/40 flex-shrink-0"
+      onError={() => setError(true)}
+    />
+  )
 }
+
 
 export default function TrackDetailPage({ params }) {
   const unwrappedParams = use(params)
   const trackId = unwrappedParams.releaseId
-  const router = useRouter()
+  const router  = useRouter()
 
-  const [track, setTrack] = useState(null)
+  const [track, setTrack]   = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError]   = useState(null)
 
-  const [showPlatformModal, setShowPlatformModal] = useState(false)
-  const [showSubmissionModal, setShowSubmissionModal] = useState(false)
+  const [showPlatformModal, setShowPlatformModal]         = useState(false)
+  const [showSubmissionModal, setShowSubmissionModal]     = useState(false)
   const [showLabelSigningModal, setShowLabelSigningModal] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editingEntry, setEditingEntry] = useState(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [entryToDelete, setEntryToDelete] = useState(null)
-  const [showDownloadModal, setShowDownloadModal] = useState(false)
-  const [fileToDownload, setFileToDownload] = useState(null)
-  const [downloadFileType, setDownloadFileType] = useState(null)
-  const [showDeleteTrackModal, setShowDeleteTrackModal] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [submitting, setSubmitting]                       = useState(false)
+  const [showEditModal, setShowEditModal]                 = useState(false)
+  const [editingEntry, setEditingEntry]                   = useState(null)
+  const [showDeleteConfirm, setShowDeleteConfirm]         = useState(false)
+  const [entryToDelete, setEntryToDelete]                 = useState(null)
+  const [showDownloadModal, setShowDownloadModal]         = useState(false)
+  const [fileToDownload, setFileToDownload]               = useState(null)
+  const [downloadFileType, setDownloadFileType]           = useState(null)
+  const [showDeleteTrackModal, setShowDeleteTrackModal]   = useState(false)
+  const [isDeleting, setIsDeleting]                       = useState(false)
+  const [sidebarArtworkError, setSidebarArtworkError]     = useState(false)
+  const [uploadingFile, setUploadingFile]                 = useState(null) // 'audio'|'artwork'|'video'|null
+
+  // Links
+  const [showAddLink, setShowAddLink]   = useState(false)
+  const [newLinkLabel, setNewLinkLabel] = useState('')
+  const [newLinkUrl, setNewLinkUrl]     = useState('')
+
+  // Hidden file inputs
+  const audioInputRef   = useRef(null)
+  const artworkInputRef = useRef(null)
+  const videoInputRef   = useRef(null)
+
+
+  // ── Data loading ──────────────────────────────────────────────────────────
 
   async function loadTrack() {
     try {
@@ -59,11 +82,165 @@ export default function TrackDetailPage({ params }) {
 
   useEffect(() => { loadTrack() }, [trackId])
 
+
+  // ── File handlers ─────────────────────────────────────────────────────────
+
   const handleFileClick = (file, fileType) => {
     setFileToDownload(file)
     setDownloadFileType(fileType)
     setShowDownloadModal(true)
   }
+
+  const handleDeleteAudio = async (filename) => {
+    if (!confirm(`Delete ${filename}? This cannot be undone.`)) return
+    try {
+      const res = await fetch(
+        `http://localhost:3001/releases/${trackId}/versions/primary/audio/${encodeURIComponent(filename)}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) throw new Error('Failed to delete audio')
+      await loadTrack()
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    }
+  }
+
+  const handleDeleteArtwork = async () => {
+    if (!confirm('Delete artwork? This cannot be undone.')) return
+    try {
+      const res = await fetch(`http://localhost:3001/releases/${trackId}/artwork`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete artwork')
+      setSidebarArtworkError(true)
+      await loadTrack()
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    }
+  }
+
+  const handleDeleteVideo = async (filename) => {
+    if (!confirm(`Delete ${filename}? This cannot be undone.`)) return
+    try {
+      const res = await fetch(
+        `http://localhost:3001/releases/${trackId}/video/${encodeURIComponent(filename)}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) throw new Error('Failed to delete video')
+      await loadTrack()
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    }
+  }
+
+  const handleUploadAudio = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingFile('audio')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      // Use dedicated endpoint — no version-conflict check
+      const res = await fetch(
+        `http://localhost:3001/releases/${trackId}/versions/primary/audio`,
+        { method: 'POST', body: formData }
+      )
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      await loadTrack()
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    } finally {
+      setUploadingFile(null)
+      e.target.value = ''
+    }
+  }
+
+  const handleUploadArtwork = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingFile('artwork')
+    try {
+      const formData = new FormData()
+      formData.append('artwork', file)
+      const res = await fetch(`http://localhost:3001/releases/${trackId}/artwork`, {
+        method: 'POST', body: formData
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      setSidebarArtworkError(false)
+      await loadTrack()
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    } finally {
+      setUploadingFile(null)
+      e.target.value = ''
+    }
+  }
+
+  const handleUploadVideo = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingFile('video')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      // Use dedicated endpoint — bypasses versions entirely
+      const res = await fetch(
+        `http://localhost:3001/releases/${trackId}/video`,
+        { method: 'POST', body: formData }
+      )
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      await loadTrack()
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    } finally {
+      setUploadingFile(null)
+      e.target.value = ''
+    }
+  }
+
+
+  // ── Link handlers ─────────────────────────────────────────────────────────
+
+  // FIX: include id so the server can find and filter the correct link
+  const handleAddLink = async () => {
+    if (!newLinkUrl) return
+    try {
+      const res = await fetch(`http://localhost:3001/releases/${trackId}/song-links`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id:    Date.now().toString(),
+          label: newLinkLabel || newLinkUrl,
+          url:   newLinkUrl
+        })
+      })
+      if (!res.ok) throw new Error('Failed to add link')
+      setNewLinkLabel('')
+      setNewLinkUrl('')
+      setShowAddLink(false)
+      await loadTrack()
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    }
+  }
+
+  // FIX: pass link.id (not array index) — server filters by link.id
+  const handleDeleteLink = async (linkId) => {
+    try {
+      const res = await fetch(
+        `http://localhost:3001/releases/${trackId}/song-links/${linkId}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) throw new Error('Failed to delete link')
+      await loadTrack()
+    } catch (err) {
+      alert(`Error: ${err.message}`)
+    }
+  }
+
+
+  // ── Distribution handlers ─────────────────────────────────────────────────
 
   async function handlePlatformSubmit(formData) {
     setSubmitting(true)
@@ -75,7 +252,7 @@ export default function TrackDetailPage({ params }) {
       const updatedData = await fetchRelease(trackId)
       setTrack(updatedData.release || updatedData)
       setShowPlatformModal(false)
-    } catch (err) {
+    } catch {
       alert('Failed to log upload. Please try again.')
     } finally {
       setSubmitting(false)
@@ -91,7 +268,7 @@ export default function TrackDetailPage({ params }) {
       const updatedData = await fetchRelease(trackId)
       setTrack(updatedData.release || updatedData)
       setShowSubmissionModal(false)
-    } catch (err) {
+    } catch {
       alert('Failed to log submission. Please try again.')
     } finally {
       setSubmitting(false)
@@ -110,8 +287,8 @@ export default function TrackDetailPage({ params }) {
       const updatedTrack = await fetchRelease(trackId)
       setTrack(updatedTrack.release || updatedTrack)
       setShowLabelSigningModal(false)
-    } catch (error) {
-      alert(`Error: ${error.message}`)
+    } catch (err) {
+      alert(`Error: ${err.message}`)
     }
   }
 
@@ -121,8 +298,8 @@ export default function TrackDetailPage({ params }) {
       await loadTrack()
       setShowDeleteConfirm(false)
       setEntryToDelete(null)
-    } catch (error) {
-      alert(`Failed to delete: ${error.message}`)
+    } catch (err) {
+      alert(`Failed to delete: ${err.message}`)
     }
   }
 
@@ -131,8 +308,8 @@ export default function TrackDetailPage({ params }) {
       await updateDistributionEntry(trackId, pathType, timestamp, updatedData)
       await loadTrack()
       setEditingEntry(null)
-    } catch (error) {
-      alert(`Failed to update: ${error.message}`)
+    } catch (err) {
+      alert(`Failed to update: ${err.message}`)
     }
   }
 
@@ -146,95 +323,94 @@ export default function TrackDetailPage({ params }) {
     try {
       await deleteRelease(trackId)
       router.push('/')
-    } catch (error) {
-      alert(`Failed to delete track: ${error.message}`)
+    } catch (err) {
+      alert(`Failed to delete track: ${err.message}`)
       setIsDeleting(false)
       setShowDeleteTrackModal(false)
     }
   }
 
+
+  // ── Loading / error states ────────────────────────────────────────────────
+
   if (loading || !track) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4" />
           <p className="text-gray-300">Loading track...</p>
         </div>
       </div>
     )
   }
 
-  const metadata = track.metadata || track
-  const artworkUrl = `http://localhost:3001/releases/${trackId}/artwork/`
+  const metadata   = track.metadata || track
+  const artworkUrl = `http://localhost:3001/releases/${trackId}/artwork/?t=${Date.now()}`
 
   const signedSubmission = metadata.distribution?.submit?.find(s => s.status?.toLowerCase() === 'signed')
-const isSigned   = !!signedSubmission
-const signedLabel = signedSubmission?.label || null
-const hasSubmissions = metadata.distribution?.submit?.length > 0
-const submittedLabel = hasSubmissions
-  ? metadata.distribution.submit.find(s => s.status !== 'signed')?.label || metadata.distribution.submit[0].label
-  : null
-const isReleased = metadata.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
-
-  const displayLabel = signedLabel || submittedLabel
-
+  const isSigned         = !!signedSubmission
+  const signedLabel      = signedSubmission?.label || null
+  const hasSubmissions   = metadata.distribution?.submit?.length > 0
+  const submittedLabel   = hasSubmissions
+    ? metadata.distribution.submit.find(s => s.status !== 'signed')?.label || metadata.distribution.submit[0].label
+    : null
+  const isReleased     = metadata.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
+  const displayLabel   = signedLabel || submittedLabel
   const collectionType = metadata.releaseFormat || metadata.releaseType || 'Single'
-const collectionBadgeStyle = COLLECTION_BADGE_STYLES[collectionType] || COLLECTION_BADGE_STYLES['Single']
+  const collectionName = metadata.collectionId
+    ? metadata.collectionId.replace(/^\d{4}-\d{2}-\d{2}_[^_]+_/, '').replace(/_/g, ' ')
+    : null
 
-const collectionName = metadata.collectionId
-  ? metadata.collectionId.replace(/^\d{4}-\d{2}-\d{2}_[^_]+_/, '').replace(/_/g, ' ')
-  : null
+  const audioFiles   = track.versions?.primary?.files?.audio  || []
+  const artworkFiles = track.versions?.primary?.files?.artwork || []
+  const videoFiles   = track.versions?.primary?.files?.video  || []
+  const hasArtwork   = !sidebarArtworkError
 
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+
+      {/* Hidden file inputs */}
+      <input ref={audioInputRef}   type="file" accept=".wav,.mp3,.flac,.aiff,.m4a" className="hidden" onChange={handleUploadAudio}   />
+      <input ref={artworkInputRef} type="file" accept=".jpg,.jpeg,.png,.webp"       className="hidden" onChange={handleUploadArtwork} />
+      <input ref={videoInputRef}   type="file" accept=".mp4,.mov,.avi,.mkv,.webm"   className="hidden" onChange={handleUploadVideo}   />
 
       {/* ── Header ── */}
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-start justify-between mb-4 gap-4">
-          <div className="flex-1">
-  {/* Part of collection — shown above title */}
-  {metadata.collectionId && (
-    <Link
-      href={`/collections/${metadata.collectionId}`}
-      className="inline-flex items-center gap-1.5 mb-2 group"
-    >
-      <span className={`px-1.5 py-0.5 rounded text-xs font-bold border ${
-        collectionType === 'Album'
-          ? 'bg-purple-600/90 border-purple-400/50 text-white'
-          : 'bg-indigo-600/90 border-indigo-400/50 text-white'
-      }`}>
-        {collectionType}
-      </span>
-      <span className="text-sm text-indigo-300 group-hover:text-indigo-200 transition-colors">
-        {collectionName}
-      </span>
-      <span className="text-indigo-400 text-xs">→</span>
-    </Link>
-  )}
-  <div className="flex items-center gap-3 flex-wrap mb-2">
-    <h1 className="text-4xl font-bold text-gray-100">{metadata.title}</h1>
+            <div className="flex-1">
 
+              {metadata.collectionId && (
+                <Link href={`/collections/${metadata.collectionId}`} className="inline-flex items-center gap-2 mb-2 group">
+                  <CollectionThumb collectionId={metadata.collectionId} />
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-bold border ${
+                    collectionType === 'Album'
+                      ? 'bg-purple-600/90 border-purple-400/50 text-white'
+                      : 'bg-indigo-600/90 border-indigo-400/50 text-white'
+                  }`}>
+                    {collectionType}
+                  </span>
+                  <span className="text-sm text-indigo-300 group-hover:text-indigo-200 transition-colors">{collectionName}</span>
+                  <span className="text-indigo-400 text-xs">→</span>
+                </Link>
+              )}
+
+              <div className="flex items-center gap-3 flex-wrap mb-2">
+                <h1 className="text-4xl font-bold text-gray-100">{metadata.title}</h1>
                 {isSigned && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-green-500/20 border border-green-500/50 text-green-300">
-                    Signed
-                  </div>
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-green-500/20 border border-green-500/50 text-green-300">Signed</div>
                 )}
                 {!isSigned && hasSubmissions && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-yellow-500/20 border border-yellow-500/50 text-yellow-300">
-                    Submitted
-                  </div>
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-yellow-500/20 border border-yellow-500/50 text-yellow-300">Submitted</div>
                 )}
                 {isReleased && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">
-                    Released
-                  </div>
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">Released</div>
                 )}
                 {isSigned && displayLabel && (
-                  <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">
-                    {displayLabel}
-                  </div>
+                  <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">{displayLabel}</div>
                 )}
               </div>
               <p className="text-xl text-gray-300">{metadata.artist}</p>
@@ -253,28 +429,54 @@ const collectionName = metadata.collectionId
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6 sticky top-24">
 
               {/* Artwork */}
-              <div className="aspect-square bg-gray-900/50 rounded-lg overflow-hidden mb-6 relative">
-              {track.versions?.primary?.files?.artwork?.length > 0 ? (
-  <img src={artworkUrl} alt={`${metadata.title} artwork`} className="w-full h-full object-cover" />
-) : (
-  <div className="flex items-center justify-center h-full">
-    <svg width="100" height="100" viewBox="0 0 120 120" className="opacity-30">
-      <circle cx="60" cy="60" r="55" fill="#2a2a2a" stroke="#6b7280" strokeWidth="1.5"/>
-      <circle cx="60" cy="60" r="40" fill="none" stroke="#4b5563" strokeWidth="0.8"/>
-      <circle cx="60" cy="60" r="25" fill="#1a1a2e" stroke="#7c3aed" strokeWidth="1.5"/>
-      <circle cx="60" cy="60" r="8"  fill="#000" stroke="#9ca3af" strokeWidth="1.5"/>
-    </svg>
-  </div>
-)}
-
-                <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-bold border ${collectionBadgeStyle}`}>
-                  {collectionType}
-                </div>
+              <div className="aspect-square bg-gray-900/50 rounded-lg overflow-hidden mb-6 relative group">
+                {!sidebarArtworkError ? (
+                  <>
+                    <img
+                      src={artworkUrl}
+                      alt={`${metadata.title} artwork`}
+                      className="w-full h-full object-cover"
+                      onError={() => setSidebarArtworkError(true)}
+                    />
+                    {/* Hover overlay with delete/replace */}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                      <button
+                        onClick={() => artworkInputRef.current?.click()}
+                        className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-medium transition-colors"
+                        title="Replace artwork"
+                      >
+                        Replace
+                      </button>
+                      <button
+                        onClick={handleDeleteArtwork}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-medium transition-colors"
+                        title="Delete artwork"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full gap-3">
+                    <svg width="80" height="80" viewBox="0 0 120 120" className="opacity-30">
+                      <circle cx="60" cy="60" r="55" fill="#2a2a2a" stroke="#6b7280" strokeWidth="1.5"/>
+                      <circle cx="60" cy="60" r="40" fill="none" stroke="#4b5563" strokeWidth="0.8"/>
+                      <circle cx="60" cy="60" r="25" fill="#1a1a2e" stroke="#7c3aed" strokeWidth="1.5"/>
+                      <circle cx="60" cy="60" r="8"  fill="#000" stroke="#9ca3af" strokeWidth="1.5"/>
+                    </svg>
+                    <button
+                      onClick={() => artworkInputRef.current?.click()}
+                      disabled={uploadingFile === 'artwork'}
+                      className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-300 rounded-lg text-xs font-medium transition-all disabled:opacity-50"
+                    >
+                      {uploadingFile === 'artwork' ? 'Uploading…' : '+ Upload Artwork'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Metadata */}
-              <div className="space-y-3">
-
+              <div className="space-y-3 mb-6">
                 {metadata.genre && (
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Genre</p>
@@ -283,7 +485,6 @@ const collectionName = metadata.collectionId
                     </span>
                   </div>
                 )}
-
                 {(metadata.bpm || metadata.key) && (
                   <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -302,7 +503,6 @@ const collectionName = metadata.collectionId
                     </div>
                   </div>
                 )}
-
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Production Date</p>
                   <p className="text-sm font-medium text-gray-200">
@@ -311,62 +511,173 @@ const collectionName = metadata.collectionId
                       : 'Not set'}
                   </p>
                 </div>
-
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Track ID</p>
                   <p className="text-xs font-mono text-gray-500 break-all">{metadata.releaseId}</p>
                 </div>
               </div>
 
-              {/* Files */}
-              <div className="mt-6 pt-6 border-t border-gray-700">
+              {/* ── Links ── */}
+              <div className="pt-6 border-t border-gray-700 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-100">Links</h3>
+                  <button onClick={() => setShowAddLink(true)} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+                    + Add
+                  </button>
+                </div>
+                {(track.songLinks || []).length === 0 ? (
+                  <p className="text-xs text-gray-500">No links yet</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {(track.songLinks || []).map((link, idx) => (
+                      <div key={link.id || idx} className="flex items-center gap-2">
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-400 hover:text-purple-300 underline truncate flex-1"
+                        >
+                          {link.label || link.url}
+                        </a>
+                        {/* FIX: pass link.id — server filters by id, not array index */}
+                        <button
+                          onClick={() => link.id
+                            ? handleDeleteLink(link.id)
+                            : alert('This link was saved without an ID. Please delete and re-add it.')
+                          }
+                          className="text-red-400 hover:text-red-300 text-xs flex-shrink-0"
+                          title="Remove link"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Files ── */}
+              <div className="pt-6 border-t border-gray-700">
                 <h3 className="font-semibold text-gray-100 mb-3">Files</h3>
 
-                <div className="mb-3">
-                  <p className="text-sm text-gray-300 mb-1">
-                    <span className="font-medium">Audio:</span> {track.versions?.primary?.files?.audio?.length || 0}
-                  </p>
-                  {(track.versions?.primary?.files?.audio || []).map((file, idx) => (
-                    <div key={idx} className="text-xs text-gray-400 ml-4 mb-1">
-                      <button onClick={() => handleFileClick(file, 'audio')} className="text-purple-400 hover:text-purple-300 underline transition-colors">
-                        {file.filename}
-                      </button>
-                      <span className="text-gray-500 ml-2">
-                        ({Math.round(file.size / 1024 / 1024)}MB{file.duration ? `, ${Math.floor(file.duration / 60)}:${String(Math.round(file.duration % 60)).padStart(2, '0')}` : ''})
-                      </span>
-                    </div>
-                  ))}
+                {/* Audio */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm text-gray-300">
+                      <span className="font-medium">Audio:</span> {audioFiles.length}
+                    </p>
+                    <button
+                      onClick={() => audioInputRef.current?.click()}
+                      disabled={uploadingFile === 'audio'}
+                      className="text-xs text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                    >
+                      {uploadingFile === 'audio' ? 'Uploading…' : '+ Add'}
+                    </button>
+                  </div>
+                  {audioFiles.length === 0 ? (
+                    <p className="text-xs text-gray-500 ml-4">No audio files — click Add to upload</p>
+                  ) : (
+                    audioFiles.map((file, idx) => (
+                      <div key={idx} className="text-xs text-gray-400 ml-4 mb-1 flex items-center gap-2">
+                        <button
+                          onClick={() => handleFileClick(file, 'audio')}
+                          className="text-purple-400 hover:text-purple-300 underline transition-colors truncate"
+                        >
+                          {file.filename}
+                        </button>
+                        <span className="text-gray-500 flex-shrink-0">
+                          ({Math.round(file.size / 1024 / 1024)}MB
+                          {file.duration ? `, ${Math.floor(file.duration / 60)}:${String(Math.round(file.duration % 60)).padStart(2, '0')}` : ''})
+                        </span>
+                        <button
+                          onClick={() => handleDeleteAudio(file.filename)}
+                          className="text-red-400 hover:text-red-300 flex-shrink-0"
+                          title="Delete audio file"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
 
-                <div className="mb-3">
-                  <p className="text-sm text-gray-300 mb-1">
-                    <span className="font-medium">Artwork:</span> {track.versions?.primary?.files?.artwork?.length || 0}
-                  </p>
-                  {(track.versions?.primary?.files?.artwork || []).map((file, idx) => (
-                    <div key={idx} className="text-xs text-gray-400 ml-4 mb-1">
-                      <button onClick={() => handleFileClick(file, 'artwork')} className="text-purple-400 hover:text-purple-300 underline transition-colors">
-                        {file.filename}
+                {/* Artwork */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm text-gray-300">
+                      <span className="font-medium">Artwork:</span> {hasArtwork ? 1 : 0}
+                    </p>
+                    {!hasArtwork && (
+                      <button
+                        onClick={() => artworkInputRef.current?.click()}
+                        disabled={uploadingFile === 'artwork'}
+                        className="text-xs text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                      >
+                        {uploadingFile === 'artwork' ? 'Uploading…' : '+ Add'}
                       </button>
-                      <span className="text-gray-500 ml-2">({Math.round(file.size / 1024 / 1024)}MB)</span>
+                    )}
+                  </div>
+                  {hasArtwork ? (
+                    <div className="ml-4 flex items-center gap-2">
+                      <span className="text-xs text-gray-400">artwork file</span>
+                      <button
+                        onClick={() => artworkInputRef.current?.click()}
+                        className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                        title="Replace artwork"
+                      >
+                        ↺ Replace
+                      </button>
+                      <button
+                        onClick={handleDeleteArtwork}
+                        className="text-red-400 hover:text-red-300 text-xs"
+                        title="Delete artwork"
+                      >
+                        🗑️
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    <p className="text-xs text-gray-500 ml-4">No artwork — click Add to upload</p>
+                  )}
                 </div>
 
+                {/* Video */}
                 <div className="mb-3">
-                  <p className="text-sm text-gray-300 mb-1">
-                    <span className="font-medium">Video:</span> {track.versions?.primary?.files?.video?.length || 0}
-                  </p>
-                  {(track.versions?.primary?.files?.video || []).length > 0
-                    ? (track.versions.primary.files.video).map((file, idx) => (
-                        <div key={idx} className="text-xs text-gray-400 ml-4 mb-1">
-                          <button onClick={() => handleFileClick(file, 'video')} className="text-purple-400 hover:text-purple-300 underline transition-colors">
-                            {file.filename}
-                          </button>
-                          <span className="text-gray-500 ml-2">({Math.round(file.size / 1024 / 1024)}MB)</span>
-                        </div>
-                      ))
-                    : <p className="text-xs text-gray-500 ml-4">No video files</p>
-                  }
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm text-gray-300">
+                      <span className="font-medium">Video:</span> {videoFiles.length}
+                    </p>
+                    <button
+                      onClick={() => videoInputRef.current?.click()}
+                      disabled={uploadingFile === 'video'}
+                      className="text-xs text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                    >
+                      {uploadingFile === 'video' ? 'Uploading…' : '+ Add'}
+                    </button>
+                  </div>
+                  {videoFiles.length === 0 ? (
+                    <p className="text-xs text-gray-500 ml-4">No video files — click Add to upload</p>
+                  ) : (
+                    videoFiles.map((file, idx) => (
+                      <div key={idx} className="text-xs text-gray-400 ml-4 mb-1 flex items-center gap-2">
+                        <button
+                          onClick={() => handleFileClick(file, 'video')}
+                          className="text-purple-400 hover:text-purple-300 underline transition-colors truncate"
+                        >
+                          {file.filename}
+                        </button>
+                        <span className="text-gray-500 flex-shrink-0">
+                          ({Math.round(file.size / 1024 / 1024)}MB)
+                        </span>
+                        <button
+                          onClick={() => handleDeleteVideo(file.filename)}
+                          className="text-red-400 hover:text-red-300 flex-shrink-0"
+                          title="Delete video file"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -394,8 +705,6 @@ const collectionName = metadata.collectionId
           {/* ── Right Content ── */}
           <div className="lg:col-span-2 space-y-8">
 
-            <SongLinks releaseId={trackId} initialLinks={track.songLinks || []} />
-
             {/* Label Submissions */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
@@ -415,8 +724,8 @@ const collectionName = metadata.collectionId
                           </div>
                           <div className="flex items-center gap-2 ml-4">
                             <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
-                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'submit', index })} className="text-blue-400 hover:text-blue-300 text-sm p-1">edit</button>
-                            <button onClick={() => confirmDelete('submit', entry.timestamp, entry.label)} className="text-red-400 hover:text-red-300 text-sm p-1">del</button>
+                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'submit', index })} className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
+                            <button onClick={() => confirmDelete('submit', entry.timestamp, entry.label)} className="text-red-400 hover:text-red-300 text-sm p-1" title="Delete">🗑️</button>
                           </div>
                         </div>
                       </div>
@@ -456,8 +765,8 @@ const collectionName = metadata.collectionId
                           </div>
                           <div className="flex items-center gap-2 ml-4">
                             <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
-                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'release', index })} className="text-blue-400 hover:text-blue-300 text-sm p-1">edit</button>
-                            <button onClick={() => confirmDelete('release', entry.timestamp, entry.platform)} className="text-red-400 hover:text-red-300 text-sm p-1">del</button>
+                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'release', index })} className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
+                            <button onClick={() => confirmDelete('release', entry.timestamp, entry.platform)} className="text-red-400 hover:text-red-300 text-sm p-1" title="Delete">🗑️</button>
                           </div>
                         </div>
                       </div>
@@ -510,19 +819,20 @@ const collectionName = metadata.collectionId
                 onClick={() => setShowEditModal(true)}
                 className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-300 rounded-lg transition-all font-medium text-sm"
               >
-                Edit Track
+                ✏️ Edit Track
               </button>
               <button
                 onClick={() => setShowDeleteTrackModal(true)}
                 className="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-300 rounded-lg transition-all font-medium text-sm"
               >
-                Delete Track Permanently
+                🗑️ Delete Track Permanently
               </button>
             </div>
 
           </div>
         </div>
       </div>
+
 
       {/* ── Modals ── */}
 
@@ -593,6 +903,42 @@ const collectionName = metadata.collectionId
           onClose={() => setShowEditModal(false)}
           onSuccess={() => { setShowEditModal(false); loadTrack() }}
         />
+      </Modal>
+
+      {/* Add Link Modal */}
+      <Modal isOpen={showAddLink} onClose={() => setShowAddLink(false)} title="Add Link">
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Label <span className="text-gray-500">(e.g. Spotify, SoundCloud)</span></label>
+            <input
+              type="text"
+              value={newLinkLabel}
+              onChange={e => setNewLinkLabel(e.target.value)}
+              placeholder="Spotify"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">URL <span className="text-red-400">*</span></label>
+            <input
+              type="url"
+              value={newLinkUrl}
+              onChange={e => setNewLinkUrl(e.target.value)}
+              placeholder="https://"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button onClick={handleAddLink} disabled={!newLinkUrl}
+              className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-2 rounded-lg transition-all font-medium">
+              Add Link
+            </button>
+            <button onClick={() => setShowAddLink(false)}
+              className="px-5 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all">
+              Cancel
+            </button>
+          </div>
+        </div>
       </Modal>
 
     </div>

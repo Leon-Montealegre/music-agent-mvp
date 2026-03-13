@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from 'react'
 
-export default function LabelContactForm({ releaseId, labelName, existingContact, onSuccess, onCancel }) {
+export default function LabelContactForm({
+  releaseId,
+  labelName,
+  existingContact,
+  onSuccess,
+  onCancel,
+  baseUrl // optional — if not provided, falls back to release endpoint
+}) {
   const [formData, setFormData] = useState({
     name: '',
     label: labelName || '',
@@ -14,48 +21,37 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
   })
   const [submitting, setSubmitting] = useState(false)
 
-  // Pre-fill if editing
+  const apiBase = baseUrl || `http://localhost:3001/releases/${releaseId}`
+
   useEffect(() => {
     if (existingContact) {
       setFormData({
-        name: existingContact.name || '',
-        label: existingContact.label || labelName || '',
-        email: existingContact.email || '',
-        phone: existingContact.phone || '',
+        name:     existingContact.name     || '',
+        label:    existingContact.label    || labelName || '',
+        email:    existingContact.email    || '',
+        phone:    existingContact.phone    || '',
         location: existingContact.location || '',
-        role: existingContact.role || '',
-        notes: existingContact.notes || ''
+        role:     existingContact.role     || '',
+        notes:    existingContact.notes    || ''
       })
     }
   }, [existingContact, labelName])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    if (!formData.name) {
-      alert('Name is required')
-      return
-    }
+    if (!formData.name) { alert('Name is required'); return }
 
     setSubmitting(true)
     try {
-      let response
-      
-      if (existingContact?.id) {
-        // Update existing contact
-        response = await fetch(`http://localhost:3001/releases/${releaseId}/label-deal/contacts/${existingContact.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        })
-      } else {
-        // Add new contact
-        response = await fetch(`http://localhost:3001/releases/${releaseId}/label-deal/contacts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        })
-      }
+      const url = existingContact?.id
+        ? `${apiBase}/label-deal/contacts/${existingContact.id}`
+        : `${apiBase}/label-deal/contacts`
+
+      const response = await fetch(url, {
+        method: existingContact?.id ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
 
       if (!response.ok) {
         const error = await response.json()
@@ -63,7 +59,6 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
       }
 
       const data = await response.json()
-      console.log('✅ Contact saved:', data)
       onSuccess(data.contact)
     } catch (error) {
       console.error('Error saving contact:', error)
@@ -75,7 +70,7 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
 
   return (
     <form onSubmit={handleSubmit} className="p-6 space-y-4">
-      {/* Name */}
+
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
           Contact Name <span className="text-red-400">*</span>
@@ -90,11 +85,8 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
         />
       </div>
 
-      {/* Label (read-only) */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Label
-        </label>
+        <label className="block text-sm font-medium text-gray-300 mb-2">Label</label>
         <input
           type="text"
           value={formData.label}
@@ -104,7 +96,6 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
         />
       </div>
 
-      {/* Email */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
           Email <span className="text-gray-500">(Optional)</span>
@@ -118,7 +109,6 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
         />
       </div>
 
-      {/* Phone */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
           Phone <span className="text-gray-500">(Optional)</span>
@@ -132,7 +122,6 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
         />
       </div>
 
-      {/* Location */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
           Location <span className="text-gray-500">(Optional)</span>
@@ -146,7 +135,6 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
         />
       </div>
 
-      {/* Role */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
           Role <span className="text-gray-500">(Optional)</span>
@@ -168,7 +156,6 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
         </select>
       </div>
 
-      {/* Notes */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
           Notes <span className="text-gray-500">(Optional)</span>
@@ -182,7 +169,6 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
         />
       </div>
 
-      {/* Buttons */}
       <div className="flex gap-3 pt-4">
         <button
           type="submit"
@@ -199,6 +185,7 @@ export default function LabelContactForm({ releaseId, labelName, existingContact
           Cancel
         </button>
       </div>
+
     </form>
   )
 }

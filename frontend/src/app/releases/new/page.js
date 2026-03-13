@@ -8,29 +8,25 @@ export default function CreateTrackPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Core fields
-  const [artist, setArtist] = useState('')
-  const [title, setTitle] = useState('')
-  const [genre, setGenre] = useState('')
+  const [artist, setArtist]       = useState('')
+  const [title, setTitle]         = useState('')
+  const [genre, setGenre]         = useState('')
   const [trackDate, setTrackDate] = useState(new Date().toISOString().split('T')[0])
-  const [bpm, setBpm] = useState('')
-  const [key, setKey] = useState('')
+  const [bpm, setBpm]             = useState('')
+  const [key, setKey]             = useState('')
 
-  // Files
-  const [audioFile, setAudioFile] = useState(null)
+  const [audioFile, setAudioFile]     = useState(null)
   const [artworkFile, setArtworkFile] = useState(null)
-  const [videoFile, setVideoFile] = useState(null)
+  const [videoFile, setVideoFile]     = useState(null)
 
-  // Collection grouping
-  const [collections, setCollections] = useState([])
-  const [grouping, setGrouping] = useState('standalone')
+  const [collections, setCollections]               = useState([])
+  const [grouping, setGrouping]                     = useState('standalone')
   const [selectedCollectionId, setSelectedCollectionId] = useState('')
-  const [newCollectionType, setNewCollectionType] = useState('EP')
-  const [newCollectionName, setNewCollectionName] = useState('')
+  const [newCollectionType, setNewCollectionType]   = useState('EP')
+  const [newCollectionName, setNewCollectionName]   = useState('')
   const [newCollectionArtist, setNewCollectionArtist] = useState('')
-  const [newCollectionDate, setNewCollectionDate] = useState('')
   const [newCollectionArtwork, setNewCollectionArtwork] = useState(null)
-  const [artworkPreview, setArtworkPreview] = useState(null)
+  const [artworkPreview, setArtworkPreview]         = useState(null)
 
   const genres = ['Ambient', 'Deep House', 'House', 'Indie Dance', 'Melodic House and Techno', 'Progressive House', 'Tech House', 'Techno', 'Trance', 'Other']
   const keys = [
@@ -78,27 +74,30 @@ export default function CreateTrackPage() {
     setIsSubmitting(true)
 
     try {
-      if (!artist || !title) throw new Error('Artist and Title are required')
-      if (!genre)            throw new Error('Genre is required')
-      if (!audioFile)        throw new Error('Audio file is required')
+      if (!artist || !title)                                throw new Error('Artist and Title are required')
+      if (!genre)                                           throw new Error('Genre is required')
       if (grouping === 'existing' && !selectedCollectionId) throw new Error('Please select a collection')
       if (grouping === 'new' && !newCollectionName)         throw new Error('Please enter a name for the new collection')
 
       const trackId = generateTrackId(trackDate, artist, title)
 
-      // Step 1: Upload audio + files
-      const formData = new FormData()
-      formData.append('audio', audioFile)
-      if (artworkFile) formData.append('artwork', artworkFile)
-      if (videoFile)   formData.append('video', videoFile)
+      // Step 1: Upload files — only if at least one file is selected
+      let uploadData = { files: { audio: [], artwork: [], video: [] } }
 
-      let uploadUrl = `http://localhost:3001/upload?releaseId=${encodeURIComponent(trackId)}&artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&genre=${encodeURIComponent(genre)}`
-      if (bpm) uploadUrl += `&bpm=${encodeURIComponent(bpm)}`
-      if (key) uploadUrl += `&key=${encodeURIComponent(key)}`
+      if (audioFile || artworkFile || videoFile) {
+        const formData = new FormData()
+        if (audioFile)   formData.append('audio', audioFile)
+        if (artworkFile) formData.append('artwork', artworkFile)
+        if (videoFile)   formData.append('video', videoFile)
 
-      const uploadResponse = await fetch(uploadUrl, { method: 'POST', body: formData })
-      if (!uploadResponse.ok) throw new Error((await uploadResponse.json()).error || 'Upload failed')
-      const uploadData = await uploadResponse.json()
+        let uploadUrl = `http://localhost:3001/upload?releaseId=${encodeURIComponent(trackId)}&artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&genre=${encodeURIComponent(genre)}`
+        if (bpm) uploadUrl += `&bpm=${encodeURIComponent(bpm)}`
+        if (key) uploadUrl += `&key=${encodeURIComponent(key)}`
+
+        const uploadResponse = await fetch(uploadUrl, { method: 'POST', body: formData })
+        if (!uploadResponse.ok) throw new Error((await uploadResponse.json()).error || 'Upload failed')
+        uploadData = await uploadResponse.json()
+      }
 
       // Step 2: Save metadata
       const metadataPayload = {
@@ -137,7 +136,7 @@ export default function CreateTrackPage() {
             artist: newCollectionArtist || artist,
             collectionType: newCollectionType,
             genre,
-            releaseDate: newCollectionDate || trackDate,
+            releaseDate: trackDate,
           })
         })
         if (!createRes.ok) throw new Error('Failed to create collection')
@@ -262,116 +261,116 @@ export default function CreateTrackPage() {
           {/* ── Collection Grouping ── */}
           <div className="space-y-4 pt-6 border-t border-gray-600">
             <h2 className="text-lg font-semibold text-gray-200 border-b border-gray-600 pb-2">Collection</h2>
-            <p className="text-xs text-gray-500">Optionally group this track into an EP, Album, or Remix release</p>
+            <p className="text-xs text-gray-500">Optionally group this track into an EP or Album release</p>
 
             <div className="space-y-2">
-              {[
-                { value: 'standalone', label: 'Standalone Single' },
-                { value: 'existing',   label: 'Add to existing EP / Album' },
-                { value: 'new',        label: 'Create new EP / Album / Remix' },
-              ].map(({ value, label }) => (
-                <label key={value} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm ${
-                  grouping === value
-                    ? 'border-purple-500 bg-purple-500/10 text-gray-100'
-                    : 'border-gray-600 bg-gray-700/50 text-gray-400'
-                }`}>
-                  <input type="radio" name="grouping" value={value} checked={grouping === value}
-                    onChange={() => setGrouping(value)} className="accent-purple-500" />
-                  {label}
-                </label>
-              ))}
+
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm ${
+                grouping === 'standalone' ? 'border-purple-500 bg-purple-500/10 text-gray-100' : 'border-gray-600 bg-gray-700/50 text-gray-400'
+              }`}>
+                <input type="radio" name="grouping" value="standalone" checked={grouping === 'standalone'}
+                  onChange={() => setGrouping('standalone')} className="accent-purple-500" />
+                Standalone Single
+              </label>
+
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm ${
+                grouping === 'existing' ? 'border-purple-500 bg-purple-500/10 text-gray-100' : 'border-gray-600 bg-gray-700/50 text-gray-400'
+              }`}>
+                <input type="radio" name="grouping" value="existing" checked={grouping === 'existing'}
+                  onChange={() => setGrouping('existing')} className="accent-purple-500" />
+                Add to existing EP / Album
+              </label>
+
+              {grouping === 'existing' && (
+                <div className="ml-6">
+                  {collections.length === 0 ? (
+                    <p className="text-xs text-gray-500 italic">No collections yet — create one below</p>
+                  ) : (
+                    <select value={selectedCollectionId} onChange={e => setSelectedCollectionId(e.target.value)} className={inputClass}>
+                      <option value="">Select a collection...</option>
+                      {collections.map(c => (
+                        <option key={c.releaseId} value={c.releaseId}>[{c.collectionType}] {c.title} — {c.artist}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm ${
+                grouping === 'new' ? 'border-purple-500 bg-purple-500/10 text-gray-100' : 'border-gray-600 bg-gray-700/50 text-gray-400'
+              }`}>
+                <input type="radio" name="grouping" value="new" checked={grouping === 'new'}
+                  onChange={() => setGrouping('new')} className="accent-purple-500" />
+                Create new EP / Album
+              </label>
+
+              {grouping === 'new' && (
+                <div className="ml-4 space-y-4 p-4 bg-gray-900/50 rounded-lg border border-gray-600">
+
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-2">Type</label>
+                    <div className="flex gap-2">
+                      {['EP', 'Album'].map(type => (
+                        <button key={type} type="button" onClick={() => setNewCollectionType(type)}
+                          className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
+                            newCollectionType === type
+                              ? type === 'EP'
+                                ? 'bg-indigo-600 border-indigo-500 text-white'
+                                : 'bg-purple-600 border-purple-500 text-white'
+                              : 'bg-gray-700 border-gray-600 text-gray-400 hover:bg-gray-600'
+                          }`}>
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">{newCollectionType} Name <span className="text-red-400">*</span></label>
+                    <input type="text" value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)} className={inputClass} />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Artist <span className="text-gray-500 font-normal">(defaults to track artist)</span></label>
+                    <input type="text" value={newCollectionArtist} onChange={e => setNewCollectionArtist(e.target.value)}
+                      placeholder={artist} className={inputClass} />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-2">Artwork <span className="text-gray-500 font-normal">(Optional)</span></label>
+                    <div className="flex items-center gap-3">
+                      {artworkPreview ? (
+                        <img src={artworkPreview} alt="preview" className="w-16 h-16 rounded-lg object-cover border border-gray-600 flex-shrink-0" />
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-gray-700 border border-gray-600 flex items-center justify-center text-gray-500 text-xs flex-shrink-0">
+                          No img
+                        </div>
+                      )}
+                      <label className="flex-1 cursor-pointer">
+                        <input type="file" accept="image/*" onChange={handleArtworkSelect} className="hidden" />
+                        <span className="block w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-300 text-sm rounded-lg text-center transition-colors cursor-pointer">
+                          {artworkPreview ? 'Change Image' : '+ Choose Image'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                </div>
+              )}
             </div>
-
-            {/* Existing collection picker */}
-            {grouping === 'existing' && (
-              <div className="ml-4">
-                {collections.length === 0 ? (
-                  <p className="text-xs text-gray-500 italic">No collections yet — create one below</p>
-                ) : (
-                  <select value={selectedCollectionId} onChange={e => setSelectedCollectionId(e.target.value)} className={inputClass}>
-                    <option value="">Select a collection...</option>
-                    {collections.map(c => (
-                      <option key={c.releaseId} value={c.releaseId}>[{c.collectionType}] {c.title} — {c.artist}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )}
-
-            {/* New collection form */}
-            {grouping === 'new' && (
-              <div className="ml-4 space-y-4 p-4 bg-gray-900/50 rounded-lg border border-gray-600">
-
-                {/* Type buttons */}
-                <div>
-                  <label className="block text-xs text-gray-400 mb-2">Type</label>
-                  <div className="flex gap-2">
-                    {['EP', 'Album'].map(type => (
-                      <button key={type} type="button" onClick={() => setNewCollectionType(type)}
-                        className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${
-                          newCollectionType === type
-                            ? type === 'EP'    ? 'bg-indigo-600 border-indigo-500 text-white'
-                            :                    'bg-purple-600 border-purple-500 text-white'
-                            : 'bg-gray-700 border-gray-600 text-gray-400 hover:bg-gray-600'
-                        }`}>
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">{newCollectionType} Name <span className="text-red-400">*</span></label>
-                  <input type="text" value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)}
-                    className={inputClass} />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Artist <span className="text-gray-500 font-normal">(defaults to track artist)</span></label>
-                  <input type="text" value={newCollectionArtist} onChange={e => setNewCollectionArtist(e.target.value)}
-                    placeholder={artist} className={inputClass} />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">
-                    Production Date <span className="text-gray-500 font-normal">(defaults to track date)</span>
-                  </label>
-                  <input type="date" value={newCollectionDate} onChange={e => setNewCollectionDate(e.target.value)} className={inputClass} />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-400 mb-2">Artwork <span className="text-gray-500 font-normal">(Optional)</span></label>
-                  <div className="flex items-center gap-3">
-                    {artworkPreview ? (
-                      <img src={artworkPreview} alt="preview" className="w-16 h-16 rounded-lg object-cover border border-gray-600 flex-shrink-0" />
-                    ) : (
-                      <div className="w-16 h-16 rounded-lg bg-gray-700 border border-gray-600 flex items-center justify-center text-gray-500 text-xs flex-shrink-0">
-                        No img
-                      </div>
-                    )}
-                    <label className="flex-1 cursor-pointer">
-                      <input type="file" accept="image/*" onChange={handleArtworkSelect} className="hidden" />
-                      <span className="block w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-300 text-sm rounded-lg text-center transition-colors cursor-pointer">
-                        {artworkPreview ? 'Change Image' : '+ Choose Image'}
-                      </span>
-                    </label>
-                  </div>
-                </div>
-
-              </div>
-            )}
           </div>
 
           {/* ── Files ── */}
           <div className="space-y-5 pt-6 border-t border-gray-600">
             <h2 className="text-lg font-semibold text-gray-200 border-b border-gray-600 pb-2">Files</h2>
 
+            {/* Audio — now optional */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Audio File <span className="text-red-400">*</span>
+                Audio File <span className="text-gray-500 font-normal">(Optional)</span>
                 <span className="text-xs text-gray-500 ml-2">(.wav, .mp3, .flac)</span>
               </label>
-              <input type="file" accept=".wav,.mp3,.flac,.aiff,.m4a,.ogg" onChange={e => setAudioFile(e.target.files[0])} required className={fileInputClass} />
+              <input type="file" accept=".wav,.mp3,.flac,.aiff,.m4a,.ogg" onChange={e => setAudioFile(e.target.files[0])} className={fileInputClass} />
               {audioFile && (
                 <div className="flex items-center justify-between text-sm text-gray-400 mt-2 bg-gray-900/50 p-2 rounded">
                   <span>Selected: {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)</span>
