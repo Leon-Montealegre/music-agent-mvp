@@ -20,6 +20,8 @@ export default function PromoDealPage({ params }) {
   const [showContactModal, setShowContactModal] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  const [notesText, setNotesText] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
   
   // Delete file state
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -48,6 +50,14 @@ export default function PromoDealPage({ params }) {
   useEffect(() => {
     loadTrack()
   }, [releaseId])
+
+  useEffect(() => {
+    if (track?.notes?.text !== undefined && track?.notes?.text !== null) {
+      setNotesText(track.notes.text)
+    } else if (track) {
+      setNotesText('')
+    }
+  }, [track])
 
   const handleFileUpload = async (file) => {
     if (!file) return
@@ -184,6 +194,45 @@ export default function PromoDealPage({ params }) {
   const promoInfo = track.metadata?.promoInfo || track.promoInfo || {}
   const contacts = promoInfo.contacts || []
   const documents = promoInfo.contractDocuments || []
+  const distributionPromote = track.distribution?.promote || []
+  const metadataPromote = track.metadata?.distribution?.promote || []
+  const allPromoteEntries = [...distributionPromote, ...metadataPromote]
+  const livePromos = allPromoteEntries.filter(
+    (entry) => entry.status?.toLowerCase() === 'live'
+  )
+  const hasLivePromos = livePromos.length > 0
+  const activePromosCount = livePromos.length
+  const latestLiveDate = livePromos
+    .map((entry) => entry.liveDate)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b) - new Date(a))[0] || null
+  const promoTitle =
+    (livePromos[0]?.promoName && livePromos[0].promoName.trim()) || 'Promo Deal'
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true)
+    try {
+      const response = await fetch(`${apiBase}/notes`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ notes: notesText })
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.error || 'Failed to save notes')
+      }
+
+      await loadTrack()
+    } catch (error) {
+      console.error('Error saving notes:', error)
+      alert(`Failed to save notes: ${error.message}`)
+    } finally {
+      setSavingNotes(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
@@ -193,9 +242,16 @@ export default function PromoDealPage({ params }) {
           <div className="flex items-start justify-between gap-4">
             {/* Left side: Title */}
             <div>
-              <h1 className="text-3xl font-bold text-gray-100 mb-2">
-                Promo Deal - {promoInfo.label || 'Unknown Label'}
-              </h1>
+              <div className="flex items-center gap-3 flex-wrap mb-2">
+                <h1 className="text-3xl font-bold text-gray-100">
+                  {promoTitle}
+                </h1>
+                {hasLivePromos && (
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-gradient-to-r from-pink-500/30 via-rose-500/30 to-orange-400/30 border border-pink-400/60 text-pink-200">
+                    Promoted
+                  </div>
+                )}
+              </div>
               <p className="text-gray-300">
                 {track.metadata?.title || track.title} • {track.metadata?.artist || track.artist}
               </p>
@@ -236,14 +292,16 @@ export default function PromoDealPage({ params }) {
               <h3 className="font-semibold text-gray-100 mb-4">Promo Info</h3>
               <div className="space-y-3 text-sm">
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Label</p>
-                  <p className="text-gray-200">{promoInfo.label || 'Not set'}</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Active Promos</p>
+                  <p className="text-gray-200">
+                    {activePromosCount > 0 ? activePromosCount : 'None'}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Signed Date</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Latest Live Date</p>
                   <p className="text-gray-200">
-                    {promoInfo.signedDate
-                      ? new Date(promoInfo.signedDate).toLocaleDateString('en-US', {
+                    {latestLiveDate
+                      ? new Date(latestLiveDate).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric'
@@ -363,10 +421,10 @@ export default function PromoDealPage({ params }) {
               </div>
             </div>
 
-            {/* Contract Documents Card */}
+            {/* Upload Documents Card */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Contract Documents</h2>
+                <h2 className="text-xl font-semibold text-gray-100">Upload Documents</h2>
                 <p className="text-sm text-gray-400 mt-1">Upload contracts, riders, and other deal documents</p>
               </div>
               <div className="p-6">
@@ -450,6 +508,35 @@ export default function PromoDealPage({ params }) {
                 )}
               </div>
             </div>
+
+            {/* Notes Card */}
+            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
+              <div className="p-6 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-gray-100">Notes</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  Internal notes about this promo deal
+                </p>
+              </div>
+              <div className="p-6 space-y-4">
+                <textarea
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Write any promo-related notes here..."
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveNotes}
+                    disabled={savingNotes}
+                    className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium disabled:bg-gray-600 disabled:cursor-not-allowed"
+                  >
+                    {savingNotes ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -465,7 +552,7 @@ export default function PromoDealPage({ params }) {
       >
         <LabelContactForm
           releaseId={releaseId}
-          labelName={promoInfo.label}
+          labelName=""
           existingContact={editingContact}
           onSuccess={handleContactSuccess}
           onCancel={() => {

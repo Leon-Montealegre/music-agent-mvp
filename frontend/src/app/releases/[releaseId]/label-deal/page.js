@@ -20,6 +20,8 @@ export default function LabelDealPage({ params }) {
   const [showContactModal, setShowContactModal] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  const [notesText, setNotesText] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
   
   // Delete file state
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -46,6 +48,41 @@ export default function LabelDealPage({ params }) {
   useEffect(() => {
     loadTrack()
   }, [releaseId])
+
+  useEffect(() => {
+    if (track?.notes?.text !== undefined && track?.notes?.text !== null) {
+      setNotesText(track.notes.text)
+    } else if (track) {
+      setNotesText('')
+    }
+  }, [track])
+
+  const apiBase = `http://localhost:3001/releases/${releaseId}`
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true)
+    try {
+      const response = await fetch(`${apiBase}/notes`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ notes: notesText })
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.error || 'Failed to save notes')
+      }
+
+      await loadTrack()
+    } catch (error) {
+      console.error('Error saving notes:', error)
+      alert(`Failed to save notes: ${error.message}`)
+    } finally {
+      setSavingNotes(false)
+    }
+  }
 
   const handleFileUpload = async (file) => {
     if (!file) return
@@ -166,7 +203,9 @@ export default function LabelDealPage({ params }) {
       {/* Left side: Title */}
       <div>
         <h1 className="text-3xl font-bold text-gray-100 mb-2">
-          Label Deal - {labelInfo.label || 'Unknown Label'}
+          {labelInfo.label && labelInfo.label.trim()
+            ? `Label Deal - ${labelInfo.label}`
+            : 'Label Deal'}
         </h1>
         <p className="text-gray-300">
           {track.metadata?.title || track.title} • {track.metadata?.artist || track.artist}
@@ -336,10 +375,10 @@ export default function LabelDealPage({ params }) {
               </div>
             </div>
 
-            {/* Contract Documents Card */}
+            {/* Upload Documents Card */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Contract Documents</h2>
+                <h2 className="text-xl font-semibold text-gray-100">Upload Documents</h2>
                 <p className="text-sm text-gray-400 mt-1">Upload contracts, riders, and other deal documents</p>
               </div>
               <div className="p-6">
@@ -421,6 +460,35 @@ export default function LabelDealPage({ params }) {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Notes Card */}
+            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
+              <div className="p-6 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-gray-100">Notes</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  Internal notes about this label deal
+                </p>
+              </div>
+              <div className="p-6 space-y-4">
+                <textarea
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Write any label-deal related notes here..."
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveNotes}
+                    disabled={savingNotes}
+                    className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium disabled:bg-gray-600 disabled:cursor-not-allowed"
+                  >
+                    {savingNotes ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

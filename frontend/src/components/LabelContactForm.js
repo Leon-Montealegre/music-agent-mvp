@@ -87,12 +87,14 @@ export default function LabelContactForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">Label</label>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Company or Label Name
+        </label>
         <input
           type="text"
           value={formData.label}
-          readOnly
-          className="w-full px-3 py-2 border border-gray-600 bg-gray-800 text-gray-400 rounded-lg cursor-not-allowed"
+          onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
           placeholder="Early Morning"
         />
       </div>
@@ -150,6 +152,11 @@ export default function LabelContactForm({
           <option value="Label Owner">Label Owner</option>
           <option value="Label Manager">Label Manager</option>
           <option value="Marketing">Marketing</option>
+          <option value="Blog Owner">Blog Owner</option>
+          <option value="Playlist Curator">Playlist Curator</option>
+          <option value="Podcast Host">Podcast Host</option>
+          <option value="Channel Owner">Channel Owner</option>
+          <option value="PR Manager">PR Manager</option>
           <option value="Booking Agent">Booking Agent</option>
           <option value="Manager">Manager</option>
           <option value="Artist">Artist</option>
@@ -166,7 +173,7 @@ export default function LabelContactForm({
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           rows={3}
           className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-          placeholder="Met in London in a pub, was interested in collabing with me and Hernan Cattaneo"
+          placeholder="Accept calls mon-fri between 9h-17h CET on his cell. Birthday is on June 15."
         />
       </div>
 
