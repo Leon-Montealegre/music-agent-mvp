@@ -6,13 +6,14 @@
 // Health: curl http://localhost:3001/health
 // =============================================================================
 
-const express       = require('express')
-const multer        = require('multer')
-const cors          = require('cors')
-const path          = require('path')
-const fs            = require('fs').promises
-const fsSync        = require('fs')
-const os            = require('os')
+const express        = require('express')
+const multer         = require('multer')
+const cors           = require('cors')
+const path           = require('path')
+const fs             = require('fs').promises
+const fsSync         = require('fs')
+const os             = require('os')
+const { randomUUID } = require('crypto')
 const checkDiskSpace = require('check-disk-space').default
 const musicMetadata = require('music-metadata')
 
@@ -173,6 +174,18 @@ const releaseLabelDealUpload = multer({
   })
 })
 
+// Release promo-deal files
+const releasePromoDealUpload = multer({
+  storage: multer.diskStorage({
+    destination(req, file, cb) {
+      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'promo-deal')
+      fsSync.mkdirSync(dir, { recursive: true })
+      cb(null, dir)
+    },
+    filename(req, file, cb) { cb(null, file.originalname) }
+  })
+})
+
 // Collection artwork
 const collectionUpload = multer({
   storage: multer.diskStorage({
@@ -202,6 +215,18 @@ const collectionLabelDealUpload = multer({
   storage: multer.diskStorage({
     destination(req, file, cb) {
       const dir = path.join(COLLECTIONS_PATH, req.params.collectionId, 'label-deal')
+      fsSync.mkdirSync(dir, { recursive: true })
+      cb(null, dir)
+    },
+    filename(req, file, cb) { cb(null, file.originalname) }
+  })
+})
+
+// Collection promo-deal files
+const collectionPromoDealUpload = multer({
+  storage: multer.diskStorage({
+    destination(req, file, cb) {
+      const dir = path.join(COLLECTIONS_PATH, req.params.collectionId, 'promo-deal')
       fsSync.mkdirSync(dir, { recursive: true })
       cb(null, dir)
     },
@@ -1065,6 +1090,79 @@ app.delete('/releases/:releaseId/label-deal/files/:filename', async (req, res) =
 })
 
 // =============================================================================
+// RELEASES — PROMO DEAL FILES
+// =============================================================================
+
+app.post('/releases/:releaseId/promo-deal/files', releasePromoDealUpload.single('file'), async (req, res) => {
+  try {
+    const { releaseId } = req.params
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
+
+    if (!metadata.metadata) metadata.metadata = {}
+    if (!metadata.metadata.promoInfo) {
+      metadata.metadata.promoInfo = { contacts: [], contractDocuments: [] }
+    }
+    if (!metadata.metadata.promoInfo.contractDocuments) {
+      metadata.metadata.promoInfo.contractDocuments = []
+    }
+
+    metadata.metadata.promoInfo.contractDocuments.push({
+      filename:   req.file.originalname,
+      uploadedAt: new Date().toISOString(),
+      size:       req.file.size
+    })
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+
+    res.json({ success: true, file: { filename: req.file.originalname, size: req.file.size } })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.get('/releases/:releaseId/promo-deal/files/:filename', async (req, res) => {
+  try {
+    const filePath = path.join(RELEASES_DIR, req.params.releaseId, 'promo-deal', req.params.filename)
+    try { await fs.access(filePath) }
+    catch { return res.status(404).json({ error: 'File not found' }) }
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.filename}"`)
+    fsSync.createReadStream(filePath).pipe(res)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.delete('/releases/:releaseId/promo-deal/files/:filename', async (req, res) => {
+  try {
+    const { releaseId, filename } = req.params
+    const filePath     = path.join(RELEASES_DIR, releaseId, 'promo-deal', filename)
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+
+    try { await fs.unlink(filePath) }
+    catch { return res.status(404).json({ error: 'File not found' }) }
+
+    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
+    if (!metadata.metadata) metadata.metadata = {}
+    if (!metadata.metadata.promoInfo) {
+      metadata.metadata.promoInfo = { contacts: [], contractDocuments: [] }
+    }
+
+    if (metadata.metadata.promoInfo.contractDocuments) {
+      metadata.metadata.promoInfo.contractDocuments =
+        metadata.metadata.promoInfo.contractDocuments.filter(d => d.filename !== filename)
+    }
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// =============================================================================
 // RELEASES — LABEL DEAL CONTACTS
 // =============================================================================
 
@@ -1132,6 +1230,108 @@ app.delete('/releases/:releaseId/label-deal/contacts/:contactId', async (req, re
     const original = metadata.metadata.labelInfo.contacts.length
     metadata.metadata.labelInfo.contacts = metadata.metadata.labelInfo.contacts.filter(c => c.id !== contactId)
     if (metadata.metadata.labelInfo.contacts.length === original) return res.status(404).json({ error: 'Contact not found' })
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// =============================================================================
+// RELEASES — PROMO DEAL CONTACTS
+// =============================================================================
+
+app.post('/releases/:releaseId/promo-deal/contacts', async (req, res) => {
+  try {
+    const { releaseId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    if (!name) return res.status(400).json({ error: 'Name is required' })
+
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
+
+    if (!metadata.metadata) metadata.metadata = {}
+    if (!metadata.metadata.promoInfo) {
+      metadata.metadata.promoInfo = { contacts: [], contractDocuments: [] }
+    }
+    if (!metadata.metadata.promoInfo.contacts) {
+      metadata.metadata.promoInfo.contacts = []
+    }
+
+    const newContact = {
+      id:         randomUUID(),
+      name,
+      label:      label    || '',
+      email:      email    || '',
+      phone:      phone    || '',
+      location:   location || '',
+      role:       role     || '',
+      notes:      notes    || '',
+      lastContact: null,
+      createdAt:  new Date().toISOString(),
+      updatedAt:  new Date().toISOString()
+    }
+
+    metadata.metadata.promoInfo.contacts.push(newContact)
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true, contact: newContact })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.patch('/releases/:releaseId/promo-deal/contacts/:contactId', async (req, res) => {
+  try {
+    const { releaseId, contactId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    if (!name) return res.status(400).json({ error: 'Name is required' })
+
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
+
+    if (!metadata.metadata?.promoInfo?.contacts)
+      return res.status(404).json({ error: 'No contacts found' })
+
+    const idx = metadata.metadata.promoInfo.contacts.findIndex(c => c.id === contactId)
+    if (idx === -1) return res.status(404).json({ error: 'Contact not found' })
+
+    metadata.metadata.promoInfo.contacts[idx] = {
+      ...metadata.metadata.promoInfo.contacts[idx],
+      name,
+      label:      label    || '',
+      email:      email    || '',
+      phone:      phone    || '',
+      location:   location || '',
+      role:       role     || '',
+      notes:      notes    || '',
+      updatedAt:  new Date().toISOString()
+    }
+
+    metadata.updatedAt = new Date().toISOString()
+    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true, contact: metadata.metadata.promoInfo.contacts[idx] })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.delete('/releases/:releaseId/promo-deal/contacts/:contactId', async (req, res) => {
+  try {
+    const { releaseId, contactId } = req.params
+    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
+
+    if (!metadata.metadata?.promoInfo?.contacts)
+      return res.status(404).json({ error: 'No contacts found' })
+
+    const original = metadata.metadata.promoInfo.contacts.length
+    metadata.metadata.promoInfo.contacts =
+      metadata.metadata.promoInfo.contacts.filter(c => c.id !== contactId)
+    if (metadata.metadata.promoInfo.contacts.length === original)
+      return res.status(404).json({ error: 'Contact not found' })
 
     metadata.updatedAt = new Date().toISOString()
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
@@ -1607,6 +1807,167 @@ app.delete('/collections/:collectionId/label-deal/contacts/:contactId', async (r
     const original = metadata.labelInfo.contacts.length
     metadata.labelInfo.contacts = metadata.labelInfo.contacts.filter(c => c.id !== contactId)
     if (metadata.labelInfo.contacts.length === original) return res.status(404).json({ error: 'Contact not found' })
+
+    await fs.writeFile(metaFilePath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// =============================================================================
+// COLLECTIONS — PROMO DEAL FILES
+// =============================================================================
+
+app.post('/collections/:collectionId/promo-deal/files', collectionPromoDealUpload.single('file'), async (req, res) => {
+  try {
+    const { collectionId } = req.params
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+
+    const metaFilePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
+    const metadata = await readCollection(collectionId)
+
+    if (!metadata.promoInfo) {
+      metadata.promoInfo = { contacts: [], contractDocuments: [] }
+    }
+    if (!metadata.promoInfo.contractDocuments) {
+      metadata.promoInfo.contractDocuments = []
+    }
+
+    metadata.promoInfo.contractDocuments.push({
+      filename:   req.file.originalname,
+      size:       req.file.size,
+      uploadedAt: new Date().toISOString()
+    })
+
+    await fs.writeFile(metaFilePath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/collections/:collectionId/promo-deal/files/:filename', (req, res) => {
+  const filePath = path.join(COLLECTIONS_PATH, req.params.collectionId, 'promo-deal', req.params.filename)
+  if (!fsSync.existsSync(filePath)) return res.status(404).json({ error: 'File not found' })
+  res.setHeader('Content-Disposition', `attachment; filename="${req.params.filename}"`)
+  fsSync.createReadStream(filePath).pipe(res)
+})
+
+app.delete('/collections/:collectionId/promo-deal/files/:filename', async (req, res) => {
+  try {
+    const { collectionId, filename } = req.params
+    const filePath     = path.join(COLLECTIONS_PATH, collectionId, 'promo-deal', filename)
+    const metaFilePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
+
+    try { await fs.unlink(filePath) } catch {}
+    const metadata = await readCollection(collectionId)
+
+    if (!metadata.promoInfo) {
+      metadata.promoInfo = { contacts: [], contractDocuments: [] }
+    }
+
+    if (metadata.promoInfo?.contractDocuments) {
+      metadata.promoInfo.contractDocuments =
+        metadata.promoInfo.contractDocuments.filter(d => d.filename !== filename)
+    }
+
+    await fs.writeFile(metaFilePath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// =============================================================================
+// COLLECTIONS — PROMO DEAL CONTACTS
+// =============================================================================
+
+app.post('/collections/:collectionId/promo-deal/contacts', async (req, res) => {
+  try {
+    const { collectionId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    if (!name) return res.status(400).json({ error: 'Name is required' })
+
+    const metaFilePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
+    const metadata = await readCollection(collectionId)
+
+    if (!metadata.promoInfo) {
+      metadata.promoInfo = { contacts: [], contractDocuments: [] }
+    }
+    if (!metadata.promoInfo.contacts) {
+      metadata.promoInfo.contacts = []
+    }
+
+    const newContact = {
+      id:         randomUUID(),
+      name,
+      label:      label    || '',
+      email:      email    || '',
+      phone:      phone    || '',
+      location:   location || '',
+      role:       role     || '',
+      notes:      notes    || '',
+      createdAt:  new Date().toISOString(),
+      updatedAt:  new Date().toISOString()
+    }
+
+    metadata.promoInfo.contacts.push(newContact)
+    await fs.writeFile(metaFilePath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true, contact: newContact })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.patch('/collections/:collectionId/promo-deal/contacts/:contactId', async (req, res) => {
+  try {
+    const { collectionId, contactId } = req.params
+    const { name, label, email, phone, location, role, notes } = req.body
+    if (!name) return res.status(400).json({ error: 'Name is required' })
+
+    const metaFilePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
+    const metadata = await readCollection(collectionId)
+
+    if (!metadata.promoInfo?.contacts)
+      return res.status(404).json({ error: 'No contacts found' })
+
+    const idx = metadata.promoInfo.contacts.findIndex(c => c.id === contactId)
+    if (idx === -1) return res.status(404).json({ error: 'Contact not found' })
+
+    metadata.promoInfo.contacts[idx] = {
+      ...metadata.promoInfo.contacts[idx],
+      name,
+      label:      label    || '',
+      email:      email    || '',
+      phone:      phone    || '',
+      location:   location || '',
+      role:       role     || '',
+      notes:      notes    || '',
+      updatedAt:  new Date().toISOString()
+    }
+
+    await fs.writeFile(metaFilePath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true, contact: metadata.promoInfo.contacts[idx] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/collections/:collectionId/promo-deal/contacts/:contactId', async (req, res) => {
+  try {
+    const { collectionId, contactId } = req.params
+    const metaFilePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
+    const metadata = await readCollection(collectionId)
+
+    if (!metadata.promoInfo?.contacts)
+      return res.status(404).json({ error: 'No contacts found' })
+
+    const original = metadata.promoInfo.contacts.length
+    metadata.promoInfo.contacts =
+      metadata.promoInfo.contacts.filter(c => c.id !== contactId)
+    if (metadata.promoInfo.contacts.length === original)
+      return res.status(404).json({ error: 'Contact not found' })
 
     await fs.writeFile(metaFilePath, JSON.stringify(metadata, null, 2))
     res.json({ success: true })
