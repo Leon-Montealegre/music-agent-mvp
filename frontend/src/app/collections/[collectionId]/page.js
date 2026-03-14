@@ -367,23 +367,6 @@ export default function CollectionDetailPage({ params }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
 
-      {/* ── Persistent Top Bar ── */}
-      <div style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        backgroundColor: '#0a0a0a',
-        padding: '16px 24px',
-        borderBottom: '1px solid #2a2a2a'
-      }}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div />
-          <Link href="/" className="text-purple-400 hover:text-purple-300 transition-colors text-sm font-medium">
-            ← Catalogue
-          </Link>
-        </div>
-      </div>
-
       {/* ── Header ── */}
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-6">
