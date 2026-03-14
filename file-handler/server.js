@@ -938,8 +938,8 @@ app.patch('/releases/:releaseId/sign', async (req, res) => {
     const submission = metadata.metadata.distribution.submit.find(s => s.label === labelName)
     if (!submission) return res.status(404).json({ success: false, error: `No submission found for label: ${labelName}` })
 
-    submission.status   = 'signed'
-    submission.signedAt = new Date().toISOString()
+    submission.status     = 'Signed'
+    submission.signedDate = signedDate || new Date().toISOString()
 
     if (!metadata.metadata.labelInfo) metadata.metadata.labelInfo = {}
     metadata.metadata.labelInfo.isSigned   = true
@@ -2321,8 +2321,8 @@ app.patch('/collections/:collectionId/sign', async (req, res) => {
     const submission = metadata.distribution.submit.find(s => s.label === labelName)
     if (!submission) return res.status(404).json({ success: false, error: `No submission found for label: ${labelName}` })
 
-    submission.status = 'Signed'
-    submission.signedAt = new Date().toISOString()
+    submission.status     = 'Signed'
+    submission.signedDate = signedDate || new Date().toISOString()
 
     if (!metadata.labelInfo) metadata.labelInfo = {}
     metadata.labelInfo.isSigned = true
