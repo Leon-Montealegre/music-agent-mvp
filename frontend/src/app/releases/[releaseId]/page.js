@@ -298,9 +298,8 @@ export default function TrackDetailPage({ params }) {
       })
       const data = await response.json()
       if (!response.ok) { alert(`Failed to mark as signed: ${data.error || 'Unknown error'}`); return }
-      const updatedTrack = await fetchRelease(trackId)
-      setTrack(updatedTrack.release || updatedTrack)
       setShowLabelSigningModal(false)
+      await loadTrack()
     } catch (err) {
       alert(`Error: ${err.message}`)
     }

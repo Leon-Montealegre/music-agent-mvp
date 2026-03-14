@@ -19,6 +19,7 @@ export default function CollectionLabelEntryPage({ params }) {
 
   const [detailsForm, setDetailsForm] = useState({
     label: '',
+    platform: '',
     status: 'Pending',
     signedDate: '',
     notes: ''
@@ -55,6 +56,7 @@ export default function CollectionLabelEntryPage({ params }) {
       setEntry(fetchedEntry)
       setDetailsForm({
         label: fetchedEntry.label || fetchedEntry.labelName || '',
+        platform: fetchedEntry.platform || '',
         status: fetchedEntry.status || 'Pending',
         signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : (fetchedEntry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
         notes: fetchedEntry.notes || ''
@@ -80,6 +82,7 @@ export default function CollectionLabelEntryPage({ params }) {
     try {
       const payload = {
         label: detailsForm.label.trim(),
+        platform: detailsForm.platform,
         status: detailsForm.status,
         notes: detailsForm.notes
       }
@@ -100,6 +103,7 @@ export default function CollectionLabelEntryPage({ params }) {
       setEntry(data.entry)
       setDetailsForm({
         label: data.entry.label || data.entry.labelName || '',
+        platform: data.entry.platform || '',
         status: data.entry.status || 'Pending',
         signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : (data.entry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
         notes: data.entry.notes || ''
@@ -638,6 +642,21 @@ export default function CollectionLabelEntryPage({ params }) {
               onChange={e => setDetailsForm({ ...detailsForm, label: e.target.value })}
               className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
             />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Submitted via</label>
+            <select
+              value={detailsForm.platform}
+              onChange={e => setDetailsForm({ ...detailsForm, platform: e.target.value })}
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">Select platform</option>
+              <option value="LabelRadar">LabelRadar</option>
+              <option value="Email">Email</option>
+              <option value="Website">Website</option>
+              <option value="SubmitHub">SubmitHub</option>
+              <option value="Other">Other</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm text-gray-300 mb-1">Status</label>
