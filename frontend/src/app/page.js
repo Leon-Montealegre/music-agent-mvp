@@ -22,6 +22,12 @@ export default function HomePage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [sortBy, setSortBy] = useState('date-newest')
   const [sortDirection, setSortDirection] = useState('asc')
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('catalogueView') || 'grid'
+    }
+    return 'grid'
+  })
 
   // Collapsible section state
   const [collectionsOpen, setCollectionsOpen] = useState(true)
@@ -45,6 +51,12 @@ export default function HomePage() {
     }
     loadData()
   }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('catalogueView', viewMode)
+    }
+  }, [viewMode])
 
   // --- Counts ---
   const countSingles = releases.filter(r => !r.collectionId).length
@@ -234,6 +246,116 @@ export default function HomePage() {
     </Link>
   )
 
+  const ListRow = ({ item, type }) => {
+    const isCollection = type === 'collection'
+    const href = isCollection ? `/collections/${item.releaseId}` : `/releases/${item.releaseId}`
+    const artworkSrc = isCollection
+      ? `http://localhost:3001/collections/${item.releaseId}/artwork`
+      : `http://localhost:3001/releases/${item.releaseId}/artwork`
+    const hasArtwork = item.fileCounts?.artwork > 0
+
+    return (
+      <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '10px 16px',
+            borderBottom: '1px solid #1f2937',
+            cursor: 'pointer',
+            transition: 'background 0.1s',
+            minHeight: '56px',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          {/* Artwork */}
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '6px',
+            overflow: 'hidden', flexShrink: 0,
+            background: isCollection ? '#1e1b4b' : '#1a1a2e',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {hasArtwork ? (
+              <img src={artworkSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isCollection ? '#6366f1' : '#7c3aed'} strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            )}
+          </div>
+
+          {/* Title */}
+          <div style={{ minWidth: 0, width: '200px', flexShrink: 0 }}>
+            <div style={{
+              color: '#f3f4f6', fontWeight: 600, fontSize: '14px',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {item.title}
+            </div>
+          </div>
+
+          {/* Artist */}
+          <div style={{
+            color: '#9ca3af', fontSize: '13px', width: '140px', flexShrink: 0,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {item.artist}
+          </div>
+
+          {/* Genre */}
+          {item.genre ? (
+            <span style={{
+              padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
+              background: isCollection ? 'rgba(99,102,241,0.2)' : 'rgba(124,58,237,0.2)',
+              color: isCollection ? '#a5b4fc' : '#c4b5fd',
+              border: `1px solid ${isCollection ? 'rgba(99,102,241,0.4)' : 'rgba(124,58,237,0.4)'}`,
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}>
+              {item.genre}
+            </span>
+          ) : (
+            <div style={{ width: '60px', flexShrink: 0 }} />
+          )}
+
+          {/* BPM */}
+          <div style={{ color: '#9ca3af', fontSize: '12px', width: '48px', flexShrink: 0 }}>
+            {item.bpm ? `${item.bpm} BPM` : ''}
+          </div>
+
+          {/* Key */}
+          <div style={{ color: '#9ca3af', fontSize: '12px', width: '36px', flexShrink: 0 }}>
+            {item.key || ''}
+          </div>
+
+          {/* Date */}
+          <div style={{ color: '#6b7280', fontSize: '12px', width: '90px', flexShrink: 0 }}>
+            {item.releaseDate || ''}
+          </div>
+
+          {/* Badges — right-aligned */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {item.distribution?.release?.some(e => e.status?.toLowerCase() === 'live') && (
+              <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(21,128,61,0.4)', color: '#86efac', border: '1px solid rgba(21,128,61,0.5)' }}>Released</span>
+            )}
+            {item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed') && (
+              <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(161,98,7,0.4)', color: '#fde68a', border: '1px solid rgba(161,98,7,0.5)' }}>Signed</span>
+            )}
+            {item.distribution?.submit?.length > 0 &&
+             !item.distribution.submit.some(e => e.status?.toLowerCase() === 'signed') &&
+             !item.distribution.release?.some(e => e.status?.toLowerCase() === 'live') && (
+              <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(29,78,216,0.4)', color: '#93c5fd', border: '1px solid rgba(29,78,216,0.5)' }}>Submitted</span>
+            )}
+            {item.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live') && (
+              <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(236,72,153,0.2)', color: '#fbcfe8', border: '1px solid rgba(236,72,153,0.4)' }}>Promoted</span>
+            )}
+          </div>
+        </div>
+      </Link>
+    )
+  }
+
   // --- Collapsible section header ---
   const SectionHeader = ({ label, count, isOpen, onToggle, accent = 'purple' }) => {
     const colors = {
@@ -276,6 +398,49 @@ export default function HomePage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {/* View mode toggle */}
+              <div style={{ display: 'flex', border: '1px solid #374151', borderRadius: '8px', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  title="Grid view"
+                  style={{
+                    padding: '8px 12px',
+                    background: viewMode === 'grid' ? '#7c3aed' : '#1f2937',
+                    color: viewMode === 'grid' ? '#fff' : '#9ca3af',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                    lineHeight: 1,
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <rect x="1" y="1" width="6" height="6" rx="1"/>
+                    <rect x="9" y="1" width="6" height="6" rx="1"/>
+                    <rect x="1" y="9" width="6" height="6" rx="1"/>
+                    <rect x="9" y="9" width="6" height="6" rx="1"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  title="List view"
+                  style={{
+                    padding: '8px 12px',
+                    background: viewMode === 'list' ? '#7c3aed' : '#1f2937',
+                    color: viewMode === 'list' ? '#fff' : '#9ca3af',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                    lineHeight: 1,
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <rect x="1" y="2" width="14" height="2" rx="1"/>
+                    <rect x="1" y="7" width="14" height="2" rx="1"/>
+                    <rect x="1" y="12" width="14" height="2" rx="1"/>
+                  </svg>
+                </button>
+              </div>
+
               <Link href="/stats" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium">
                 📊 Statistics
               </Link>
@@ -420,9 +585,15 @@ export default function HomePage() {
                   accent="indigo"
                 />
                 {collectionsOpen && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 items-start">
-                    {sortedCollections.map(item => <CollectionCard key={item.releaseId} item={item} />)}
-                  </div>
+                  viewMode === 'list' ? (
+                    <div style={{ border: '1px solid #1f2937', borderRadius: '8px', overflow: 'hidden' }}>
+                      {sortedCollections.map(item => <ListRow key={item.releaseId} item={item} type="collection" />)}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 items-start">
+                      {sortedCollections.map(item => <CollectionCard key={item.releaseId} item={item} />)}
+                    </div>
+                  )
                 )}
               </div>
             )}
@@ -438,9 +609,15 @@ export default function HomePage() {
                   accent="purple"
                 />
                 {singlesOpen && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 items-start">
-                    {sortedSingles.map(item => <ReleaseCard key={item.releaseId} release={item} />)}
-                  </div>
+                  viewMode === 'list' ? (
+                    <div style={{ border: '1px solid #1f2937', borderRadius: '8px', overflow: 'hidden' }}>
+                      {sortedSingles.map(item => <ListRow key={item.releaseId} item={item} type="single" />)}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 items-start">
+                      {sortedSingles.map(item => <ReleaseCard key={item.releaseId} release={item} />)}
+                    </div>
+                  )
                 )}
               </div>
             )}
@@ -448,13 +625,21 @@ export default function HomePage() {
 
         ) : (
           // ── FLAT VIEW (filtered to specific type) ──
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 items-start">
-            {flatItems.map(item =>
-              item._type === 'collection'
-                ? <CollectionCard key={item.releaseId} item={item} />
-                : <ReleaseCard key={item.releaseId} release={item} />
-            )}
-          </div>
+          viewMode === 'list' ? (
+            <div style={{ border: '1px solid #1f2937', borderRadius: '8px', overflow: 'hidden' }}>
+              {flatItems.map(item =>
+                <ListRow key={item.releaseId} item={item} type={item._type === 'collection' ? 'collection' : 'single'} />
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 items-start">
+              {flatItems.map(item =>
+                item._type === 'collection'
+                  ? <CollectionCard key={item.releaseId} item={item} />
+                  : <ReleaseCard key={item.releaseId} release={item} />
+              )}
+            </div>
+          )
         )}
       </div>
     </div>
