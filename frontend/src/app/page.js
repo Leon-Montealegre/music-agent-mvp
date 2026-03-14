@@ -294,6 +294,15 @@ export default function HomePage() {
             }}>
               {item.title}
             </div>
+            {type === 'single' && item.collectionId && (
+              <div style={{
+                color: '#818cf8', fontSize: '11px',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                marginTop: '1px',
+              }}>
+                {item.collectionId.replace(/^\d{4}-\d{2}-\d{2}_[^_]+_/, '').replace(/_/g, ' ')}
+              </div>
+            )}
           </div>
 
           {/* Artist */}
