@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchPromoEntry, fetchRelease } from '@/lib/api'
+import BackButton from '@/components/BackButton'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
@@ -265,13 +266,8 @@ export default function PromoEntryPage({ params }) {
       {/* Persistent Top Bar */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10 }} className="bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          <BackButton href={`/releases/${releaseId}`} label="Back" />
           <div />
-          <button
-            onClick={() => router.push(`/releases/${releaseId}`)}
-            className="text-purple-400 hover:text-purple-300 transition-colors text-sm font-medium"
-          >
-            ← Back
-          </button>
         </div>
       </div>
 
