@@ -868,9 +868,18 @@ app.patch('/releases/:releaseId/distribution/:pathType/:timestamp', async (req, 
       timestamp: entries[idx].timestamp,
       updatedAt: new Date().toISOString()
     }
+
+    const updatedEntry = metadata.metadata.distribution[pathType][idx]
+    if (pathType === 'submit' && updatedEntry.status === 'Signed' && updatedEntry.signedDate) {
+      if (!metadata.metadata.labelInfo) metadata.metadata.labelInfo = {}
+      metadata.metadata.labelInfo.isSigned = true
+      metadata.metadata.labelInfo.label = updatedEntry.label
+      metadata.metadata.labelInfo.signedDate = updatedEntry.signedDate
+    }
+
     metadata.updatedAt = new Date().toISOString()
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true, entry: metadata.metadata.distribution[pathType][idx] })
+    res.json({ success: true, entry: updatedEntry })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
@@ -2259,6 +2268,15 @@ app.patch('/collections/:collectionId/distribution/:pathType/:timestamp', async 
       timestamp: metadata.distribution[pathType][idx].timestamp,
       updatedAt: new Date().toISOString()
     }
+
+    const updatedEntry = metadata.distribution[pathType][idx]
+    if (pathType === 'submit' && updatedEntry.status === 'Signed' && updatedEntry.signedDate) {
+      if (!metadata.labelInfo) metadata.labelInfo = {}
+      metadata.labelInfo.isSigned = true
+      metadata.labelInfo.label = updatedEntry.label
+      metadata.labelInfo.signedDate = updatedEntry.signedDate
+    }
+
     metadata.updatedAt = new Date().toISOString()
     await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
     res.json({ success: true, collection: metadata })
@@ -2286,6 +2304,36 @@ app.delete('/collections/:collectionId/distribution/:pathType/:timestamp', async
     res.json({ success: true, message: 'Entry deleted' })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+app.patch('/collections/:collectionId/sign', async (req, res) => {
+  try {
+    const { collectionId } = req.params
+    const { labelName, signedDate } = req.body
+    if (!labelName) return res.status(400).json({ success: false, error: 'Label name required' })
+
+    const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
+    const metadata = await readCollection(collectionId)
+    if (!metadata.distribution) metadata.distribution = { release: [], submit: [], promote: [] }
+    if (!metadata.distribution.submit) metadata.distribution.submit = []
+
+    const submission = metadata.distribution.submit.find(s => s.label === labelName)
+    if (!submission) return res.status(404).json({ success: false, error: `No submission found for label: ${labelName}` })
+
+    submission.status = 'Signed'
+    submission.signedAt = new Date().toISOString()
+
+    if (!metadata.labelInfo) metadata.labelInfo = {}
+    metadata.labelInfo.isSigned = true
+    metadata.labelInfo.label = labelName
+    metadata.labelInfo.signedDate = signedDate || new Date().toISOString()
+    metadata.updatedAt = new Date().toISOString()
+
+    await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
+    res.json({ success: true, message: `Marked as signed by ${labelName}`, submission })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 

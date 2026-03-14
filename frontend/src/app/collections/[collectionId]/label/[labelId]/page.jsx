@@ -252,13 +252,13 @@ export default function CollectionLabelEntryPage({ params }) {
       {/* Sticky top bar */}
       <div className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          <div />
           <button
             onClick={() => router.push(`/collections/${collectionId}`)}
             className="text-purple-400 hover:text-purple-300 transition-colors text-sm font-medium"
           >
             ← Back
           </button>
-          <div />
         </div>
       </div>
 

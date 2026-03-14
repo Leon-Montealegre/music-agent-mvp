@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { fetchRelease, updateDistribution, deleteDistributionEntry, updateDistributionEntry, deleteRelease } from '@/lib/api'
 import Modal from '@/components/Modal'
-import BackButton from '@/components/BackButton'
 import LogPlatformForm from '@/components/LogPlatformForm'
 import LogSubmissionForm from '@/components/LogSubmissionForm'
 import DownloadModal from '@/components/DownloadModal'
@@ -59,14 +58,16 @@ export default function TrackDetailPage({ params }) {
   const [newLinkUrl, setNewLinkUrl]     = useState('')
 
   // Promo deals
+  const todayStr = new Date().toISOString().split('T')[0]
   const [showPromoForm, setShowPromoForm] = useState(false)
   const [promoForm, setPromoForm] = useState({
     promoName: '',
     status: 'Not Started',
-    scheduledDate: '',
-    liveDate: '',
+    scheduledDate: todayStr,
+    liveDate: todayStr,
     notes: ''
   })
+  const [signingDate, setSigningDate] = useState(todayStr)
   const [editingPromo, setEditingPromo] = useState(null)
 
   // Hidden file inputs
@@ -292,7 +293,7 @@ export default function TrackDetailPage({ params }) {
       const response = await fetch(`http://localhost:3001/releases/${trackId}/sign`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ labelName })
+        body: JSON.stringify({ labelName, signedDate: signingDate })
       })
       const data = await response.json()
       if (!response.ok) { alert(`Failed to mark as signed: ${data.error || 'Unknown error'}`); return }
@@ -391,6 +392,16 @@ export default function TrackDetailPage({ params }) {
       <input ref={artworkInputRef} type="file" accept=".jpg,.jpeg,.png,.webp"       className="hidden" onChange={handleUploadArtwork} />
       <input ref={videoInputRef}   type="file" accept=".mp4,.mov,.avi,.mkv,.webm"   className="hidden" onChange={handleUploadVideo}   />
 
+      {/* ── Persistent Top Bar ── */}
+      <div className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          <div />
+          <Link href="/" className="text-purple-400 hover:text-purple-300 transition-colors text-sm font-medium">
+            ← Catalogue
+          </Link>
+        </div>
+      </div>
+
       {/* ── Header ── */}
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-6">
@@ -428,13 +439,12 @@ export default function TrackDetailPage({ params }) {
                     Promoted
                   </div>
                 )}
-                {isSigned && displayLabel && (
-                  <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">{displayLabel}</div>
-                )}
               </div>
               <p className="text-xl text-gray-300">{metadata.artist}</p>
+              {isSigned && displayLabel && (
+                <p className="text-sm text-slate-400">{displayLabel}</p>
+              )}
             </div>
-            <BackButton />
           </div>
         </div>
       </div>
@@ -530,6 +540,27 @@ export default function TrackDetailPage({ params }) {
                       : 'Not set'}
                   </p>
                 </div>
+                {isSigned && metadata.labelInfo?.signedDate && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider">Signed Date</p>
+                    <p className="text-sm font-medium text-gray-200">
+                      {new Date(metadata.labelInfo.signedDate).toLocaleDateString('en-GB')}
+                    </p>
+                  </div>
+                )}
+                {(() => {
+                  const latestReleaseDate = metadata.distribution?.release
+                    ?.filter(e => e.releaseDate)
+                    .sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate))[0]?.releaseDate
+                  return latestReleaseDate ? (
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider">Release Date</p>
+                      <p className="text-sm font-medium text-gray-200">
+                        {new Date(latestReleaseDate).toLocaleDateString('en-GB')}
+                      </p>
+                    </div>
+                  ) : null
+                })()}
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Track ID</p>
                   <p className="text-xs font-mono text-gray-500 break-all">{metadata.releaseId}</p>
@@ -746,7 +777,16 @@ export default function TrackDetailPage({ params }) {
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
                           <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
-                          <span className="text-xl text-gray-400">›</span>
+                          {!entry.id ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); confirmDelete('submit', entry.timestamp, entry.label) }}
+                              className="px-2 py-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-300 rounded text-xs font-medium"
+                            >
+                              Delete
+                            </button>
+                          ) : (
+                            <span className="text-xl text-gray-400">›</span>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -762,42 +802,6 @@ export default function TrackDetailPage({ params }) {
                     Mark as Signed by Label
                   </button>
                 )}
-              </div>
-            </div>
-
-            {/* Platform Distribution */}
-            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
-              <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Platform Distribution</h2>
-                <p className="text-sm text-gray-400 mt-1">Track where this track has been uploaded or released</p>
-              </div>
-              <div className="p-6">
-                {metadata.distribution?.release?.length > 0 ? (
-                  <div className="space-y-3">
-                    {metadata.distribution.release.map((entry, index) => (
-                      <div key={index} className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-100">{entry.platform}</p>
-                            <p className="text-sm text-gray-400 mt-1">Status: <span className="text-gray-300">{entry.status}</span></p>
-                            {entry.url && <a href={entry.url} target="_blank" rel="noopener noreferrer" className="text-sm text-purple-400 hover:text-purple-300 mt-1 inline-block">View on platform →</a>}
-                            {entry.notes && <p className="text-sm text-gray-500 mt-1">{entry.notes}</p>}
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
-                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'release', index })} className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
-                            <button onClick={() => confirmDelete('release', entry.timestamp, entry.platform)} className="text-red-400 hover:text-red-300 text-sm p-1" title="Delete">🗑️</button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-center py-8">No platform uploads logged yet</p>
-                )}
-                <button onClick={() => setShowPlatformModal(true)} className="mt-4 w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-500 hover:shadow-lg hover:shadow-purple-500/50 transition-all font-medium">
-                  + Add Platform
-                </button>
               </div>
             </div>
 
@@ -868,7 +872,16 @@ export default function TrackDetailPage({ params }) {
                               ? new Date(entry.timestamp).toLocaleDateString()
                               : ''}
                           </span>
-                          <span className="text-xl text-gray-400">›</span>
+                          {!entry.id ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); confirmDelete('promote', entry.timestamp, entry.promoName || entry.platform || 'Promo Deal') }}
+                              className="px-2 py-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-300 rounded text-xs font-medium"
+                            >
+                              Delete
+                            </button>
+                          ) : (
+                            <span className="text-xl text-gray-400">›</span>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -928,8 +941,8 @@ export default function TrackDetailPage({ params }) {
                           setPromoForm({
                             promoName: '',
                             status: 'Not Started',
-                            scheduledDate: '',
-                            liveDate: '',
+                            scheduledDate: new Date().toISOString().split('T')[0],
+                            liveDate: new Date().toISOString().split('T')[0],
                             notes: ''
                           })
                         } catch (err) {
@@ -950,8 +963,8 @@ export default function TrackDetailPage({ params }) {
                             setPromoForm({
                               promoName: '',
                               status: 'Not Started',
-                              scheduledDate: '',
-                              liveDate: '',
+                              scheduledDate: new Date().toISOString().split('T')[0],
+                              liveDate: new Date().toISOString().split('T')[0],
                               notes: ''
                             })
                           }}
@@ -1066,8 +1079,8 @@ export default function TrackDetailPage({ params }) {
                         setPromoForm({
                           promoName: '',
                           status: 'Not Started',
-                          scheduledDate: '',
-                          liveDate: '',
+                          scheduledDate: new Date().toISOString().split('T')[0],
+                          liveDate: new Date().toISOString().split('T')[0],
                           notes: ''
                         })
                         setShowPromoForm(true)
@@ -1078,6 +1091,48 @@ export default function TrackDetailPage({ params }) {
                     </button>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Platform Distribution */}
+            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
+              <div className="p-6 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-gray-100">Platform Distribution</h2>
+                <p className="text-sm text-gray-400 mt-1">Track where this track has been uploaded or released</p>
+              </div>
+              <div className="p-6">
+                {metadata.distribution?.release?.length > 0 ? (
+                  <div className="space-y-3">
+                    {metadata.distribution.release.map((entry, index) => (
+                      <div key={index} className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-100">{entry.platform}</p>
+                            <p className="text-sm text-gray-400 mt-1">Status: <span className="text-gray-300">{entry.status}</span></p>
+                            {entry.status?.toLowerCase() === 'live' && entry.releaseDate && (
+                              <p className="text-xs text-green-400 mt-1">Released on {new Date(entry.releaseDate).toLocaleDateString('en-GB')}</p>
+                            )}
+                            {entry.status?.toLowerCase() === 'scheduled' && entry.releaseDate && (
+                              <p className="text-xs text-yellow-400 mt-1">To be released on {new Date(entry.releaseDate).toLocaleDateString('en-GB')}</p>
+                            )}
+                            {entry.url && <a href={entry.url} target="_blank" rel="noopener noreferrer" className="text-sm text-purple-400 hover:text-purple-300 mt-1 inline-block">View on platform →</a>}
+                            {entry.notes && <p className="text-sm text-gray-500 mt-1">{entry.notes}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 ml-4">
+                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
+                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'release', index })} className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
+                            <button onClick={() => confirmDelete('release', entry.timestamp, entry.platform)} className="text-red-400 hover:text-red-300 text-sm p-1" title="Delete">🗑️</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">No platform uploads logged yet</p>
+                )}
+                <button onClick={() => setShowPlatformModal(true)} className="mt-4 w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-500 hover:shadow-lg hover:shadow-purple-500/50 transition-all font-medium">
+                  + Add Platform
+                </button>
               </div>
             </div>
 
@@ -1135,6 +1190,15 @@ export default function TrackDetailPage({ params }) {
       <Modal isOpen={showLabelSigningModal} onClose={() => setShowLabelSigningModal(false)} title="Mark Track as Signed">
         <div className="p-4">
           <p className="text-gray-300 mb-4">Select which label signed this track:</p>
+          <div className="mb-4">
+            <label className="block text-sm text-gray-300 mb-1">Signature Date</label>
+            <input
+              type="date"
+              value={signingDate}
+              onChange={e => setSigningDate(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
           {metadata.distribution?.submit?.length > 0 ? (
             <div className="space-y-2">
               {metadata.distribution.submit.map((submission, index) => (

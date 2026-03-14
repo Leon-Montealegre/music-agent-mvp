@@ -77,6 +77,7 @@ export default function CollectionDetailPage({ params }) {
   const [sPlatform, setSPlatform] = useState('Email')
   const [sStatus, setSStatus]     = useState('Pending')
   const [sNotes, setSNotes]       = useState('')
+  const [sSignedDate, setSSignedDate] = useState(new Date().toISOString().split('T')[0])
 
   // Links
   const [showAddLink, setShowAddLink]   = useState(false)
@@ -102,7 +103,7 @@ export default function CollectionDetailPage({ params }) {
   const [uploadingArtwork, setUploadingArtwork] = useState(false)
 
   const genres = ['Ambient', 'Deep House', 'House', 'Indie Dance', 'Melodic House and Techno', 'Progressive House', 'Tech House', 'Techno', 'Trance', 'Other']
-  const platformOptions  = ['Beatport', 'Spotify', 'SoundCloud', 'Bandcamp', 'Apple Music', 'Traxsource', 'Juno', 'YouTube', 'Other']
+  const platformOptions  = ['Beatport', 'Spotify', 'SoundCloud', 'Bandcamp', 'Apple Music', 'YouTube', 'DistroKid', 'Other']
   const platformStatuses = ['Uploaded', 'Live', 'Scheduled', 'Removed']
   const submitPlatforms  = ['Email', 'Submithub', 'Direct Message', 'Demo Form', 'Other']
   const submitStatuses   = ['Pending', 'Accepted', 'Rejected', 'No Response', 'Signed']
@@ -224,10 +225,12 @@ export default function CollectionDetailPage({ params }) {
     setSubmitting(true)
     try {
       if (editingEntry?.pathType === 'submit') {
+        const submitPayload = { label: sLabel, platform: sPlatform, status: sStatus, notes: sNotes }
+        if (sStatus === 'Signed' && sSignedDate) submitPayload.signedDate = sSignedDate
         await fetch(`http://localhost:3001/collections/${collectionId}/distribution/submit/${editingEntry.timestamp}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: sLabel, platform: sPlatform, status: sStatus, notes: sNotes })
+          body: JSON.stringify(submitPayload)
         })
         setEditingEntry(null)
       } else {
@@ -252,13 +255,13 @@ export default function CollectionDetailPage({ params }) {
 
   const handleMarkAsSigned = async (labelName) => {
     try {
-      const submission = collection.distribution?.submit?.find(s => s.label === labelName)
-      if (!submission) return
-      await fetch(`http://localhost:3001/collections/${collectionId}/distribution/submit/${submission.timestamp}`, {
+      const response = await fetch(`http://localhost:3001/collections/${collectionId}/sign`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...submission, status: 'Signed', signedAt: new Date().toISOString(), signedDate: signingDate || new Date().toISOString().split('T')[0] })
+        body: JSON.stringify({ labelName, signedDate: signingDate })
       })
+      const data = await response.json()
+      if (!response.ok) { alert(`Failed to mark as signed: ${data.error || 'Unknown error'}`); return }
       await loadCollection()
       setShowLabelSigningModal(false)
     } catch (err) {
@@ -420,10 +423,10 @@ export default function CollectionDetailPage({ params }) {
       {/* ── Persistent Top Bar ── */}
       <div className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          <div />
           <Link href="/" className="text-purple-400 hover:text-purple-300 transition-colors text-sm font-medium">
             ← Catalogue
           </Link>
-          <div />
         </div>
       </div>
 
@@ -545,6 +548,27 @@ export default function CollectionDetailPage({ params }) {
                     </p>
                   </div>
                 )}
+                {isSigned && collection.labelInfo?.signedDate && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider">Signed Date</p>
+                    <p className="text-sm font-medium text-gray-200">
+                      {new Date(collection.labelInfo.signedDate).toLocaleDateString('en-GB')}
+                    </p>
+                  </div>
+                )}
+                {(() => {
+                  const latestReleaseDate = dist.release
+                    ?.filter(e => e.releaseDate)
+                    .sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate))[0]?.releaseDate
+                  return latestReleaseDate ? (
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider">Release Date</p>
+                      <p className="text-sm font-medium text-gray-200">
+                        {new Date(latestReleaseDate).toLocaleDateString('en-GB')}
+                      </p>
+                    </div>
+                  ) : null
+                })()}
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Collection ID</p>
                   <p className="text-xs font-mono text-gray-500 break-all">{collectionId}</p>
@@ -653,7 +677,16 @@ export default function CollectionDetailPage({ params }) {
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
                           <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
-                          <span className="text-xl text-gray-400">›</span>
+                          {!entry.id ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); confirmDelete('submit', entry.timestamp, entry.label) }}
+                              className="px-2 py-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-300 rounded text-xs font-medium"
+                            >
+                              Delete
+                            </button>
+                          ) : (
+                            <span className="text-xl text-gray-400">›</span>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -743,7 +776,16 @@ export default function CollectionDetailPage({ params }) {
                               ? new Date(entry.timestamp).toLocaleDateString()
                               : ''}
                           </span>
-                          <span className="text-xl text-gray-400">›</span>
+                          {!entry.id ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); confirmDelete('promote', entry.timestamp, entry.promoName || entry.platform || 'Promo Deal') }}
+                              className="px-2 py-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-300 rounded text-xs font-medium"
+                            >
+                              Delete
+                            </button>
+                          ) : (
+                            <span className="text-xl text-gray-400">›</span>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -864,7 +906,7 @@ export default function CollectionDetailPage({ params }) {
                             setPromoForm(prev => ({ ...prev, promoName: e.target.value }))
                           }
                           className="w-full px-3 py-2 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
-                          placeholder="e.g. TikTok Influencer Campaign"
+                          placeholder="e.g. Music Blog, Spotify Playlist, Instagram Page"
                           required
                         />
                       </div>
@@ -1114,6 +1156,12 @@ export default function CollectionDetailPage({ params }) {
               {submitStatuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+          {sStatus === 'Signed' && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">Signature Date</label>
+              <input type="date" value={sSignedDate} onChange={e => setSSignedDate(e.target.value)} className={inputClass} />
+            </div>
+          )}
           <div>
             <label className="block text-sm text-gray-300 mb-1">Notes <span className="text-gray-500">(Optional)</span></label>
             <input type="text" value={sNotes} onChange={e => setSNotes(e.target.value)} className={inputClass} />
