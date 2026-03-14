@@ -15,6 +15,7 @@ export default function HomePage() {
   const [releases, setReleases] = useState([])
   const [collections, setCollections] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -37,6 +38,7 @@ export default function HomePage() {
         setCollections(collectionsRes.collections || [])
       } catch (err) {
         console.error('Error loading catalogue:', err)
+        setError('Could not connect to backend. Make sure the server is running on port 3001.')
       } finally {
         setLoading(false)
       }
@@ -135,6 +137,17 @@ export default function HomePage() {
 
   const totalVisible = filteredReleases.length + filteredCollections.length
   const useSections  = typeFilter === 'all'
+
+  if (error) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111' }}>
+        <div style={{ textAlign: 'center', color: '#f87171' }}>
+          <p style={{ fontSize: '1.2rem', marginBottom: '8px' }}>⚠️ Backend not reachable</p>
+          <p style={{ color: '#9ca3af', fontSize: '0.9rem' }}>{error}</p>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (

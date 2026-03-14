@@ -263,7 +263,7 @@ export default function CollectionPromoEntryPage({ params }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       {/* Sticky back bar */}
-      <div className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
+      <div style={{ position: 'sticky', top: 0, zIndex: 10 }} className="bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
           <div />
           <button
