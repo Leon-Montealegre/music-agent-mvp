@@ -3,7 +3,6 @@
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchCollectionLabelEntry } from '@/lib/api'
-import BackButton from '@/components/BackButton'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
@@ -258,15 +257,6 @@ export default function CollectionLabelEntryPage({ params }) {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Sticky top bar */}
-      <div style={{ position: 'fixed', top: 73, left: 0, right: 0, zIndex: 40 }} className="bg-gray-900/95 backdrop-blur-lg border-b border-gray-700/50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <BackButton href={`/collections/${collectionId}`} label="Back" />
-          <div />
-        </div>
-      </div>
-      <div style={{ height: 49 }} />
-
       {/* Header */}
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-6">

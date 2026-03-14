@@ -2,6 +2,7 @@ import './globals.css'
 import Link from 'next/link'
 import ScrollToTop from '@/components/ScrollToTop'
 import FeedbackButton from '@/components/FeedbackButton'
+import HeaderNav from '@/components/HeaderNav'
 
 
 export const metadata = {
@@ -28,6 +29,7 @@ export default function RootLayout({ children }) {
               </Link>
               
               <div className="flex items-center gap-3">
+                <HeaderNav />
                 <FeedbackButton />
 
                 {/* ✅ NEW: Settings link */}
