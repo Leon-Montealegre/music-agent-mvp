@@ -261,6 +261,7 @@ export default function TrackDetailPage({ params }) {
       const entry = { platform: formData.platform, status: formData.status, timestamp: new Date().toISOString() }
       if (formData.url)   entry.url   = formData.url
       if (formData.notes) entry.notes = formData.notes
+      if (formData.releaseDate) entry.releaseDate = formData.releaseDate
       await updateDistribution(trackId, 'release', entry)
       const updatedData = await fetchRelease(trackId)
       setTrack(updatedData.release || updatedData)
@@ -408,21 +409,6 @@ export default function TrackDetailPage({ params }) {
           <div className="flex items-start justify-between mb-4 gap-4">
             <div className="flex-1">
 
-              {metadata.collectionId && (
-                <Link href={`/collections/${metadata.collectionId}`} className="inline-flex items-center gap-2 mb-2 group">
-                  <CollectionThumb collectionId={metadata.collectionId} />
-                  <span className={`px-1.5 py-0.5 rounded text-xs font-bold border ${
-                    collectionType === 'Album'
-                      ? 'bg-purple-600/90 border-purple-400/50 text-white'
-                      : 'bg-indigo-600/90 border-indigo-400/50 text-white'
-                  }`}>
-                    {collectionType}
-                  </span>
-                  <span className="text-sm text-indigo-300 group-hover:text-indigo-200 transition-colors">{collectionName}</span>
-                  <span className="text-indigo-400 text-xs">→</span>
-                </Link>
-              )}
-
               <div className="flex items-center gap-3 flex-wrap mb-2">
                 <h1 className="text-4xl font-bold text-gray-100">{metadata.title}</h1>
                 {isSigned && (
@@ -441,8 +427,15 @@ export default function TrackDetailPage({ params }) {
                 )}
               </div>
               <p className="text-xl text-gray-300">{metadata.artist}</p>
+              {metadata.collectionId && (
+                <Link href={`/collections/${metadata.collectionId}`} className="inline-flex items-center gap-2 mt-1 group">
+                  <CollectionThumb collectionId={metadata.collectionId} />
+                  <span className="text-sm text-indigo-300 group-hover:text-indigo-200 transition-colors">{collectionName}</span>
+                  <span className="text-indigo-400 text-xs">→</span>
+                </Link>
+              )}
               {isSigned && displayLabel && (
-                <p className="text-sm text-slate-400">{displayLabel}</p>
+                <p className="text-sm text-slate-400 mt-1">{displayLabel}</p>
               )}
             </div>
           </div>
@@ -532,35 +525,6 @@ export default function TrackDetailPage({ params }) {
                     </div>
                   </div>
                 )}
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Production Date</p>
-                  <p className="text-sm font-medium text-gray-200">
-                    {metadata.trackDate || metadata.releaseDate
-                      ? new Date(metadata.trackDate || metadata.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                      : 'Not set'}
-                  </p>
-                </div>
-                {isSigned && metadata.labelInfo?.signedDate && (
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider">Signed Date</p>
-                    <p className="text-sm font-medium text-gray-200">
-                      {new Date(metadata.labelInfo.signedDate).toLocaleDateString('en-GB')}
-                    </p>
-                  </div>
-                )}
-                {(() => {
-                  const latestReleaseDate = metadata.distribution?.release
-                    ?.filter(e => e.releaseDate)
-                    .sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate))[0]?.releaseDate
-                  return latestReleaseDate ? (
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider">Release Date</p>
-                      <p className="text-sm font-medium text-gray-200">
-                        {new Date(latestReleaseDate).toLocaleDateString('en-GB')}
-                      </p>
-                    </div>
-                  ) : null
-                })()}
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Track ID</p>
                   <p className="text-xs font-mono text-gray-500 break-all">{metadata.releaseId}</p>
@@ -773,10 +737,15 @@ export default function TrackDetailPage({ params }) {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-lg text-gray-100">{entry.label}</p>
                           <p className="text-sm text-gray-400 mt-1">via {entry.platform} • <span className="font-medium text-gray-300">{entry.status}</span></p>
+                          {entry.status === 'Signed' && entry.signedDate && (
+                            <p className="text-xs text-green-400 mt-1">
+                              Signed on {new Date(entry.signedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                            </p>
+                          )}
                           {entry.notes && <p className="text-sm text-gray-500 mt-2 italic">&quot;{entry.notes}&quot;</p>}
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
+                          <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</span>
                           {!entry.id ? (
                             <button
                               onClick={(e) => { e.stopPropagation(); confirmDelete('submit', entry.timestamp, entry.label) }}
@@ -851,13 +820,13 @@ export default function TrackDetailPage({ params }) {
                           {entry.scheduledDate && (
                             <p className="text-xs text-gray-400 mt-1">
                               Scheduled:{' '}
-                              {new Date(entry.scheduledDate).toLocaleDateString()}
+                              {new Date(entry.scheduledDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                             </p>
                           )}
                           {entry.liveDate && (
                             <p className="text-xs text-green-400 mt-1">
                               Live:{' '}
-                              {new Date(entry.liveDate).toLocaleDateString()}
+                              {new Date(entry.liveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                             </p>
                           )}
                           {entry.notes && (
@@ -869,7 +838,7 @@ export default function TrackDetailPage({ params }) {
                         <div className="flex items-center gap-3 flex-shrink-0">
                           <span className="text-xs text-gray-500">
                             {entry.timestamp
-                              ? new Date(entry.timestamp).toLocaleDateString()
+                              ? new Date(entry.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                               : ''}
                           </span>
                           {!entry.id ? (
@@ -1110,16 +1079,16 @@ export default function TrackDetailPage({ params }) {
                             <p className="font-medium text-gray-100">{entry.platform}</p>
                             <p className="text-sm text-gray-400 mt-1">Status: <span className="text-gray-300">{entry.status}</span></p>
                             {entry.status?.toLowerCase() === 'live' && entry.releaseDate && (
-                              <p className="text-xs text-green-400 mt-1">Released on {new Date(entry.releaseDate).toLocaleDateString('en-GB')}</p>
+                              <p className="text-xs text-green-400 mt-1">Released on {new Date(entry.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                             )}
                             {entry.status?.toLowerCase() === 'scheduled' && entry.releaseDate && (
-                              <p className="text-xs text-yellow-400 mt-1">To be released on {new Date(entry.releaseDate).toLocaleDateString('en-GB')}</p>
+                              <p className="text-xs text-yellow-400 mt-1">To be released on {new Date(entry.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                             )}
                             {entry.url && <a href={entry.url} target="_blank" rel="noopener noreferrer" className="text-sm text-purple-400 hover:text-purple-300 mt-1 inline-block">View on platform →</a>}
                             {entry.notes && <p className="text-sm text-gray-500 mt-1">{entry.notes}</p>}
                           </div>
                           <div className="flex items-center gap-2 ml-4">
-                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
+                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</span>
                             <button onClick={() => setEditingEntry({ ...entry, pathType: 'release', index })} className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
                             <button onClick={() => confirmDelete('release', entry.timestamp, entry.platform)} className="text-red-400 hover:text-red-300 text-sm p-1" title="Delete">🗑️</button>
                           </div>

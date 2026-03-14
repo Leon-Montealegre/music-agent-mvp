@@ -548,27 +548,6 @@ export default function CollectionDetailPage({ params }) {
                     </p>
                   </div>
                 )}
-                {isSigned && collection.labelInfo?.signedDate && (
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider">Signed Date</p>
-                    <p className="text-sm font-medium text-gray-200">
-                      {new Date(collection.labelInfo.signedDate).toLocaleDateString('en-GB')}
-                    </p>
-                  </div>
-                )}
-                {(() => {
-                  const latestReleaseDate = dist.release
-                    ?.filter(e => e.releaseDate)
-                    .sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate))[0]?.releaseDate
-                  return latestReleaseDate ? (
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider">Release Date</p>
-                      <p className="text-sm font-medium text-gray-200">
-                        {new Date(latestReleaseDate).toLocaleDateString('en-GB')}
-                      </p>
-                    </div>
-                  ) : null
-                })()}
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Collection ID</p>
                   <p className="text-xs font-mono text-gray-500 break-all">{collectionId}</p>
@@ -673,10 +652,15 @@ export default function CollectionDetailPage({ params }) {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-lg text-gray-100">{entry.label}</p>
                           <p className="text-sm text-gray-400 mt-1">via {entry.platform} • <span className="font-medium text-gray-300">{entry.status}</span></p>
+                          {entry.status === 'Signed' && entry.signedDate && (
+                            <p className="text-xs text-green-400 mt-1">
+                              Signed on {new Date(entry.signedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                            </p>
+                          )}
                           {entry.notes && <p className="text-sm text-gray-500 mt-2 italic">&quot;{entry.notes}&quot;</p>}
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
+                          <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</span>
                           {!entry.id ? (
                             <button
                               onClick={(e) => { e.stopPropagation(); confirmDelete('submit', entry.timestamp, entry.label) }}
@@ -755,13 +739,13 @@ export default function CollectionDetailPage({ params }) {
                           {entry.scheduledDate && (
                             <p className="text-xs text-gray-400 mt-1">
                               Scheduled:{' '}
-                              {new Date(entry.scheduledDate).toLocaleDateString()}
+                              {new Date(entry.scheduledDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                             </p>
                           )}
                           {entry.liveDate && (
                             <p className="text-xs text-green-400 mt-1">
                               Live:{' '}
-                              {new Date(entry.liveDate).toLocaleDateString()}
+                              {new Date(entry.liveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                             </p>
                           )}
                           {entry.notes && (
@@ -773,7 +757,7 @@ export default function CollectionDetailPage({ params }) {
                         <div className="flex items-center gap-3 flex-shrink-0">
                           <span className="text-xs text-gray-500">
                             {entry.timestamp
-                              ? new Date(entry.timestamp).toLocaleDateString()
+                              ? new Date(entry.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                               : ''}
                           </span>
                           {!entry.id ? (
@@ -1031,17 +1015,17 @@ export default function CollectionDetailPage({ params }) {
                             <p className="font-medium text-gray-100">{entry.platform}</p>
                             <p className="text-sm text-gray-400 mt-1">Status: <span className="text-gray-300">{entry.status}</span></p>
                             {entry.status?.toLowerCase() === 'live' && entry.releaseDate && (
-                              <p className="text-xs text-green-400 mt-1">Released on {new Date(entry.releaseDate).toLocaleDateString()}</p>
+                              <p className="text-xs text-green-400 mt-1">Released on {new Date(entry.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                             )}
                             {entry.status?.toLowerCase() === 'scheduled' && entry.releaseDate && (
-                              <p className="text-xs text-yellow-400 mt-1">To be released on {new Date(entry.releaseDate).toLocaleDateString()}</p>
+                              <p className="text-xs text-yellow-400 mt-1">To be released on {new Date(entry.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                             )}
                             {entry.url && <a href={entry.url} target="_blank" rel="noopener noreferrer"
                               className="text-sm text-purple-400 hover:text-purple-300 mt-1 inline-block">View on platform →</a>}
                             {entry.notes && <p className="text-sm text-gray-500 mt-1">{entry.notes}</p>}
                           </div>
                           <div className="flex items-center gap-2 ml-4">
-                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
+                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</span>
                             <button onClick={() => setEditingEntry({ ...entry, pathType: 'release', index })}
                               className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
                             <button onClick={() => confirmDelete('release', entry.timestamp, entry.platform)}
