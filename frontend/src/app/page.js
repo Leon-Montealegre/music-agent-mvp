@@ -67,16 +67,12 @@ export default function HomePage() {
   // --- Shared status helper ---
   function matchesStatusFilter(dist) {
     if (statusFilter === 'all') return true
-    const isSigned       = dist?.submit?.some(e => e.status?.toLowerCase() === 'signed')
-    const isReleased     = dist?.release?.some(e => e.status?.toLowerCase() === 'live')
-    const isPromoted     = dist?.promote?.some(e => e.status?.toLowerCase() === 'live')
-    const hasSubmissions = dist?.submit?.length > 0
-    const hasNonSigned   = dist?.submit?.some(e => e.status?.toLowerCase() !== 'signed')
-    if (statusFilter === 'not-submitted') return !hasSubmissions
-    if (statusFilter === 'submitted')     return hasNonSigned && !isSigned && !isReleased
-    if (statusFilter === 'signed')        return isSigned
-    if (statusFilter === 'released')      return isReleased
-    if (statusFilter === 'promoted')      return isPromoted
+    const isSigned   = dist?.submit?.some(e => e.status?.toLowerCase() === 'signed')
+    const isReleased = dist?.release?.some(e => e.status?.toLowerCase() === 'live')
+    const isPromoted = dist?.promote?.some(e => e.status?.toLowerCase() === 'live')
+    if (statusFilter === 'signed')   return isSigned
+    if (statusFilter === 'released') return isReleased
+    if (statusFilter === 'promoted') return isPromoted
     return true
   }
 
@@ -504,12 +500,10 @@ export default function HomePage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-gray-500 text-sm font-medium whitespace-nowrap">Status:</span>
                 {[
-                  { value: 'all',           label: 'All' },
-                  { value: 'not-submitted', label: 'Not Submitted' },
-                  { value: 'submitted',     label: 'Submitted' },
-                  { value: 'signed',        label: 'Signed' },
-                  { value: 'released',      label: 'Released' },
-                  { value: 'promoted',      label: 'Promoted' },
+                  { value: 'all',      label: 'All' },
+                  { value: 'signed',   label: 'Signed' },
+                  { value: 'released', label: 'Released' },
+                  { value: 'promoted', label: 'Promoted' },
                 ].map(({ value, label }) => (
                   <button
                     key={value}
