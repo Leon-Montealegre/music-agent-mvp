@@ -447,7 +447,7 @@ export default function HomePage() {
               </div>
 
               <Link href="/contacts" className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg transition-colors font-medium border border-gray-600/50 h-[40px] flex items-center">
-                📇 Contacts
+                👤 Contacts
               </Link>
               <Link href="/files" className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg transition-colors font-medium border border-gray-600/50 h-[40px] flex items-center">
                 📁 Files
@@ -456,7 +456,7 @@ export default function HomePage() {
                 📊 Statistics
               </Link>
               <Link href="/releases/new" className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium h-[40px] flex items-center">
-                + Add Track
+                ✚ Add Track
               </Link>
             </div>
           </div>

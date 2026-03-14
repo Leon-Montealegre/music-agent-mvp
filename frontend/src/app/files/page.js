@@ -4,7 +4,16 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { fetchAllFiles } from '@/lib/contacts'
 
-const CATEGORIES = ['All', 'Label Deal', 'Promo Deal', 'Label Submission', 'Promo Entry', 'Notes']
+// Display labels for filter chips; internal category values stay as-is
+const CATEGORY_CHIPS = [
+  { label: 'All', value: 'all' },
+  { label: 'Track Uploads', value: 'Track Upload' },
+  { label: 'Label Deal', value: 'Label Deal' },
+  { label: 'Promo Deal', value: 'Promo Deal' },
+  { label: 'Submission Docs', value: 'Label Submission' },
+  { label: 'Promo Docs', value: 'Promo Entry' },
+  { label: 'Notes', value: 'Notes' },
+]
 
 function getFileType(filename) {
   const ext = (filename || '').split('.').pop()?.toLowerCase() || ''
@@ -33,11 +42,22 @@ function formatDate(isoStr) {
 }
 
 const CATEGORY_BADGE_STYLES = {
+  'Track Upload': 'bg-emerald-600/40 text-emerald-300 border-emerald-500/50',
   'Label Deal': 'bg-purple-600/40 text-purple-300 border-purple-500/50',
   'Promo Deal': 'bg-pink-600/40 text-pink-300 border-pink-500/50',
   'Label Submission': 'bg-blue-600/40 text-blue-300 border-blue-500/50',
   'Promo Entry': 'bg-rose-600/40 text-rose-300 border-rose-500/50',
   'Notes': 'bg-gray-600/40 text-gray-400 border-gray-500/50',
+}
+
+// Display label for category badge (internal value → UI label)
+const CATEGORY_DISPLAY_LABELS = {
+  'Track Upload': 'Track Uploads',
+  'Label Deal': 'Label Deal',
+  'Promo Deal': 'Promo Deal',
+  'Label Submission': 'Submission Docs',
+  'Promo Entry': 'Promo Docs',
+  'Notes': 'Notes',
 }
 
 async function handleDownload(downloadUrl, filename) {
@@ -142,17 +162,17 @@ export default function FilesPage() {
 
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-gray-500 text-sm font-medium">Filter:</span>
-              {CATEGORIES.map(cat => (
+              {CATEGORY_CHIPS.map(({ label, value }) => (
                 <button
-                  key={cat}
-                  onClick={() => setCategoryFilter(cat === 'All' ? 'all' : cat)}
+                  key={value}
+                  onClick={() => setCategoryFilter(value)}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-sm ${
-                    (categoryFilter === 'all' && cat === 'All') || categoryFilter === cat
+                    categoryFilter === value
                       ? 'bg-purple-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  {cat}
+                  {label}
                 </button>
               ))}
             </div>
@@ -201,7 +221,7 @@ export default function FilesPage() {
                       {file.filename}
                     </p>
                     <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium border ${badgeStyle}`}>
-                      {file.category}
+                      {CATEGORY_DISPLAY_LABELS[file.category] ?? file.category}
                     </span>
                   </div>
                   <div className="flex-shrink-0 w-20 text-right">

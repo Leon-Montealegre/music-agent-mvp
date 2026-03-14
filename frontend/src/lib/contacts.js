@@ -252,6 +252,25 @@ function extractFilesFromItem(item, sourceId, sourceType) {
     }
   }
 
+  // 6. metadata.versions.primary.files.audio[] → category: 'Track Upload' (releases only; skip for collections)
+  if (sourceType === 'release') {
+    const audioFiles = meta.versions?.primary?.files?.audio || []
+    for (const a of audioFiles) {
+      const filename = a.filename || a.name
+      if (!filename) continue
+      files.push({
+        ...a,
+        filename,
+        category: 'Track Upload',
+        sourceId,
+        sourceName,
+        sourceType,
+        sourceHref,
+        downloadUrl: `${API_BASE}/releases/${sourceId}/files/audio/${encodeURIComponent(filename)}`
+      })
+    }
+  }
+
   return files
 }
 
