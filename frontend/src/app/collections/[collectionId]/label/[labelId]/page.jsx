@@ -259,7 +259,7 @@ export default function CollectionLabelEntryPage({ params }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       {/* Sticky top bar */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #1f2937' }} className="bg-gray-950">
+      <div style={{ position: 'sticky', top: 73, zIndex: 40, borderBottom: '1px solid #374151' }} className="bg-gray-950">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <BackButton href={`/collections/${collectionId}`} label="Back" />
           <div />
