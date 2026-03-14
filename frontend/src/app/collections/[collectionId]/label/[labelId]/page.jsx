@@ -285,72 +285,53 @@ export default function CollectionLabelEntryPage({ params }) {
 
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
+        <h2 className="text-2xl font-bold text-gray-100 mb-6">
+          {(metadata.collectionType || '')} Label Details
+        </h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left column: Label Details */}
+          {/* Left column: Label Details (read-only) */}
           <div className="lg:col-span-1">
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6">
               <h2 className="text-lg font-semibold text-gray-100 mb-4">Label Details</h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">
-                    Label Name <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={detailsForm.label}
-                    onChange={e => setDetailsForm({ ...detailsForm, label: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
-                    placeholder="Label or company name"
-                  />
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Label Name</p>
+                  <p className="text-sm font-medium text-gray-200">{entry.label || entry.labelName || '—'}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Status</label>
-                  <select
-                    value={detailsForm.status}
-                    onChange={e => setDetailsForm({ ...detailsForm, status: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option>Pending</option>
-                    <option>Submitted</option>
-                    <option>In Discussion</option>
-                    <option>Signed</option>
-                    <option>Passed</option>
-                    <option>Cancelled</option>
-                  </select>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                  <span className={`inline-block px-3 py-1 rounded-md text-sm font-semibold ${statusClasses}`}>
+                    {entry.status || 'Pending'}
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1">Signed Date</label>
-                  <input
-                    type="date"
-                    value={detailsForm.signedDate}
-                    onChange={e => setDetailsForm({ ...detailsForm, signedDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
+                {entry.signedDate && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signature Date</p>
+                    <p className="text-sm font-medium text-gray-200">
+                      {new Date(entry.signedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                )}
 
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1">Notes about this entry</label>
-                  <textarea
-                    value={detailsForm.notes}
-                    onChange={e => setDetailsForm({ ...detailsForm, notes: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
-                    placeholder="High-level notes about this label deal"
-                  />
-                </div>
+                {entry.platform && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Submitted via</p>
+                    <p className="text-sm font-medium text-gray-200">{entry.platform}</p>
+                  </div>
+                )}
+
+                {entry.timestamp && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Logged</p>
+                    <p className="text-sm text-gray-400">
+                      {new Date(entry.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                )}
               </div>
-
-              <button
-                type="button"
-                onClick={handleSaveDetails}
-                disabled={savingDetails}
-                className="mt-6 w-full bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium disabled:bg-gray-600 disabled:cursor-not-allowed"
-              >
-                {savingDetails ? 'Saving...' : 'Save Details'}
-              </button>
             </div>
           </div>
 

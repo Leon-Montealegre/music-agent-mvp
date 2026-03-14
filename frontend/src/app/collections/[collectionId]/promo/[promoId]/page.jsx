@@ -294,82 +294,53 @@ export default function CollectionPromoEntryPage({ params }) {
 
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
+        <h2 className="text-2xl font-bold text-gray-100 mb-6">
+          {(metadata.collectionType || '')} Promotion Details
+        </h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left column: Promo Details */}
+          {/* Left column: Promo Details (read-only) */}
           <div className="lg:col-span-1">
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6">
               <h2 className="text-lg font-semibold text-gray-100 mb-4">Promo Details</h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">
-                    Promo Name <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={detailsForm.promoName}
-                    onChange={e => setDetailsForm({ ...detailsForm, promoName: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="Campaign name"
-                  />
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Promo Name</p>
+                  <p className="text-sm font-medium text-gray-200">{entry.promoName || entry.platform || '—'}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Status</label>
-                  <select
-                    value={detailsForm.status}
-                    onChange={e => setDetailsForm({ ...detailsForm, status: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
-                  >
-                    <option>Pending</option>
-                    <option>Scheduled</option>
-                    <option>Live</option>
-                    <option>Completed</option>
-                    <option>Cancelled</option>
-                  </select>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                  <span className={`inline-block px-3 py-1 rounded-md text-sm font-semibold ${statusClasses}`}>
+                    {entry.status || 'Pending'}
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1">Live Date</label>
-                  <input
-                    type="date"
-                    value={detailsForm.liveDate}
-                    onChange={e => setDetailsForm({ ...detailsForm, liveDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
-                  />
-                </div>
+                {entry.liveDate && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Live Date</p>
+                    <p className="text-sm font-medium text-gray-200">
+                      {new Date(entry.liveDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                )}
 
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1">Platform / Type</label>
-                  <input
-                    type="text"
-                    value={detailsForm.platform}
-                    onChange={e => setDetailsForm({ ...detailsForm, platform: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="Radio show, playlist, blog, etc."
-                  />
-                </div>
+                {entry.platform && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Platform / Type</p>
+                    <p className="text-sm font-medium text-gray-200">{entry.platform}</p>
+                  </div>
+                )}
 
-                <div>
-                  <label className="block text-sm text-gray-300 mb-1">Notes about this entry</label>
-                  <textarea
-                    value={detailsForm.notes}
-                    onChange={e => setDetailsForm({ ...detailsForm, notes: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="High-level notes about this campaign"
-                  />
-                </div>
+                {entry.timestamp && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Logged</p>
+                    <p className="text-sm text-gray-400">
+                      {new Date(entry.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                )}
               </div>
-
-              <button
-                type="button"
-                onClick={handleSaveDetails}
-                disabled={savingDetails}
-                className="mt-6 w-full bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded-lg transition-all font-medium disabled:bg-gray-600 disabled:cursor-not-allowed"
-              >
-                {savingDetails ? 'Saving...' : 'Save Details'}
-              </button>
             </div>
           </div>
 

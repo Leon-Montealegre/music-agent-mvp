@@ -229,13 +229,6 @@ export default function CreateTrackPage() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Production Date <span className="text-gray-500 font-normal">(optional)</span>
-                <span className="text-xs text-gray-500 ml-2">(when you finished this track)</span>
-              </label>
-              <input type="date" value={trackDate} onChange={e => setTrackDate(e.target.value)} className={inputClass} />
-            </div>
           </div>
 
           {/* ── Optional Details ── */}

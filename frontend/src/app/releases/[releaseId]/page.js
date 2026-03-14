@@ -448,7 +448,7 @@ export default function TrackDetailPage({ params }) {
 
           {/* ── Left Sidebar ── */}
           <div className="lg:col-span-1">
-            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6 sticky top-24">
+            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6">
 
               {/* Artwork */}
               <div className="aspect-square bg-gray-900/50 rounded-lg overflow-hidden mb-6 relative group">

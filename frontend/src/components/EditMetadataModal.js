@@ -238,11 +238,6 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
         </select>
       </div>
 
-      {/* Production Date */}
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Production Date</label>
-        <input type="date" value={trackDate} onChange={e => setTrackDate(e.target.value)} className={inputClass} />
-      </div>
 
       {/* BPM + Key */}
       <div className="grid grid-cols-2 gap-4">

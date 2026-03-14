@@ -106,7 +106,7 @@ export default function CollectionDetailPage({ params }) {
   const platformOptions  = ['Beatport', 'Spotify', 'SoundCloud', 'Bandcamp', 'Apple Music', 'YouTube', 'DistroKid', 'Other']
   const platformStatuses = ['Uploaded', 'Live', 'Scheduled', 'Removed']
   const submitPlatforms  = ['Email', 'Submithub', 'Direct Message', 'Demo Form', 'Other']
-  const submitStatuses   = ['Pending', 'Accepted', 'Rejected', 'No Response', 'Signed']
+  const submitStatuses   = ['Pending', 'Sent', 'Responded', 'Passed']
 
   const inputClass = "w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
 
@@ -226,7 +226,6 @@ export default function CollectionDetailPage({ params }) {
     try {
       if (editingEntry?.pathType === 'submit') {
         const submitPayload = { label: sLabel, platform: sPlatform, status: sStatus, notes: sNotes }
-        if (sStatus === 'Signed' && sSignedDate) submitPayload.signedDate = sSignedDate
         await fetch(`http://localhost:3001/collections/${collectionId}/distribution/submit/${editingEntry.timestamp}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -465,7 +464,7 @@ export default function CollectionDetailPage({ params }) {
 
           {/* ── Left Sidebar ── */}
           <div className="lg:col-span-1">
-            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6 sticky top-24">
+            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6">
 
               {/* Artwork */}
 {/* Hidden input for quick upload */}
@@ -540,14 +539,6 @@ export default function CollectionDetailPage({ params }) {
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Tracks</p>
                   <p className="text-sm font-medium text-gray-200">{tracks.length}</p>
                 </div>
-                {collection.releaseDate && (
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider">Date</p>
-                    <p className="text-sm font-medium text-gray-200">
-                      {new Date(collection.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
-                  </div>
-                )}
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Collection ID</p>
                   <p className="text-xs font-mono text-gray-500 break-all">{collectionId}</p>
@@ -890,7 +881,7 @@ export default function CollectionDetailPage({ params }) {
                             setPromoForm(prev => ({ ...prev, promoName: e.target.value }))
                           }
                           className="w-full px-3 py-2 bg-gray-800 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500"
-                          placeholder="e.g. Music Blog, Spotify Playlist, Instagram Page"
+                          placeholder="Deep House Sessions"
                           required
                         />
                       </div>
@@ -1140,12 +1131,6 @@ export default function CollectionDetailPage({ params }) {
               {submitStatuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          {sStatus === 'Signed' && (
-            <div>
-              <label className="block text-sm text-gray-300 mb-1">Signature Date</label>
-              <input type="date" value={sSignedDate} onChange={e => setSSignedDate(e.target.value)} className={inputClass} />
-            </div>
-          )}
           <div>
             <label className="block text-sm text-gray-300 mb-1">Notes <span className="text-gray-500">(Optional)</span></label>
             <input type="text" value={sNotes} onChange={e => setSNotes(e.target.value)} className={inputClass} />
