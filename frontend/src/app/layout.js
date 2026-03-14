@@ -34,7 +34,8 @@ export default function RootLayout({ children }) {
                 {/* ✅ NEW: Settings link */}
                 <Link
                   href="/settings"
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg transition-colors font-medium text-sm shadow-md border border-gray-600/50"
+                  style={{ height: '36px' }}
+                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-colors font-medium shadow-md border border-gray-600/50"
                 >
                   <span className="text-base">⚙️</span>
                   <span>Settings</span>
@@ -44,7 +45,8 @@ export default function RootLayout({ children }) {
                   href="https://www.buymeacoffee.com/musicagent"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors font-medium text-sm shadow-md hover:shadow-lg border border-orange-500/20"
+                  style={{ height: '36px' }}
+                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition-colors font-medium shadow-md hover:shadow-lg border border-orange-500/20"
                 >
                   <span className="text-base">☕</span>
                   <span>Buy me a coffee</span>

@@ -404,7 +404,7 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-4">
               {/* View mode toggle */}
-              <div style={{ display: 'flex', border: '1px solid #374151', borderRadius: '8px', overflow: 'hidden' }}>
+              <div className="flex h-[40px] items-center" style={{ border: '1px solid #374151', borderRadius: '8px', overflow: 'hidden' }}>
                 <button
                   onClick={() => setViewMode('grid')}
                   title="Grid view"
@@ -446,10 +446,16 @@ export default function HomePage() {
                 </button>
               </div>
 
-              <Link href="/stats" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium">
+              <Link href="/contacts" className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg transition-colors font-medium border border-gray-600/50 h-[40px] flex items-center">
+                📇 Contacts
+              </Link>
+              <Link href="/files" className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg transition-colors font-medium border border-gray-600/50 h-[40px] flex items-center">
+                📁 Files
+              </Link>
+              <Link href="/stats" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium h-[40px] flex items-center">
                 📊 Statistics
               </Link>
-              <Link href="/releases/new" className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium">
+              <Link href="/releases/new" className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium h-[40px] flex items-center">
                 + Add Track
               </Link>
             </div>

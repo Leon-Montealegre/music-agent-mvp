@@ -166,7 +166,8 @@ export default function FeedbackButton() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2 font-medium text-sm shadow-md hover:shadow-lg border border-gray-600/30"
+        style={{ minHeight: '36px', height: '36px' }}
+        className="px-4 py-2 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-white transition-colors flex items-center gap-2 font-medium shadow-md hover:shadow-lg border border-gray-600/30"
       >
         💬 Feedback
       </button>
