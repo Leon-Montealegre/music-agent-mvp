@@ -29,7 +29,6 @@ export default function RootLayout({ children }) {
               </Link>
               
               <div className="flex items-center gap-3">
-                <HeaderNav />
                 <FeedbackButton />
 
                 {/* ✅ NEW: Settings link */}
@@ -50,6 +49,7 @@ export default function RootLayout({ children }) {
                   <span className="text-base">☕</span>
                   <span>Buy me a coffee</span>
                 </a>
+                <HeaderNav />
               </div>
             </div>
           </div>
