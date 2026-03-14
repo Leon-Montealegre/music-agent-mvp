@@ -4,23 +4,21 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { fetchAllFiles } from '@/lib/contacts'
 
-// Display labels for filter chips; internal category values stay as-is
 const CATEGORY_CHIPS = [
   { label: 'All', value: 'all' },
-  { label: 'Track Uploads', value: 'Track Upload' },
-  { label: 'Label Deal', value: 'Label Deal' },
-  { label: 'Promo Deal', value: 'Promo Deal' },
-  { label: 'Submission Docs', value: 'Label Submission' },
-  { label: 'Promo Docs', value: 'Promo Entry' },
-  { label: 'Notes', value: 'Notes' },
+  { label: 'Audio', value: 'Audio' },
+  { label: 'Video', value: 'Video' },
+  { label: 'Label', value: 'Label' },
+  { label: 'Promo', value: 'Promo' },
+  { label: 'General', value: 'General' },
 ]
 
 function getFileType(filename) {
   const ext = (filename || '').split('.').pop()?.toLowerCase() || ''
   if (ext === 'pdf') return { icon: '📄', tint: 'text-red-400' }
-  if (['wav', 'mp3', 'flac', 'aiff', 'm4a', 'ogg'].includes(ext)) return { icon: '🎵', tint: 'text-purple-400' }
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return { icon: '🖼️', tint: 'text-blue-400' }
-  if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return { icon: '🎬', tint: 'text-orange-400' }
+  if (['wav', 'mp3', 'flac', 'aiff', 'aif'].includes(ext)) return { icon: '🎵', tint: 'text-purple-400' }
+  if (['mp4', 'mov', 'avi'].includes(ext)) return { icon: '🎬', tint: 'text-orange-400' }
+  if (['jpg', 'jpeg', 'png'].includes(ext)) return { icon: '🖼️', tint: 'text-blue-400' }
   return { icon: '📎', tint: 'text-gray-400' }
 }
 
@@ -42,22 +40,11 @@ function formatDate(isoStr) {
 }
 
 const CATEGORY_BADGE_STYLES = {
-  'Track Upload': 'bg-emerald-600/40 text-emerald-300 border-emerald-500/50',
-  'Label Deal': 'bg-purple-600/40 text-purple-300 border-purple-500/50',
-  'Promo Deal': 'bg-pink-600/40 text-pink-300 border-pink-500/50',
-  'Label Submission': 'bg-blue-600/40 text-blue-300 border-blue-500/50',
-  'Promo Entry': 'bg-rose-600/40 text-rose-300 border-rose-500/50',
-  'Notes': 'bg-gray-600/40 text-gray-400 border-gray-500/50',
-}
-
-// Display label for category badge (internal value → UI label)
-const CATEGORY_DISPLAY_LABELS = {
-  'Track Upload': 'Track Uploads',
-  'Label Deal': 'Label Deal',
-  'Promo Deal': 'Promo Deal',
-  'Label Submission': 'Submission Docs',
-  'Promo Entry': 'Promo Docs',
-  'Notes': 'Notes',
+  'Audio': 'bg-purple-600/40 text-purple-300 border-purple-500/50',
+  'Video': 'bg-orange-600/40 text-orange-300 border-orange-500/50',
+  'Label': 'bg-blue-600/40 text-blue-300 border-blue-500/50',
+  'Promo': 'bg-pink-600/40 text-pink-300 border-pink-500/50',
+  'General': 'bg-gray-600/40 text-gray-400 border-gray-500/50',
 }
 
 async function handleDownload(downloadUrl, filename) {
@@ -221,7 +208,7 @@ export default function FilesPage() {
                       {file.filename}
                     </p>
                     <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium border ${badgeStyle}`}>
-                      {CATEGORY_DISPLAY_LABELS[file.category] ?? file.category}
+                      {file.category}
                     </span>
                   </div>
                   <div className="flex-shrink-0 w-20 text-right">

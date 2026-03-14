@@ -124,7 +124,7 @@ export default function TrackNotes({
       <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
         <div className="p-6 border-b border-gray-700">
           <h2 className="text-xl font-semibold text-gray-100">
-            {fileCardTitle || 'Documents'}
+            {fileCardTitle || 'Files'}
           </h2>
           <p className="text-sm text-gray-400 mt-1">Upload and manage related files</p>
         </div>

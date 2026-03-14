@@ -130,89 +130,56 @@ export async function fetchAllContacts() {
 }
 
 /**
- * Build download URL for a file based on category and source.
- */
-function buildDownloadUrl(sourceId, sourceType, category, filename, labelId, promoId) {
-  const base = `${API_BASE}/${sourceType === 'release' ? 'releases' : 'collections'}/${sourceId}`
-  switch (category) {
-    case 'Notes':
-      return `${base}/notes/files/${encodeURIComponent(filename)}`
-    case 'Label Deal':
-      return `${base}/label-deal/files/${encodeURIComponent(filename)}`
-    case 'Promo Deal':
-      return `${base}/promo-deal/files/${encodeURIComponent(filename)}`
-    case 'Label Submission':
-      return `${base}/label/${labelId}/files/${encodeURIComponent(filename)}`
-    case 'Promo Entry':
-      return `${base}/promo/${promoId}/files/${encodeURIComponent(filename)}`
-    default:
-      return `${base}/notes/files/${encodeURIComponent(filename)}`
-  }
-}
-
-/**
  * Extract files from a release or collection object.
+ * Sources: Audio, Video (releases only), Label, Promo, General.
+ * No label-deal or promo-deal — those pages no longer exist.
  */
 function extractFilesFromItem(item, sourceId, sourceType) {
   const files = []
   const sourceName = item.title || item.metadata?.title || 'Untitled'
   const sourceHref = sourceType === 'release' ? `/releases/${sourceId}` : `/collections/${sourceId}`
-
   const meta = item.metadata || item
+  const base = `${API_BASE}/${sourceType === 'release' ? 'releases' : 'collections'}/${sourceId}`
 
-  // 1. metadata.notes.documents[] → category: 'Notes'
-  const notes = item.notes || meta.notes || {}
-  const noteDocs = notes.documents || []
-  for (const d of noteDocs) {
-    const filename = d.filename || d.name
-    if (!filename) continue
-    files.push({
-      ...d,
-      filename,
-      category: 'Notes',
-      sourceId,
-      sourceName,
-      sourceType,
-      sourceHref,
-      downloadUrl: buildDownloadUrl(sourceId, sourceType, 'Notes', filename)
-    })
+  // 1. versions.primary.files.audio[] → category: 'Audio' (releases only)
+  if (sourceType === 'release') {
+    const audioFiles = (item.versions || meta.versions)?.primary?.files?.audio || []
+    for (const a of audioFiles) {
+      const filename = a.filename || a.name
+      if (!filename) continue
+      files.push({
+        ...a,
+        filename,
+        category: 'Audio',
+        sourceId,
+        sourceName,
+        sourceType,
+        sourceHref,
+        downloadUrl: `${API_BASE}/releases/${sourceId}/files/audio/${encodeURIComponent(filename)}`
+      })
+    }
   }
 
-  // 2. metadata.metadata.labelInfo.contractDocuments[] → category: 'Label Deal'
-  const labelDocs = meta.labelInfo?.contractDocuments || []
-  for (const d of labelDocs) {
-    const filename = d.filename || d.name
-    if (!filename) continue
-    files.push({
-      ...d,
-      filename,
-      category: 'Label Deal',
-      sourceId,
-      sourceName,
-      sourceType,
-      sourceHref,
-      downloadUrl: buildDownloadUrl(sourceId, sourceType, 'Label Deal', filename)
-    })
+  // 2. versions.primary.files.video[] → category: 'Video' (releases only)
+  if (sourceType === 'release') {
+    const videoFiles = (item.versions || meta.versions)?.primary?.files?.video || []
+    for (const v of videoFiles) {
+      const filename = v.filename || v.name
+      if (!filename) continue
+      files.push({
+        ...v,
+        filename,
+        category: 'Video',
+        sourceId,
+        sourceName,
+        sourceType,
+        sourceHref,
+        downloadUrl: `${API_BASE}/releases/${sourceId}/video/${encodeURIComponent(filename)}`
+      })
+    }
   }
 
-  // 3. metadata.metadata.promoInfo.contractDocuments[] → category: 'Promo Deal'
-  const promoDocs = meta.promoInfo?.contractDocuments || []
-  for (const d of promoDocs) {
-    const filename = d.filename || d.name
-    if (!filename) continue
-    files.push({
-      ...d,
-      filename,
-      category: 'Promo Deal',
-      sourceId,
-      sourceName,
-      sourceType,
-      sourceHref,
-      downloadUrl: buildDownloadUrl(sourceId, sourceType, 'Promo Deal', filename)
-    })
-  }
-
-  // 4. distribution.submit[].documents[] → category: 'Label Submission'
+  // 3. metadata.metadata.distribution.submit[].documents[] → category: 'Label'
   const submitEntries = (item.distribution?.submit || meta.distribution?.submit || [])
   for (const entry of submitEntries) {
     const entryDocs = entry.documents || []
@@ -222,17 +189,17 @@ function extractFilesFromItem(item, sourceId, sourceType) {
       files.push({
         ...d,
         filename,
-        category: 'Label Submission',
+        category: 'Label',
         sourceId,
         sourceName,
         sourceType,
         sourceHref,
-        downloadUrl: buildDownloadUrl(sourceId, sourceType, 'Label Submission', filename, entry.id, null)
+        downloadUrl: `${base}/label/${entry.id}/files/${encodeURIComponent(filename)}`
       })
     }
   }
 
-  // 5. distribution.promote[].documents[] → category: 'Promo Entry'
+  // 4. metadata.metadata.distribution.promote[].documents[] → category: 'Promo'
   const promoteEntries = (item.distribution?.promote || meta.distribution?.promote || [])
   for (const entry of promoteEntries) {
     const entryDocs = entry.documents || []
@@ -242,33 +209,32 @@ function extractFilesFromItem(item, sourceId, sourceType) {
       files.push({
         ...d,
         filename,
-        category: 'Promo Entry',
+        category: 'Promo',
         sourceId,
         sourceName,
         sourceType,
         sourceHref,
-        downloadUrl: buildDownloadUrl(sourceId, sourceType, 'Promo Entry', filename, null, entry.id)
+        downloadUrl: `${base}/promo/${entry.id}/files/${encodeURIComponent(filename)}`
       })
     }
   }
 
-  // 6. metadata.versions.primary.files.audio[] → category: 'Track Upload' (releases only; skip for collections)
-  if (sourceType === 'release') {
-    const audioFiles = meta.versions?.primary?.files?.audio || []
-    for (const a of audioFiles) {
-      const filename = a.filename || a.name
-      if (!filename) continue
-      files.push({
-        ...a,
-        filename,
-        category: 'Track Upload',
-        sourceId,
-        sourceName,
-        sourceType,
-        sourceHref,
-        downloadUrl: `${API_BASE}/releases/${sourceId}/files/audio/${encodeURIComponent(filename)}`
-      })
-    }
+  // 5. metadata.notes.documents[] → category: 'General'
+  const notes = item.notes || meta.notes || {}
+  const noteDocs = notes.documents || []
+  for (const d of noteDocs) {
+    const filename = d.filename || d.name
+    if (!filename) continue
+    files.push({
+      ...d,
+      filename,
+      category: 'General',
+      sourceId,
+      sourceName,
+      sourceType,
+      sourceHref,
+      downloadUrl: `${base}/notes/files/${encodeURIComponent(filename)}`
+    })
   }
 
   return files
