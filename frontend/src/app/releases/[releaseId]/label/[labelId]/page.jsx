@@ -416,10 +416,39 @@ export default function LabelEntryPage({ params }) {
               </div>
             </div>
 
-            {/* Documents */}
+            {/* Page notes */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Upload Files</h2>
+                <h2 className="text-xl font-semibold text-gray-100">Notes</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  Track any important context here — what was discussed, timeline expectations, key contacts reached out to, next steps.
+                </p>
+              </div>
+              <div className="p-6 space-y-4">
+                <textarea
+                  value={pageNotes}
+                  onChange={e => setPageNotes(e.target.value)}
+                  rows={5}
+                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Track any important context here — what was discussed, timeline expectations, key contacts reached out to, next steps."
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSavePageNotes}
+                    disabled={savingNotes}
+                    className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium disabled:bg-gray-600 disabled:cursor-not-allowed"
+                  >
+                    {savingNotes ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Files */}
+            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
+              <div className="p-6 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-gray-100">Files</h2>
                 <p className="text-sm text-gray-400 mt-1">
                   Upload contracts, riders, and other deal files
                 </p>
@@ -503,35 +532,6 @@ export default function LabelEntryPage({ params }) {
                     ))}
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Page notes */}
-            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
-              <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Notes</h2>
-                <p className="text-sm text-gray-400 mt-1">
-                  Track any important context here — what was discussed, timeline expectations, key contacts reached out to, next steps.
-                </p>
-              </div>
-              <div className="p-6 space-y-4">
-                <textarea
-                  value={pageNotes}
-                  onChange={e => setPageNotes(e.target.value)}
-                  rows={5}
-                  className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Track any important context here — what was discussed, timeline expectations, key contacts reached out to, next steps."
-                />
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={handleSavePageNotes}
-                    disabled={savingNotes}
-                    className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium disabled:bg-gray-600 disabled:cursor-not-allowed"
-                  >
-                    {savingNotes ? 'Saving...' : 'Save'}
-                  </button>
-                </div>
               </div>
             </div>
           </div>
