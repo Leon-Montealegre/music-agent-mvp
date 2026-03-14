@@ -93,7 +93,11 @@ export default function CollectionPromoEntryPage({ params }) {
         platform: detailsForm.platform,
         notes: detailsForm.notes
       }
-      if (detailsForm.liveDate) payload.liveDate = detailsForm.liveDate
+      if (detailsForm.status === 'Live' && detailsForm.liveDate) {
+        payload.liveDate = detailsForm.liveDate
+      } else {
+        payload.liveDate = null
+      }
 
       const res = await fetch(`${apiBase}/promo/${promoId}`, {
         method: 'PATCH',

@@ -4,6 +4,7 @@ import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Modal from '@/components/Modal'
+import LogSubmissionForm from '@/components/LogSubmissionForm'
 import TrackNotes from '@/components/TrackNotes'
 import EditMetadataModal from '@/components/EditMetadataModal'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
@@ -72,13 +73,6 @@ export default function CollectionDetailPage({ params }) {
   const [pNotes, setPNotes]       = useState('')
   const [pReleaseDate, setPReleaseDate] = useState(new Date().toISOString().split('T')[0])
 
-  // Submission form state
-  const [sLabel, setSLabel]       = useState('')
-  const [sPlatform, setSPlatform] = useState('Email')
-  const [sStatus, setSStatus]     = useState('Pending')
-  const [sNotes, setSNotes]       = useState('')
-  const [sSignedDate, setSSignedDate] = useState(new Date().toISOString().split('T')[0])
-
   // Links
   const [showAddLink, setShowAddLink]   = useState(false)
   const [newLinkLabel, setNewLinkLabel] = useState('')
@@ -105,9 +99,6 @@ export default function CollectionDetailPage({ params }) {
   const genres = ['Ambient', 'Deep House', 'House', 'Indie Dance', 'Melodic House and Techno', 'Progressive House', 'Tech House', 'Techno', 'Trance', 'Other']
   const platformOptions  = ['Beatport', 'Spotify', 'SoundCloud', 'Bandcamp', 'Apple Music', 'YouTube', 'DistroKid', 'Other']
   const platformStatuses = ['Uploaded', 'Live', 'Scheduled', 'Removed']
-  const submitPlatforms  = ['Email', 'Submithub', 'Direct Message', 'Demo Form', 'Other']
-  const submitStatuses   = ['Pending', 'Sent', 'Responded', 'Passed']
-
   const inputClass = "w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
 
   async function loadCollection() {
@@ -163,11 +154,6 @@ export default function CollectionDetailPage({ params }) {
       setPUrl(editingEntry.url || '')
       setPNotes(editingEntry.notes || '')
       setPReleaseDate(editingEntry.releaseDate || new Date().toISOString().split('T')[0])
-    } else if (editingEntry.pathType === 'submit') {
-      setSLabel(editingEntry.label || '')
-      setSPlatform(editingEntry.platform || 'Email')
-      setSStatus(editingEntry.status || 'Pending')
-      setSNotes(editingEntry.notes || '')
     }
   }, [editingEntry])
 
@@ -177,12 +163,6 @@ export default function CollectionDetailPage({ params }) {
       setPPlatform(''); setPStatus('Uploaded'); setPUrl(''); setPNotes(''); setPReleaseDate(new Date().toISOString().split('T')[0])
     }
   }, [showPlatformModal])
-
-  useEffect(() => {
-    if (!showSubmissionModal && !editingEntry) {
-      setSLabel(''); setSPlatform('Email'); setSStatus('Pending'); setSNotes('')
-    }
-  }, [showSubmissionModal])
 
   const handlePlatformSubmit = async () => {
     if (!pPlatform) return
@@ -213,38 +193,6 @@ export default function CollectionDetailPage({ params }) {
       }
       await loadCollection()
       setPPlatform(''); setPStatus('Uploaded'); setPUrl(''); setPNotes(''); setPReleaseDate(new Date().toISOString().split('T')[0])
-    } catch (err) {
-      alert(`Failed: ${err.message}`)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleSubmissionSubmit = async () => {
-    if (!sLabel) return
-    setSubmitting(true)
-    try {
-      if (editingEntry?.pathType === 'submit') {
-        const submitPayload = { label: sLabel, platform: sPlatform, status: sStatus, notes: sNotes }
-        await fetch(`http://localhost:3001/collections/${collectionId}/distribution/submit/${editingEntry.timestamp}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(submitPayload)
-        })
-        setEditingEntry(null)
-      } else {
-        await fetch(`http://localhost:3001/collections/${collectionId}/distribution`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            path: 'submit',
-            entry: { label: sLabel, platform: sPlatform, status: sStatus, ...(sNotes && { notes: sNotes }) }
-          })
-        })
-        setShowSubmissionModal(false)
-      }
-      await loadCollection()
-      setSLabel(''); setSPlatform('Email'); setSStatus('Pending'); setSNotes('')
     } catch (err) {
       alert(`Failed: ${err.message}`)
     } finally {
@@ -1112,38 +1060,34 @@ export default function CollectionDetailPage({ params }) {
       <Modal
         isOpen={showSubmissionModal || editingEntry?.pathType === 'submit'}
         onClose={() => { setShowSubmissionModal(false); setEditingEntry(null) }}
-        title={editingEntry?.pathType === 'submit' ? 'Edit Submission' : 'Log Label Submission'}
+        title={editingEntry?.pathType === 'submit' ? 'Edit Label Submission' : 'Log Label Submission'}
       >
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Label <span className="text-red-400">*</span></label>
-            <input type="text" value={sLabel} onChange={e => setSLabel(e.target.value)} placeholder="Label name" className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Submitted via</label>
-            <select value={sPlatform} onChange={e => setSPlatform(e.target.value)} className={inputClass}>
-              {submitPlatforms.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Status</label>
-            <select value={sStatus} onChange={e => setSStatus(e.target.value)} className={inputClass}>
-              {submitStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Notes <span className="text-gray-500">(Optional)</span></label>
-            <input type="text" value={sNotes} onChange={e => setSNotes(e.target.value)} className={inputClass} />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button onClick={handleSubmissionSubmit} disabled={!sLabel || submitting}
-              className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-2 rounded-lg transition-all font-medium">
-              {submitting ? 'Saving...' : editingEntry?.pathType === 'submit' ? 'Save Changes' : 'Log Submission'}
-            </button>
-            <button onClick={() => { setShowSubmissionModal(false); setEditingEntry(null) }}
-              className="px-5 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-all">Cancel</button>
-          </div>
-        </div>
+        <LogSubmissionForm
+          releaseId={collectionId}
+          onSuccess={() => { setShowSubmissionModal(false); setEditingEntry(null); loadCollection() }}
+          onCancel={() => { setShowSubmissionModal(false); setEditingEntry(null) }}
+          editMode={editingEntry?.pathType === 'submit'}
+          existingEntry={editingEntry}
+          onSubmit={async (formData) => {
+            if (editingEntry?.pathType === 'submit') {
+              const res = await fetch(`http://localhost:3001/collections/${collectionId}/distribution/submit/${editingEntry.timestamp}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+              })
+              if (!res.ok) throw new Error('Failed to save')
+            } else {
+              const entry = { ...formData, timestamp: new Date().toISOString() }
+              if (!entry.notes) delete entry.notes
+              const res = await fetch(`http://localhost:3001/collections/${collectionId}/distribution`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: 'submit', entry })
+              })
+              if (!res.ok) throw new Error('Failed to save')
+            }
+          }}
+        />
       </Modal>
 
       {/* Mark as Signed Modal */}

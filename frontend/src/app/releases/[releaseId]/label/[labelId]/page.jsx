@@ -56,7 +56,7 @@ export default function LabelEntryPage({ params }) {
       setDetailsForm({
         label: fetchedEntry.label || fetchedEntry.labelName || '',
         status: fetchedEntry.status || 'Pending',
-        signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : '',
+        signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : (fetchedEntry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
         notes: fetchedEntry.notes || ''
       })
       setPageNotes(fetchedEntry.pageNotes || '')
@@ -83,7 +83,11 @@ export default function LabelEntryPage({ params }) {
         status: detailsForm.status,
         notes: detailsForm.notes
       }
-      if (detailsForm.signedDate) payload.signedDate = detailsForm.signedDate
+      if (detailsForm.status === 'Signed' && detailsForm.signedDate) {
+        payload.signedDate = detailsForm.signedDate
+      } else {
+        payload.signedDate = null
+      }
 
       const res = await fetch(`${apiBase}/label/${labelId}`, {
         method: 'PATCH',
@@ -97,7 +101,7 @@ export default function LabelEntryPage({ params }) {
       setDetailsForm({
         label: data.entry.label || data.entry.labelName || '',
         status: data.entry.status || 'Pending',
-        signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : '',
+        signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : (data.entry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
         notes: data.entry.notes || ''
       })
     } catch (err) {
@@ -650,15 +654,17 @@ export default function LabelEntryPage({ params }) {
               <option>Cancelled</option>
             </select>
           </div>
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Signed Date</label>
-            <input
-              type="date"
-              value={detailsForm.signedDate}
-              onChange={e => setDetailsForm({ ...detailsForm, signedDate: e.target.value })}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
+          {detailsForm.status === 'Signed' && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">Signed Date</label>
+              <input
+                type="date"
+                value={detailsForm.signedDate || new Date().toISOString().split('T')[0]}
+                onChange={e => setDetailsForm({ ...detailsForm, signedDate: e.target.value })}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm text-gray-300 mb-1">Notes</label>
             <textarea

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { updateDistribution, updateDistributionEntry } from '@/lib/api'
 
-export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, editMode = false, existingEntry = null }) {
+export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, editMode = false, existingEntry = null, onSubmit = null }) {
   const [formData, setFormData] = useState({
     label: '',
     platform: '',
@@ -32,11 +32,11 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, edit
     }
 
     try {
-      if (editMode && existingEntry) {
-        // Update existing entry
+      if (onSubmit) {
+        await onSubmit(formData)
+      } else if (editMode && existingEntry) {
         await updateDistributionEntry(releaseId, 'submit', existingEntry.timestamp, formData)
       } else {
-        // Create new entry
         const entry = {
           label: formData.label,
           platform: formData.platform,
@@ -105,7 +105,8 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, edit
   >
     {!editMode && <option value="">Select status</option>}
     <option value="Submitted">Submitted</option>
-    <option value="Rejected">Rejected</option>
+    <option value="In Discussion">In Discussion</option>
+    <option value="Passed">Passed</option>
     <option value="No Response">No Response</option>
   </select>
 </div>
