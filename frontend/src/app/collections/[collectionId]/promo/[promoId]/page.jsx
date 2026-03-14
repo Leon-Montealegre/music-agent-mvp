@@ -262,27 +262,6 @@ export default function CollectionPromoEntryPage({ params }) {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Header */}
-      <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 flex-wrap mb-2">
-                <h1 className="text-3xl font-bold text-gray-100">
-                  {entry.promoName || entry.platform || 'Promo Entry'}
-                </h1>
-                <span className={`px-3 py-1 rounded-md text-sm font-semibold ${statusClasses}`}>
-                  {entry.status || 'Pending'}
-                </span>
-              </div>
-              <p className="text-gray-300">
-                {metadata.title} • {metadata.artist}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold text-gray-100 mb-6">
