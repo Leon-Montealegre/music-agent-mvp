@@ -82,7 +82,6 @@ export default function TrackDetailPage({ params }) {
       setLoading(true)
       const data = await fetchRelease(trackId)
       const resolved = data.release || data
-      console.log('distribution:', JSON.stringify(resolved?.distribution, null, 2))
       setTrack(resolved)
       setError(null)
     } catch (err) {

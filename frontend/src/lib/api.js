@@ -99,6 +99,25 @@ export async function fetchLabelEntry(releaseId, labelId) {
 }
 
 /**
+ * Fetch a single label/submit entry for a collection
+ * @param {string} collectionId
+ * @param {string} labelId
+ */
+export async function fetchCollectionLabelEntry(collectionId, labelId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/label/${labelId}`);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Error fetching label entry ${labelId} for collection ${collectionId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Update distribution tracking for a release
  * @param {string} releaseId - The release ID
  * @param {string} path - Distribution path: "release", "submit", or "promote"
@@ -199,6 +218,25 @@ export async function checkHealth() {
     return { status: 'error', message: 'Cannot connect to API' };
   }
 }
+/**
+ * Fetch a single promo entry for a collection
+ * @param {string} collectionId
+ * @param {string} promoId
+ */
+export async function fetchCollectionPromoEntry(collectionId, promoId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/promo/${promoId}`);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Error fetching promo entry ${promoId} for collection ${collectionId}:`, error);
+    throw error;
+  }
+}
+
 /**
  * Delete an entire release
  * @param {string} releaseId - The release ID to delete

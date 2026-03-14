@@ -4,7 +4,6 @@ import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Modal from '@/components/Modal'
-import BackButton from '@/components/BackButton'
 import TrackNotes from '@/components/TrackNotes'
 import EditMetadataModal from '@/components/EditMetadataModal'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
@@ -48,18 +47,20 @@ export default function CollectionDetailPage({ params }) {
   const [showPlatformModal, setShowPlatformModal]       = useState(false)
   const [showSubmissionModal, setShowSubmissionModal]   = useState(false)
   const [showLabelSigningModal, setShowLabelSigningModal] = useState(false)
+  const [signingDate, setSigningDate] = useState(new Date().toISOString().split('T')[0])
   const [editingEntry, setEditingEntry]                 = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm]       = useState(false)
   const [entryToDelete, setEntryToDelete]               = useState(null)
   const [submitting, setSubmitting]                     = useState(false)
 
   // Promo deals
+  const todayStr = new Date().toISOString().split('T')[0]
   const [showPromoForm, setShowPromoForm] = useState(false)
   const [promoForm, setPromoForm] = useState({
     promoName: '',
     status: 'Not Started',
-    scheduledDate: '',
-    liveDate: '',
+    scheduledDate: todayStr,
+    liveDate: todayStr,
     notes: ''
   })
   const [editingPromo, setEditingPromo] = useState(null)
@@ -69,6 +70,7 @@ export default function CollectionDetailPage({ params }) {
   const [pStatus, setPStatus]     = useState('Uploaded')
   const [pUrl, setPUrl]           = useState('')
   const [pNotes, setPNotes]       = useState('')
+  const [pReleaseDate, setPReleaseDate] = useState(new Date().toISOString().split('T')[0])
 
   // Submission form state
   const [sLabel, setSLabel]       = useState('')
@@ -159,6 +161,7 @@ export default function CollectionDetailPage({ params }) {
       setPStatus(editingEntry.status || 'Uploaded')
       setPUrl(editingEntry.url || '')
       setPNotes(editingEntry.notes || '')
+      setPReleaseDate(editingEntry.releaseDate || new Date().toISOString().split('T')[0])
     } else if (editingEntry.pathType === 'submit') {
       setSLabel(editingEntry.label || '')
       setSPlatform(editingEntry.platform || 'Email')
@@ -170,7 +173,7 @@ export default function CollectionDetailPage({ params }) {
   // Reset platform form when modal closes
   useEffect(() => {
     if (!showPlatformModal && !editingEntry) {
-      setPPlatform(''); setPStatus('Uploaded'); setPUrl(''); setPNotes('')
+      setPPlatform(''); setPStatus('Uploaded'); setPUrl(''); setPNotes(''); setPReleaseDate(new Date().toISOString().split('T')[0])
     }
   }, [showPlatformModal])
 
@@ -185,25 +188,30 @@ export default function CollectionDetailPage({ params }) {
     setSubmitting(true)
     try {
       if (editingEntry?.pathType === 'release') {
+        const editPayload = { platform: pPlatform, status: pStatus, url: pUrl, notes: pNotes }
+        if ((pStatus === 'Live' || pStatus === 'Scheduled') && pReleaseDate) {
+          editPayload.releaseDate = pReleaseDate
+        }
         await fetch(`http://localhost:3001/collections/${collectionId}/distribution/release/${editingEntry.timestamp}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ platform: pPlatform, status: pStatus, url: pUrl, notes: pNotes })
+          body: JSON.stringify(editPayload)
         })
         setEditingEntry(null)
       } else {
+        const releaseEntry = { platform: pPlatform, status: pStatus, ...(pUrl && { url: pUrl }), ...(pNotes && { notes: pNotes }) }
+        if ((pStatus === 'Live' || pStatus === 'Scheduled') && pReleaseDate) {
+          releaseEntry.releaseDate = pReleaseDate
+        }
         await fetch(`http://localhost:3001/collections/${collectionId}/distribution`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            path: 'release',
-            entry: { platform: pPlatform, status: pStatus, ...(pUrl && { url: pUrl }), ...(pNotes && { notes: pNotes }) }
-          })
+          body: JSON.stringify({ path: 'release', entry: releaseEntry })
         })
         setShowPlatformModal(false)
       }
       await loadCollection()
-      setPPlatform(''); setPStatus('Uploaded'); setPUrl(''); setPNotes('')
+      setPPlatform(''); setPStatus('Uploaded'); setPUrl(''); setPNotes(''); setPReleaseDate(new Date().toISOString().split('T')[0])
     } catch (err) {
       alert(`Failed: ${err.message}`)
     } finally {
@@ -249,7 +257,7 @@ export default function CollectionDetailPage({ params }) {
       await fetch(`http://localhost:3001/collections/${collectionId}/distribution/submit/${submission.timestamp}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...submission, status: 'Signed', signedAt: new Date().toISOString() })
+        body: JSON.stringify({ ...submission, status: 'Signed', signedAt: new Date().toISOString(), signedDate: signingDate || new Date().toISOString().split('T')[0] })
       })
       await loadCollection()
       setShowLabelSigningModal(false)
@@ -409,6 +417,16 @@ export default function CollectionDetailPage({ params }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
 
+      {/* ── Persistent Top Bar ── */}
+      <div className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          <Link href="/" className="text-purple-400 hover:text-purple-300 transition-colors text-sm font-medium">
+            ← Catalogue
+          </Link>
+          <div />
+        </div>
+      </div>
+
       {/* ── Header ── */}
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-6">
@@ -428,13 +446,12 @@ export default function CollectionDetailPage({ params }) {
                 {isReleased && (
                   <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">Released</div>
                 )}
-                {isSigned && signedLabel && (
-                  <div className="px-3 py-1 rounded-md text-sm font-medium bg-gray-700/50 border border-gray-600 text-gray-300">{signedLabel}</div>
-                )}
               </div>
               <p className="text-xl text-gray-300">{collection.artist}</p>
+              {isSigned && signedLabel && (
+                <p className="text-sm text-slate-400 mt-1">{signedLabel}</p>
+              )}
             </div>
-            <BackButton />
           </div>
         </div>
       </div>
@@ -590,59 +607,6 @@ export default function CollectionDetailPage({ params }) {
                 )}
               </div>
 
-              {/* Label Deal shortcut */}
-              {isSigned && (
-                <div className="mt-6 pt-6 border-t border-gray-700">
-                  <h3 className="font-semibold text-gray-100 mb-3">Label Deal</h3>
-                  <div className="mb-4">
-                    <p className="text-xs text-gray-400 uppercase tracking-wider">Label</p>
-                    <p className="text-sm font-medium text-gray-200">{signedLabel || 'Not set'}</p>
-                  </div>
-                  <Link href={`/collections/${collectionId}/label-deal`}
-                    className="block text-center bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-300 px-4 py-2 rounded-lg transition-all font-medium text-sm">
-                    Label Deal Details →
-                  </Link>
-                </div>
-              )}
-
-              {/* Promo Deals shortcut */}
-              {hasPromoDeals && (
-                <div className="mt-6 pt-6 border-t border-gray-700">
-                  <h3 className="font-semibold text-gray-100 mb-3">Promo Deals</h3>
-                  <div className="space-y-2 text-sm mb-4">
-                    {(dist.promote || [])
-                      .filter(entry => entry.status?.toLowerCase() === 'live')
-                      .map((entry, index) => (
-                        <div key={entry.timestamp || index} className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-200 truncate">
-                              {entry.promoName || entry.platform || 'Promo Deal'}
-                            </p>
-                          </div>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-pink-600/30 border border-pink-400/60 text-pink-200 flex-shrink-0">
-                            <span className="w-1.5 h-1.5 rounded-full bg-pink-300" />
-                            Live
-                          </span>
-                          {entry.liveDate && (
-                            <span className="text-xs text-gray-400 flex-shrink-0">
-                              {new Date(entry.liveDate).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                  <Link
-                    href={`/collections/${collectionId}/promo-deal`}
-                    className="block text-center bg-pink-600/20 hover:bg-pink-600/30 border border-pink-500/60 text-pink-200 px-4 py-2 rounded-lg transition-all font-medium text-sm"
-                  >
-                    Promo Deal Details →
-                  </Link>
-                </div>
-              )}
             </div>
           </div>
 
@@ -659,20 +623,37 @@ export default function CollectionDetailPage({ params }) {
                 {dist.submit?.length > 0 ? (
                   <div className="space-y-3">
                     {dist.submit.map((entry, index) => (
-                      <div key={index} className="p-4 bg-gray-900/50 rounded-lg border-l-4 border-purple-500">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium text-lg text-gray-100">{entry.label}</p>
-                            <p className="text-sm text-gray-400 mt-1">via {entry.platform} • <span className="font-medium text-gray-300">{entry.status}</span></p>
-                            {entry.notes && <p className="text-sm text-gray-500 mt-2 italic">&quot;{entry.notes}&quot;</p>}
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
-                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'submit', index })}
-                              className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
-                            <button onClick={() => confirmDelete('submit', entry.timestamp, entry.label)}
-                              className="text-red-400 hover:text-red-300 text-sm p-1" title="Delete">🗑️</button>
-                          </div>
+                      <div
+                        key={index}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (entry.id) {
+                            router.push(`/collections/${collectionId}/label/${entry.id}`)
+                          } else {
+                            alert('This entry was created before per-entry pages were added. Please delete and re-log it.')
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            if (entry.id) {
+                              router.push(`/collections/${collectionId}/label/${entry.id}`)
+                            } else {
+                              alert('This entry was created before per-entry pages were added. Please delete and re-log it.')
+                            }
+                          }
+                        }}
+                        className="p-4 bg-gray-900/50 rounded-lg border-l-4 border-purple-500 cursor-pointer hover:bg-gray-900/80 transition-colors flex items-center justify-between gap-4"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-lg text-gray-100">{entry.label}</p>
+                          <p className="text-sm text-gray-400 mt-1">via {entry.platform} • <span className="font-medium text-gray-300">{entry.status}</span></p>
+                          {entry.notes && <p className="text-sm text-gray-500 mt-2 italic">&quot;{entry.notes}&quot;</p>}
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
+                          <span className="text-xl text-gray-400">›</span>
                         </div>
                       </div>
                     ))}
@@ -693,46 +674,6 @@ export default function CollectionDetailPage({ params }) {
               </div>
             </div>
 
-            {/* Platform Distribution */}
-            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
-              <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Platform Distribution</h2>
-                <p className="text-sm text-gray-400 mt-1">Track where this {collection.collectionType} has been uploaded or released</p>
-              </div>
-              <div className="p-6">
-                {dist.release?.length > 0 ? (
-                  <div className="space-y-3">
-                    {dist.release.map((entry, index) => (
-                      <div key={index} className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-100">{entry.platform}</p>
-                            <p className="text-sm text-gray-400 mt-1">Status: <span className="text-gray-300">{entry.status}</span></p>
-                            {entry.url && <a href={entry.url} target="_blank" rel="noopener noreferrer"
-                              className="text-sm text-purple-400 hover:text-purple-300 mt-1 inline-block">View on platform →</a>}
-                            {entry.notes && <p className="text-sm text-gray-500 mt-1">{entry.notes}</p>}
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
-                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'release', index })}
-                              className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
-                            <button onClick={() => confirmDelete('release', entry.timestamp, entry.platform)}
-                              className="text-red-400 hover:text-red-300 text-sm p-1" title="Delete">🗑️</button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-center py-8">No platform uploads logged yet</p>
-                )}
-                <button onClick={() => setShowPlatformModal(true)}
-                  className="mt-4 w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-500 hover:shadow-lg hover:shadow-purple-500/50 transition-all font-medium">
-                  + Add Platform
-                </button>
-              </div>
-            </div>
-
             {/* Promo Deals */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
@@ -747,78 +688,62 @@ export default function CollectionDetailPage({ params }) {
                     {dist.promote.map((entry, index) => (
                       <div
                         key={entry.timestamp || index}
-                        className="p-4 bg-gray-900/50 rounded-lg border-l-4 border-pink-500"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (entry.id) {
+                            router.push(`/collections/${collectionId}/promo/${entry.id}`)
+                          } else {
+                            alert('This entry was created before per-entry pages were added. Please delete and re-log it.')
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            if (entry.id) {
+                              router.push(`/collections/${collectionId}/promo/${entry.id}`)
+                            } else {
+                              alert('This entry was created before per-entry pages were added. Please delete and re-log it.')
+                            }
+                          }
+                        }}
+                        className="p-4 bg-gray-900/50 rounded-lg border-l-4 border-pink-500 cursor-pointer hover:bg-gray-900/80 transition-colors flex items-center justify-between gap-4"
                       >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium text-lg text-gray-100">
-                              {entry.promoName || entry.platform || 'Promo Deal'}
-                            </p>
-                            <p className="text-sm text-gray-400 mt-1">
-                              Status:{' '}
-                              <span className="font-medium text-gray-300">
-                                {entry.status || 'Not Started'}
-                              </span>
-                            </p>
-                            {entry.scheduledDate && (
-                              <p className="text-xs text-gray-400 mt-1">
-                                Scheduled:{' '}
-                                {new Date(entry.scheduledDate).toLocaleDateString()}
-                              </p>
-                            )}
-                            {entry.liveDate && (
-                              <p className="text-xs text-green-400 mt-1">
-                                Live:{' '}
-                                {new Date(entry.liveDate).toLocaleDateString()}
-                              </p>
-                            )}
-                            {entry.notes && (
-                              <p className="text-sm text-gray-500 mt-2 italic">
-                                {entry.notes}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <span className="text-xs text-gray-500">
-                              {entry.timestamp
-                                ? new Date(entry.timestamp).toLocaleDateString()
-                                : ''}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-lg text-gray-100">
+                            {entry.promoName || entry.platform || 'Promo Deal'}
+                          </p>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Status:{' '}
+                            <span className="font-medium text-gray-300">
+                              {entry.status || 'Not Started'}
                             </span>
-                            <button
-                              onClick={() => {
-                                setEditingPromo(entry)
-                                setPromoForm({
-                                  promoName: entry.promoName || '',
-                                  status: entry.status || 'Not Started',
-                                  scheduledDate: entry.scheduledDate
-                                    ? entry.scheduledDate.slice(0, 10)
-                                    : '',
-                                  liveDate: entry.liveDate
-                                    ? entry.liveDate.slice(0, 10)
-                                    : '',
-                                  notes: entry.notes || ''
-                                })
-                                setShowPromoForm(true)
-                              }}
-                              className="text-blue-400 hover:text-blue-300 text-sm p-1"
-                              title="Edit promo deal"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() =>
-                                confirmDelete(
-                                  'promote',
-                                  entry.timestamp,
-                                  entry.promoName || entry.platform || 'Promo deal'
-                                )
-                              }
-                              className="text-red-400 hover:text-red-300 text-sm p-1"
-                              title="Delete promo deal"
-                            >
-                              🗑️
-                            </button>
-                          </div>
+                          </p>
+                          {entry.scheduledDate && (
+                            <p className="text-xs text-gray-400 mt-1">
+                              Scheduled:{' '}
+                              {new Date(entry.scheduledDate).toLocaleDateString()}
+                            </p>
+                          )}
+                          {entry.liveDate && (
+                            <p className="text-xs text-green-400 mt-1">
+                              Live:{' '}
+                              {new Date(entry.liveDate).toLocaleDateString()}
+                            </p>
+                          )}
+                          {entry.notes && (
+                            <p className="text-sm text-gray-500 mt-2 italic">
+                              {entry.notes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className="text-xs text-gray-500">
+                            {entry.timestamp
+                              ? new Date(entry.timestamp).toLocaleDateString()
+                              : ''}
+                          </span>
+                          <span className="text-xl text-gray-400">›</span>
                         </div>
                       </div>
                     ))}
@@ -895,8 +820,8 @@ export default function CollectionDetailPage({ params }) {
                           setPromoForm({
                             promoName: '',
                             status: 'Not Started',
-                            scheduledDate: '',
-                            liveDate: '',
+                            scheduledDate: new Date().toISOString().split('T')[0],
+                            liveDate: new Date().toISOString().split('T')[0],
                             notes: ''
                           })
                         } catch (err) {
@@ -917,8 +842,8 @@ export default function CollectionDetailPage({ params }) {
                             setPromoForm({
                               promoName: '',
                               status: 'Not Started',
-                              scheduledDate: '',
-                              liveDate: '',
+                              scheduledDate: new Date().toISOString().split('T')[0],
+                              liveDate: new Date().toISOString().split('T')[0],
                               notes: ''
                             })
                           }}
@@ -1033,8 +958,8 @@ export default function CollectionDetailPage({ params }) {
                         setPromoForm({
                           promoName: '',
                           status: 'Not Started',
-                          scheduledDate: '',
-                          liveDate: '',
+                          scheduledDate: new Date().toISOString().split('T')[0],
+                          liveDate: new Date().toISOString().split('T')[0],
                           notes: ''
                         })
                         setShowPromoForm(true)
@@ -1045,6 +970,52 @@ export default function CollectionDetailPage({ params }) {
                     </button>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Platform Distribution */}
+            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
+              <div className="p-6 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-gray-100">Platform Distribution</h2>
+                <p className="text-sm text-gray-400 mt-1">Track where this {collection.collectionType} has been uploaded or released</p>
+              </div>
+              <div className="p-6">
+                {dist.release?.length > 0 ? (
+                  <div className="space-y-3">
+                    {dist.release.map((entry, index) => (
+                      <div key={index} className="p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-100">{entry.platform}</p>
+                            <p className="text-sm text-gray-400 mt-1">Status: <span className="text-gray-300">{entry.status}</span></p>
+                            {entry.status?.toLowerCase() === 'live' && entry.releaseDate && (
+                              <p className="text-xs text-green-400 mt-1">Released on {new Date(entry.releaseDate).toLocaleDateString()}</p>
+                            )}
+                            {entry.status?.toLowerCase() === 'scheduled' && entry.releaseDate && (
+                              <p className="text-xs text-yellow-400 mt-1">To be released on {new Date(entry.releaseDate).toLocaleDateString()}</p>
+                            )}
+                            {entry.url && <a href={entry.url} target="_blank" rel="noopener noreferrer"
+                              className="text-sm text-purple-400 hover:text-purple-300 mt-1 inline-block">View on platform →</a>}
+                            {entry.notes && <p className="text-sm text-gray-500 mt-1">{entry.notes}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 ml-4">
+                            <span className="text-xs text-gray-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() : ''}</span>
+                            <button onClick={() => setEditingEntry({ ...entry, pathType: 'release', index })}
+                              className="text-blue-400 hover:text-blue-300 text-sm p-1" title="Edit">✏️</button>
+                            <button onClick={() => confirmDelete('release', entry.timestamp, entry.platform)}
+                              className="text-red-400 hover:text-red-300 text-sm p-1" title="Delete">🗑️</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">No platform uploads logged yet</p>
+                )}
+                <button onClick={() => setShowPlatformModal(true)}
+                  className="mt-4 w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-500 hover:shadow-lg hover:shadow-purple-500/50 transition-all font-medium">
+                  + Add Platform
+                </button>
               </div>
             </div>
 
@@ -1095,6 +1066,12 @@ export default function CollectionDetailPage({ params }) {
               {platformStatuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+          {(pStatus === 'Live' || pStatus === 'Scheduled') && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">Release Date</label>
+              <input type="date" value={pReleaseDate} onChange={e => setPReleaseDate(e.target.value)} className={inputClass} />
+            </div>
+          )}
           <div>
             <label className="block text-sm text-gray-300 mb-1">URL <span className="text-gray-500">(Optional)</span></label>
             <input type="url" value={pUrl} onChange={e => setPUrl(e.target.value)} placeholder="https://" className={inputClass} />
@@ -1156,6 +1133,15 @@ export default function CollectionDetailPage({ params }) {
       <Modal isOpen={showLabelSigningModal} onClose={() => setShowLabelSigningModal(false)} title="Mark as Signed">
         <div className="p-4">
           <p className="text-gray-300 mb-4">Select which label signed this {collection.collectionType}:</p>
+          <div className="mb-4">
+            <label className="block text-sm text-gray-300 mb-1">Signature Date</label>
+            <input
+              type="date"
+              value={signingDate}
+              onChange={e => setSigningDate(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
           <div className="space-y-2">
             {dist.submit?.map((submission, index) => (
               <button key={index} onClick={() => handleMarkAsSigned(submission.label)}

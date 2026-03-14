@@ -2,14 +2,14 @@
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchLabelEntry, fetchRelease } from '@/lib/api'
+import { fetchCollectionLabelEntry } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 
-export default function LabelEntryPage({ params }) {
+export default function CollectionLabelEntryPage({ params }) {
   const unwrappedParams = use(params)
-  const releaseId = unwrappedParams.releaseId
+  const collectionId = unwrappedParams.collectionId
   const labelId = unwrappedParams.labelId
   const router = useRouter()
 
@@ -39,19 +39,19 @@ export default function LabelEntryPage({ params }) {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteEntryModal, setShowDeleteEntryModal] = useState(false)
 
-  const apiBase = `http://localhost:3001/releases/${releaseId}`
+  const apiBase = `http://localhost:3001/collections/${collectionId}`
 
   async function loadData() {
     try {
       setLoading(true)
-      const [releaseRes, labelRes] = await Promise.all([
-        fetchRelease(releaseId),
-        fetchLabelEntry(releaseId, labelId)
+      const [colData, labelRes] = await Promise.all([
+        fetch(apiBase).then(r => r.json()),
+        fetchCollectionLabelEntry(collectionId, labelId)
       ])
-      const release = releaseRes.release || releaseRes
+      const collection = colData.collection || colData
       const fetchedEntry = labelRes.entry
 
-      setTrack(release)
+      setTrack(collection)
       setEntry(fetchedEntry)
       setDetailsForm({
         label: fetchedEntry.label || fetchedEntry.labelName || '',
@@ -69,7 +69,7 @@ export default function LabelEntryPage({ params }) {
 
   useEffect(() => {
     loadData()
-  }, [releaseId, labelId])
+  }, [collectionId, labelId])
 
   const handleSaveDetails = async () => {
     if (!detailsForm.label.trim()) {
@@ -220,7 +220,7 @@ export default function LabelEntryPage({ params }) {
       const res = await fetch(`${apiBase}/label/${labelId}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to delete entry')
-      router.push(`/releases/${releaseId}`)
+      router.push(`/collections/${collectionId}`)
     } catch (err) {
       console.error('Error deleting label entry:', err)
       alert(`Failed to delete entry: ${err.message}`)
@@ -249,11 +249,11 @@ export default function LabelEntryPage({ params }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-      {/* Persistent Top Bar */}
+      {/* Sticky top bar */}
       <div className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
           <button
-            onClick={() => router.push(`/releases/${releaseId}`)}
+            onClick={() => router.push(`/collections/${collectionId}`)}
             className="text-purple-400 hover:text-purple-300 transition-colors text-sm font-medium"
           >
             ← Back
@@ -461,7 +461,7 @@ export default function LabelEntryPage({ params }) {
               </div>
             </div>
 
-            {/* Documents */}
+            {/* Files */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
                 <h2 className="text-xl font-semibold text-gray-100">Upload Files</h2>
@@ -611,7 +611,6 @@ export default function LabelEntryPage({ params }) {
         title={editingContact ? 'Edit Contact' : 'Add Contact'}
       >
         <LabelContactForm
-          releaseId={releaseId}
           labelName={detailsForm.label}
           existingContact={editingContact}
           onSuccess={handleContactSuccess}
@@ -619,6 +618,7 @@ export default function LabelEntryPage({ params }) {
             setShowContactModal(false)
             setEditingContact(null)
           }}
+          baseUrl={apiBase}
           contactPath={`label/${labelId}/contacts`}
         />
       </Modal>
@@ -722,4 +722,3 @@ export default function LabelEntryPage({ params }) {
     </div>
   )
 }
-

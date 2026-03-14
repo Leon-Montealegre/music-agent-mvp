@@ -8,17 +8,18 @@ export default function LogPlatformForm({ releaseId, onSuccess, onCancel, editMo
     platform: '',
     status: '',
     url: '',
-    notes: ''
+    notes: '',
+    releaseDate: new Date().toISOString().split('T')[0]
   })
 
-  // Pre-fill form if editing
   useEffect(() => {
     if (editMode && existingEntry) {
       setFormData({
         platform: existingEntry.platform || '',
         status: existingEntry.status || '',
         url: existingEntry.url || '',
-        notes: existingEntry.notes || ''
+        notes: existingEntry.notes || '',
+        releaseDate: existingEntry.releaseDate || new Date().toISOString().split('T')[0]
       })
     }
   }, [editMode, existingEntry])
@@ -33,10 +34,12 @@ export default function LogPlatformForm({ releaseId, onSuccess, onCancel, editMo
 
     try {
       if (editMode && existingEntry) {
-        // Update existing entry
-        await updateDistributionEntry(releaseId, 'release', existingEntry.timestamp, formData)
+        const updatePayload = { ...formData }
+        if (formData.status !== 'Live' && formData.status !== 'Scheduled') {
+          delete updatePayload.releaseDate
+        }
+        await updateDistributionEntry(releaseId, 'release', existingEntry.timestamp, updatePayload)
       } else {
-        // Create new entry - MAKE SURE THIS MATCHES
         const entry = {
           platform: formData.platform,
           status: formData.status,
@@ -44,8 +47,9 @@ export default function LogPlatformForm({ releaseId, onSuccess, onCancel, editMo
         }
         if (formData.url) entry.url = formData.url
         if (formData.notes) entry.notes = formData.notes
-        
-        // This should be calling with 3 arguments: releaseId, 'release', entry
+        if ((formData.status === 'Live' || formData.status === 'Scheduled') && formData.releaseDate) {
+          entry.releaseDate = formData.releaseDate
+        }
         await updateDistribution(releaseId, 'release', entry)
       }
     
@@ -103,6 +107,21 @@ export default function LogPlatformForm({ releaseId, onSuccess, onCancel, editMo
   </select>
 </div>
 
+
+      {/* Release Date — only for Live or Scheduled */}
+      {(formData.status === 'Live' || formData.status === 'Scheduled') && (
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Release Date
+          </label>
+          <input
+            type="date"
+            value={formData.releaseDate}
+            onChange={(e) => setFormData({ ...formData, releaseDate: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+          />
+        </div>
+      )}
 
       {/* URL */}
       <div>

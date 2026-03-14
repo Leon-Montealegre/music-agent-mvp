@@ -3,7 +3,6 @@
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchPromoEntry, fetchRelease } from '@/lib/api'
-import BackButton from '@/components/BackButton'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
@@ -259,6 +258,19 @@ export default function PromoEntryPage({ params }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+      {/* Persistent Top Bar */}
+      <div className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          <button
+            onClick={() => router.push(`/releases/${releaseId}`)}
+            className="text-purple-400 hover:text-purple-300 transition-colors text-sm font-medium"
+          >
+            ← Back
+          </button>
+          <div />
+        </div>
+      </div>
+
       {/* Header */}
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-6">
@@ -276,7 +288,6 @@ export default function PromoEntryPage({ params }) {
                 {metadata.title} • {metadata.artist}
               </p>
             </div>
-            <BackButton href={`/releases/${releaseId}`} label="Back to Track" />
           </div>
         </div>
       </div>
@@ -472,7 +483,7 @@ export default function PromoEntryPage({ params }) {
             {/* Documents */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Upload Documents</h2>
+                <h2 className="text-xl font-semibold text-gray-100">Upload Files</h2>
                 <p className="text-sm text-gray-400 mt-1">
                   Contracts, confirmations, and other files related to this promo
                 </p>
@@ -522,7 +533,7 @@ export default function PromoEntryPage({ params }) {
                 {(entry.documents || []).length > 0 && (
                   <div className="mt-6 space-y-2">
                     <h3 className="font-medium text-gray-300 mb-3">
-                      Uploaded Documents ({entry.documents.length})
+                      Uploaded Files ({entry.documents.length})
                     </h3>
                     {entry.documents.map(doc => (
                       <div

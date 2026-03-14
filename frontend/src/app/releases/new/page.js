@@ -75,7 +75,6 @@ export default function CreateTrackPage() {
 
     try {
       if (!artist || !title)                                throw new Error('Artist and Title are required')
-      if (!genre)                                           throw new Error('Genre is required')
       if (grouping === 'existing' && !selectedCollectionId) throw new Error('Please select a collection')
       if (grouping === 'new' && !newCollectionName)         throw new Error('Please enter a name for the new collection')
 
@@ -223,8 +222,8 @@ export default function CreateTrackPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Genre <span className="text-red-400">*</span></label>
-              <select value={genre} onChange={e => setGenre(e.target.value)} required className={inputClass}>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Genre <span className="text-gray-500 font-normal">(optional)</span></label>
+              <select value={genre} onChange={e => setGenre(e.target.value)} className={inputClass}>
                 <option value="">Choose Genre</option>
                 {genres.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
@@ -232,10 +231,10 @@ export default function CreateTrackPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Production Date <span className="text-red-400">*</span>
+                Production Date <span className="text-gray-500 font-normal">(optional)</span>
                 <span className="text-xs text-gray-500 ml-2">(when you finished this track)</span>
               </label>
-              <input type="date" value={trackDate} onChange={e => setTrackDate(e.target.value)} required className={inputClass} />
+              <input type="date" value={trackDate} onChange={e => setTrackDate(e.target.value)} className={inputClass} />
             </div>
           </div>
 

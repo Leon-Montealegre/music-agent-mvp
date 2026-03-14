@@ -1,0 +1,4 @@
+Before you write the full Cursor prompt for all 10 changes, make sure to include this change #11:
+- Currently the catalogue view with the cards forms a "grid view", which looks nice but can take up a lot of space and with a big catalogue there could be a lot of scrolling. Be an senior and tasteful UX / UI designer and think of a nice "list view" design that a user can just toggle between grid and list. The list should be more compact and allow the user to browse large catalogues with ease. This should be purely just an aesthetic change. Of course some details might be omitted, which is fine as the user can just click on a track and see the details. At first, don't omit too many details, and together we will refine by omitting little by little more.
+
+Let me know if you have any questions.
