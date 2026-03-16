@@ -6,6 +6,9 @@
 // Health: curl http://localhost:3001/health
 // =============================================================================
 
+require('dotenv').config()
+
+
 const express        = require('express')
 const multer         = require('multer')
 const cors           = require('cors')
@@ -443,47 +446,32 @@ app.patch('/releases/:releaseId/metadata', async (req, res) => {
 
 app.get('/releases/', async (req, res) => {
   try {
-    const folders  = await fs.readdir(RELEASES_DIR)
-    const releases = []
-
-    for (const folder of folders) {
-      if (folder.startsWith('.')) continue
-      const folderPath = path.join(RELEASES_DIR, folder)
-      const stats = await fs.stat(folderPath)
-      if (!stats.isDirectory()) continue
-
-      try {
-        const parsed  = JSON.parse(await fs.readFile(path.join(folderPath, 'metadata.json'), 'utf8'))
-        const metadata = parsed.metadata || parsed
-        const versions = parsed.versions || {}
-        const files    = (versions.primary || {}).files || {}
-
-        releases.push({
-          releaseId:    parsed.releaseId || metadata.releaseId || folder,
-          artist:       metadata.artist,
-          title:        metadata.title,
-          genre:        metadata.genre,
-          bpm:          metadata.bpm,
-          key:          metadata.key,
-          releaseDate:  metadata.releaseDate || metadata.trackDate,
-          releaseType:  metadata.releaseType || metadata.releaseFormat,
-          releaseFormat: metadata.releaseFormat || metadata.releaseType,
-          collectionId: metadata.collectionId || null,
-          createdAt:    metadata.createdAt,
-          versionCount: Object.keys(versions).length,
-          fileCounts: {
-            audio:   files.audio?.length   || 0,
-            artwork: files.artwork?.length  || 0,
-            video:   files.video?.length   || 0
-          },
-          distribution: metadata.distribution || { release: [], submit: [], promote: [] }
-        })
-      } catch {
-        releases.push({ releaseId: folder, error: 'No metadata.json found', createdAt: stats.birthtime })
-      }
-    }
-
-    releases.sort((a, b) => new Date(b.releaseDate || b.createdAt) - new Date(a.releaseDate || a.createdAt))
+    const db = require('./db')
+    const result = await db.query(`
+      SELECT
+        id, slug AS "releaseId", title, artist, genre, bpm, key,
+        track_date AS "trackDate", release_date AS "releaseDate",
+        release_type AS "releaseType", release_format AS "releaseFormat",
+        collection_id AS "collectionId", is_signed AS "isSigned",
+        signed_label AS "signedLabel", signed_date AS "signedDate",
+        updated_at AS "updatedAt"
+      FROM releases
+      ORDER BY release_date DESC NULLS LAST
+    `)
+    const releases = result.rows.map(r => ({
+      releaseId:     r.releaseId,
+      artist:        r.artist,
+      title:         r.title,
+      genre:         r.genre,
+      bpm:           r.bpm,
+      key:           r.key,
+      releaseDate:   r.releaseDate,
+      releaseType:   r.releaseType,
+      releaseFormat: r.releaseFormat,
+      collectionId:  r.collectionId,
+      updatedAt:     r.updatedAt,
+      distribution:  { release: [], submit: [], promote: [] }
+    }))
     res.json({ success: true, count: releases.length, releases })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
@@ -492,40 +480,72 @@ app.get('/releases/', async (req, res) => {
 
 app.get('/releases/:releaseId/', async (req, res) => {
   try {
-    const releaseId    = requireReleaseId(req)
-    const releasePath  = path.join(RELEASES_DIR, releaseId)
-    const metadataPath = path.join(releasePath, 'metadata.json')
+    const db = require('./db')
+    const { releaseId } = req.params
 
-    try { await fs.access(releasePath) }
-    catch { return res.status(404).json({ success: false, error: `Release not found: ${releaseId}` }) }
+    const result = await db.query(`
+      SELECT
+        id, slug AS "releaseId", title, artist, genre, bpm, key,
+        track_date AS "trackDate", release_date AS "releaseDate",
+        release_type AS "releaseType", release_format AS "releaseFormat",
+        collection_id AS "collectionId", is_signed AS "isSigned",
+        signed_label AS "signedLabel", signed_date AS "signedDate",
+        updated_at AS "updatedAt"
+      FROM releases
+      WHERE slug = $1
+    `, [releaseId])
 
-    const parsed   = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-    const metadata = parsed.metadata || parsed
-    const versions = parsed.versions || {}
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: `Release not found: ${releaseId}` })
+
+    const r = result.rows[0]
+    const releaseUUID = r.id
+
+    const [distResult, notesResult, songLinksResult] = await Promise.all([
+      db.query(`SELECT * FROM distribution_entries WHERE release_id = $1`, [releaseUUID]),
+      db.query(`SELECT text FROM notes WHERE release_id = $1 LIMIT 1`, [releaseUUID]),
+      db.query(`SELECT id, label, url FROM song_links WHERE release_id = $1`, [releaseUUID])
+    ])
+
+    const distribution = { release: [], submit: [], promote: [] }
+    for (const entry of distResult.rows) {
+      distribution[entry.path_type]?.push({
+        id:        entry.id,
+        platform:  entry.platform,
+        label:     entry.label,
+        promoName: entry.promo_name,
+        status:    entry.status,
+        url:       entry.url,
+        liveDate:  entry.live_date,
+        pageNotes: entry.page_notes,
+        timestamp: entry.timestamp,
+        contacts:  [],
+        documents: []
+      })
+    }
 
     res.json({
       success: true,
       release: {
-        releaseId:        parsed.releaseId || metadata.releaseId,
-        artist:           metadata.artist,
-        title:            metadata.title,
-        genre:            metadata.genre,
-        bpm:              metadata.bpm,
-        key:              metadata.key,
-        releaseDate:      metadata.releaseDate || metadata.trackDate,
-        releaseType:      metadata.releaseType || metadata.releaseFormat,
-        releaseFormat:    metadata.releaseFormat || metadata.releaseType,
-        collectionId:     metadata.collectionId || null,
-        partOfCollection: metadata.partOfCollection || null,
-        trackType:        metadata.trackType,
-        trackDate:        metadata.trackDate,
-        createdAt:        metadata.createdAt,
-        updatedAt:        parsed.updatedAt,
-        versions,
-        files:            metadata.files,
-        distribution:     metadata.distribution || { release: [], submit: [], promote: [] },
-        notes:            parsed.notes || { text: '', documents: [] },
-        songLinks:        parsed.songLinks || []
+        releaseId:     r.releaseId,
+        artist:        r.artist,
+        title:         r.title,
+        genre:         r.genre,
+        bpm:           r.bpm,
+        key:           r.key,
+        trackDate:     r.trackDate,
+        releaseDate:   r.releaseDate,
+        releaseType:   r.releaseType,
+        releaseFormat: r.releaseFormat,
+        collectionId:  r.collectionId,
+        isSigned:      r.isSigned,
+        signedLabel:   r.signedLabel,
+        signedDate:    r.signedDate,
+        updatedAt:     r.updatedAt,
+        versions:      {},
+        distribution,
+        notes:         { text: notesResult.rows[0]?.text || '', documents: [] },
+        songLinks:     songLinksResult.rows
       }
     })
   } catch (error) {
