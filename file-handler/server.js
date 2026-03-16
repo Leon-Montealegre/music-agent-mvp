@@ -8,6 +8,7 @@
 
 require('dotenv').config()
 
+const authRoutes = require('./routes/auth');
 
 const express        = require('express')
 const multer         = require('multer')
@@ -328,6 +329,7 @@ app.get('/storage/status', async (req, res) => {
     res.status(500).json({ error: 'Failed to check disk space' })
   }
 })
+app.use('/auth', authRoutes);
 
 // =============================================================================
 // FILE UPLOAD
