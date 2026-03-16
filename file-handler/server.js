@@ -395,17 +395,42 @@ app.post('/upload', upload.any(), async (req, res) => {
 
 app.post('/metadata', async (req, res) => {
   try {
-    const { releaseId, ...metadata } = req.body
+    const db = require('./db')
+    const {
+      releaseId, title, artist, genre, bpm, key,
+      trackDate, releaseDate, releaseType, releaseFormat,
+      collectionId, isSigned, signedLabel, signedDate
+    } = req.body
+
     if (!releaseId) return res.status(400).json({ success: false, error: 'Missing releaseId' })
 
-    const releasePath  = path.join(RELEASES_DIR, releaseId)
-    const metadataPath = path.join(releasePath, 'metadata.json')
-    await fs.mkdir(releasePath, { recursive: true })
+    await db.query(`
+      INSERT INTO releases (
+        slug, title, artist, genre, bpm, key,
+        track_date, release_date, release_type, release_format,
+        collection_id, is_signed, signed_label, signed_date
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      ON CONFLICT (slug) DO UPDATE SET
+        title          = EXCLUDED.title,
+        artist         = EXCLUDED.artist,
+        genre          = EXCLUDED.genre,
+        bpm            = EXCLUDED.bpm,
+        key            = EXCLUDED.key,
+        track_date     = EXCLUDED.track_date,
+        release_date   = EXCLUDED.release_date,
+        release_type   = EXCLUDED.release_type,
+        release_format = EXCLUDED.release_format,
+        collection_id  = EXCLUDED.collection_id,
+        is_signed      = EXCLUDED.is_signed,
+        signed_label   = EXCLUDED.signed_label,
+        signed_date    = EXCLUDED.signed_date,
+        updated_at     = NOW()
+    `, [
+      releaseId, title, artist, genre, bpm || null, key || null,
+      trackDate || null, releaseDate || null, releaseType || null, releaseFormat || null,
+      collectionId || null, isSigned || false, signedLabel || null, signedDate || null
+    ])
 
-    let existing = {}
-    try { existing = JSON.parse(await fs.readFile(metadataPath, 'utf8')) } catch {}
-
-    await fs.writeFile(metadataPath, JSON.stringify({ ...existing, ...metadata, releaseId, updatedAt: new Date().toISOString() }, null, 2))
     res.json({ success: true, message: 'Metadata saved', releaseId })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
@@ -414,29 +439,44 @@ app.post('/metadata', async (req, res) => {
 
 app.patch('/releases/:releaseId/metadata', async (req, res) => {
   try {
+    const db = require('./db')
     const { releaseId } = req.params
-    const updates = req.body
-    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const {
+      title, artist, genre, bpm, key,
+      trackDate, releaseDate, releaseType, releaseFormat,
+      collectionId, isSigned, signedLabel, signedDate
+    } = req.body
 
-    const exists = await fs.access(metadataPath).then(() => true).catch(() => false)
-    if (!exists) return res.status(404).json({ success: false, error: 'Release not found' })
+    const result = await db.query(`
+      UPDATE releases SET
+        title          = COALESCE($2, title),
+        artist         = COALESCE($3, artist),
+        genre          = COALESCE($4, genre),
+        bpm            = COALESCE($5, bpm),
+        key            = COALESCE($6, key),
+        track_date     = COALESCE($7, track_date),
+        release_date   = COALESCE($8, release_date),
+        release_type   = COALESCE($9, release_type),
+        release_format = COALESCE($10, release_format),
+        collection_id  = COALESCE($11, collection_id),
+        is_signed      = COALESCE($12, is_signed),
+        signed_label   = COALESCE($13, signed_label),
+        signed_date    = COALESCE($14, signed_date),
+        updated_at     = NOW()
+      WHERE slug = $1
+      RETURNING slug
+    `, [
+      releaseId, title, artist, genre, bpm || null, key || null,
+      trackDate || null, releaseDate || null, releaseType || null, releaseFormat || null,
+      collectionId || null, isSigned ?? null, signedLabel || null, signedDate || null
+    ])
 
-    const existing = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Release not found' })
 
-    if (existing.metadata) {
-      existing.metadata = { ...existing.metadata, ...updates, releaseId: existing.metadata.releaseId }
-      const metaFields = ['genre', 'artist', 'title', 'bpm', 'key', 'trackDate', 'releaseDate', 'releaseFormat', 'releaseType']
-      metaFields.forEach(f => { if (existing[f] !== undefined && existing.metadata[f] !== undefined) delete existing[f] })
-    } else {
-      Object.assign(existing, updates)
-      existing.releaseId = releaseId
-    }
-
-    existing.updatedAt = new Date().toISOString()
-    await fs.writeFile(metadataPath, JSON.stringify(existing, null, 2))
-    res.json({ success: true, release: existing })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    res.json({ success: true, release: { releaseId, ...req.body } })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
