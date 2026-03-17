@@ -1,2 +1,21 @@
-file-handler/real test files/
+# Environment variables - NEVER commit these
+.env
+.env.*
+.env.save
+*.env
+
+# Node modules
 node_modules/
+
+# macOS system files
+.DS_Store
+
+# Next.js build output
+.next/
+out/
+
+# Logs
+*.log
+
+# Real test files
+file-handler/real test files/
