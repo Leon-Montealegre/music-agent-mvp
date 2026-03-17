@@ -8,7 +8,8 @@
 
 require('dotenv').config()
 
-const authRoutes = require('./routes/auth');
+const authRoutes = require('./routes/auth')
+const authMiddleware = require('./authMiddleware')
 
 const express        = require('express')
 const multer         = require('multer')
@@ -395,7 +396,7 @@ app.post('/upload', upload.any(), async (req, res) => {
 // RELEASES — METADATA
 // =============================================================================
 
-app.post('/metadata', async (req, res) => {
+app.post('/metadata', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
     const {
@@ -408,10 +409,10 @@ app.post('/metadata', async (req, res) => {
 
     await db.query(`
       INSERT INTO releases (
-        slug, title, artist, genre, bpm, key,
+        user_id, slug, title, artist, genre, bpm, key,
         track_date, release_date, release_type, release_format,
         collection_id, is_signed, signed_label, signed_date
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       ON CONFLICT (slug) DO UPDATE SET
         title          = EXCLUDED.title,
         artist         = EXCLUDED.artist,
@@ -428,7 +429,7 @@ app.post('/metadata', async (req, res) => {
         signed_date    = EXCLUDED.signed_date,
         updated_at     = NOW()
     `, [
-      releaseId, title, artist, genre, bpm || null, key || null,
+      req.user.id, releaseId, title, artist, genre, bpm || null, key || null,
       trackDate || null, releaseDate || null, releaseType || null, releaseFormat || null,
       collectionId || null, isSigned || false, signedLabel || null, signedDate || null
     ])
@@ -439,7 +440,7 @@ app.post('/metadata', async (req, res) => {
   }
 })
 
-app.patch('/releases/:releaseId/metadata', async (req, res) => {
+app.patch('/releases/:releaseId/metadata', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
     const { releaseId } = req.params
@@ -451,24 +452,25 @@ app.patch('/releases/:releaseId/metadata', async (req, res) => {
 
     const result = await db.query(`
       UPDATE releases SET
-        title          = COALESCE($2, title),
-        artist         = COALESCE($3, artist),
-        genre          = COALESCE($4, genre),
-        bpm            = COALESCE($5, bpm),
-        key            = COALESCE($6, key),
-        track_date     = COALESCE($7, track_date),
-        release_date   = COALESCE($8, release_date),
-        release_type   = COALESCE($9, release_type),
-        release_format = COALESCE($10, release_format),
-        collection_id  = COALESCE($11, collection_id),
-        is_signed      = COALESCE($12, is_signed),
-        signed_label   = COALESCE($13, signed_label),
-        signed_date    = COALESCE($14, signed_date),
+        title          = COALESCE($3, title),
+        artist         = COALESCE($4, artist),
+        genre          = COALESCE($5, genre),
+        bpm            = COALESCE($6, bpm),
+        key            = COALESCE($7, key),
+        track_date     = COALESCE($8, track_date),
+        release_date   = COALESCE($9, release_date),
+        release_type   = COALESCE($10, release_type),
+        release_format = COALESCE($11, release_format),
+        collection_id  = COALESCE($12, collection_id),
+        is_signed      = COALESCE($13, is_signed),
+        signed_label   = COALESCE($14, signed_label),
+        signed_date    = COALESCE($15, signed_date),
         updated_at     = NOW()
-      WHERE slug = $1
+      WHERE slug = $1 AND user_id = $2
       RETURNING slug
     `, [
-      releaseId, title, artist, genre, bpm || null, key || null,
+      releaseId, req.user.id,
+      title, artist, genre, bpm || null, key || null,
       trackDate || null, releaseDate || null, releaseType || null, releaseFormat || null,
       collectionId || null, isSigned ?? null, signedLabel || null, signedDate || null
     ])
@@ -486,7 +488,7 @@ app.patch('/releases/:releaseId/metadata', async (req, res) => {
 // RELEASES — LIST & GET
 // =============================================================================
 
-app.get('/releases/', async (req, res) => {
+app.get('/releases/', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
     const result = await db.query(`
@@ -498,8 +500,9 @@ app.get('/releases/', async (req, res) => {
         signed_label AS "signedLabel", signed_date AS "signedDate",
         updated_at AS "updatedAt"
       FROM releases
+      WHERE user_id = $1
       ORDER BY release_date DESC NULLS LAST
-    `)
+    `, [req.user.id])
     const releases = result.rows.map(r => ({
       releaseId:     r.releaseId,
       artist:        r.artist,
@@ -520,7 +523,7 @@ app.get('/releases/', async (req, res) => {
   }
 })
 
-app.get('/releases/:releaseId/', async (req, res) => {
+app.get('/releases/:releaseId/', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
     const { releaseId } = req.params
@@ -534,8 +537,8 @@ app.get('/releases/:releaseId/', async (req, res) => {
         signed_label AS "signedLabel", signed_date AS "signedDate",
         updated_at AS "updatedAt"
       FROM releases
-      WHERE slug = $1
-    `, [releaseId])
+      WHERE slug = $1 AND user_id = $2
+    `, [releaseId, req.user.id])
 
     if (result.rows.length === 0)
       return res.status(404).json({ success: false, error: `Release not found: ${releaseId}` })
