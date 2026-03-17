@@ -251,9 +251,9 @@ export default function CollectionDetailPage({ params }) {
     }
   }
 
-  const handleDeleteLink = async (index) => {
+  const handleDeleteLink = async (linkId) => {
     try {
-      const res = await fetch(`http://localhost:3001/collections/${collectionId}/song-links/${index}`, { method: 'DELETE' })
+      const res = await fetch(`http://localhost:3001/collections/${collectionId}/song-links/${linkId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete link')
       await loadCollection()
     } catch (err) {
@@ -497,12 +497,12 @@ export default function CollectionDetailPage({ params }) {
                 ) : (
                   <div className="space-y-1.5">
                     {(collection.songLinks || []).map((link, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                      <div key={link.id || idx} className="flex items-center gap-2">
                         <a href={link.url} target="_blank" rel="noopener noreferrer"
                           className="text-xs text-purple-400 hover:text-purple-300 underline truncate flex-1">
                           {link.label || link.url}
                         </a>
-                        <button onClick={() => handleDeleteLink(idx)}
+                        <button onClick={() => handleDeleteLink(link.id || idx)}
                           className="text-red-400 hover:text-red-300 text-xs flex-shrink-0" title="Remove link">
                           🗑️
                         </button>

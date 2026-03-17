@@ -299,15 +299,44 @@ app.get('/health', (req, res) => {
 // SETTINGS
 // =============================================================================
 
-app.get('/settings', async (req, res) => {
-  const settings = await readSettings()
-  res.json({ success: true, settings })
+app.get('/settings', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const result = await db.query(
+      `SELECT artist_name AS "defaultArtistName", default_genre AS "defaultGenre", preferences
+       FROM settings WHERE user_id = $1`,
+      [req.user.id]
+    )
+    const settings = result.rows[0] || {}
+    res.json({ success: true, settings })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
 })
 
-app.patch('/settings', async (req, res) => {
-  const updated = { ...(await readSettings()), ...req.body }
-  await fs.writeFile(SETTINGS_PATH, JSON.stringify(updated, null, 2))
-  res.json({ success: true, settings: updated })
+app.patch('/settings', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const { defaultArtistName, defaultGenre, preferences } = req.body
+    await db.query(
+      `INSERT INTO settings (user_id, artist_name, default_genre, preferences)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id) DO UPDATE SET
+         artist_name   = COALESCE($2, settings.artist_name),
+         default_genre = COALESCE($3, settings.default_genre),
+         preferences   = COALESCE($4, settings.preferences)`,
+      [req.user.id, defaultArtistName || null, defaultGenre || null,
+       preferences ? JSON.stringify(preferences) : null]
+    )
+    const result = await db.query(
+      `SELECT artist_name AS "defaultArtistName", default_genre AS "defaultGenre", preferences
+       FROM settings WHERE user_id = $1`,
+      [req.user.id]
+    )
+    res.json({ success: true, settings: result.rows[0] || {} })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
 })
 
 // =============================================================================
@@ -2177,85 +2206,157 @@ app.delete('/releases/:releaseId/promo-deal/contacts/:contactId', async (req, re
 // COLLECTIONS — CRUD
 // =============================================================================
 
-app.post('/collections', async (req, res) => {
+app.post('/collections', authMiddleware, async (req, res) => {
   try {
-    const { title, artist, genre, releaseDate, collectionType } = req.body
-    if (!title || !artist || !collectionType)
+    const db = require('./db')
+    const { title, artist, genre, releaseDate, collectionType, releaseType } = req.body
+    const type = collectionType || releaseType
+    if (!title || !artist || !type)
       return res.status(400).json({ success: false, error: 'title, artist and collectionType are required' })
 
-    const cleanArtist = artist.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')
-    const cleanTitle  = title.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')
-    const date        = releaseDate || new Date().toISOString().split('T')[0]
+    const cleanArtist  = artist.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')
+    const cleanTitle   = title.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')
+    const date         = releaseDate || new Date().toISOString().split('T')[0]
     const collectionId = `${date}_${cleanArtist}_${cleanTitle}`
 
-    const collectionDir = path.join(COLLECTIONS_PATH, collectionId)
-    await fs.mkdir(collectionDir, { recursive: true })
-    await fs.mkdir(path.join(collectionDir, 'artwork'), { recursive: true })
+    await db.query(
+      `INSERT INTO collections (id, user_id, slug, title, artist, genre, release_type, release_date, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW())`,
+      [req.user.id, collectionId, title, artist, genre || '', type, date || null]
+    )
+    // Return in a shape the frontend expects: collection.releaseId is used for navigation
+    res.json({ success: true, collectionId, collection: { releaseId: collectionId, collectionId, title, artist, genre: genre || '', collectionType: type, releaseType: type, releaseDate: date } })
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ success: false, error: 'Collection already exists' })
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
 
-    const metadata = {
-      releaseId: collectionId, collectionType, title, artist, genre: genre || '',
-      releaseDate: date, createdAt: new Date().toISOString(),
-      tracks: [], notes: { text: '', documents: [] },
-      fileCounts: { artwork: 0 },
-      distribution: { submit: [], release: [], promote: [] },
-      labelInfo: { isSigned: false, label: null, signedDate: null, contractDocuments: [], contacts: [] },
-      songLinks: []
+app.get('/collections', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const result = await db.query(
+      `SELECT id, slug AS "collectionId", title, artist, genre,
+              release_type AS "releaseType", release_date AS "releaseDate",
+              is_signed AS "isSigned", signed_label AS "signedLabel",
+              signed_date AS "signedDate", updated_at AS "updatedAt"
+       FROM collections WHERE user_id = $1 ORDER BY release_date DESC NULLS LAST`,
+      [req.user.id]
+    )
+    const collections = result.rows.map(c => ({
+      ...c,
+      releaseId:      c.collectionId,   // frontend uses item.releaseId
+      collectionType: c.releaseType,    // frontend uses item.collectionType
+      distribution: { release: [], submit: [], promote: [] }
+    }))
+    res.json({ success: true, count: collections.length, collections })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+app.get('/collections/:collectionId', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const { collectionId } = req.params
+
+    const result = await db.query(
+      `SELECT id, slug AS "collectionId", title, artist, genre,
+              release_type AS "releaseType", release_date AS "releaseDate",
+              is_signed AS "isSigned", signed_label AS "signedLabel",
+              signed_date AS "signedDate", updated_at AS "updatedAt"
+       FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+
+    const c = result.rows[0]
+    const collectionUUID = c.id
+
+    const [distResult, notesResult, songLinksResult] = await Promise.all([
+      db.query(`SELECT * FROM distribution_entries WHERE collection_id = $1`, [collectionUUID]),
+      db.query(`SELECT text FROM notes WHERE collection_id = $1 AND release_id IS NULL AND entry_id IS NULL LIMIT 1`, [collectionUUID]),
+      db.query(`SELECT id, label, url FROM song_links WHERE collection_id = $1`, [collectionUUID])
+    ])
+
+    const distribution = { release: [], submit: [], promote: [] }
+    for (const entry of distResult.rows) {
+      distribution[entry.path_type]?.push({
+        id: entry.id, platform: entry.platform, label: entry.label,
+        promoName: entry.promo_name, status: entry.status, url: entry.url,
+        liveDate: entry.live_date, pageNotes: entry.page_notes,
+        timestamp: entry.timestamp, contacts: [], documents: []
+      })
     }
-    await fs.writeFile(path.join(collectionDir, 'metadata.json'), JSON.stringify(metadata, null, 2))
-    res.json({ success: true, collection: metadata })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+
+    res.json({
+      success: true,
+      collection: {
+        collectionId: c.collectionId,
+        releaseId: c.collectionId,        // frontend uses collection.releaseId in some places
+        title: c.title, artist: c.artist,
+        genre: c.genre,
+        releaseType: c.releaseType,
+        collectionType: c.releaseType,    // frontend uses collection.collectionType for badges
+        releaseDate: c.releaseDate,
+        isSigned: c.isSigned, signedLabel: c.signedLabel, signedDate: c.signedDate,
+        updatedAt: c.updatedAt, distribution,
+        notes: { text: notesResult.rows[0]?.text || '', documents: [] },
+        songLinks: songLinksResult.rows
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-app.get('/collections', async (req, res) => {
+app.patch('/collections/:collectionId', authMiddleware, async (req, res) => {
   try {
-    const entries = await fs.readdir(COLLECTIONS_PATH, { withFileTypes: true })
-    const collections = []
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-      try {
-        const metadata = await readCollection(entry.name)
-        if (metadata.collectionType) collections.push(metadata)
-      } catch {}
-    }
-    res.json({ success: true, collections })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    const db = require('./db')
+    const { collectionId } = req.params
+    const { title, artist, genre, releaseType, collectionType, releaseDate, isSigned, signedLabel, signedDate } = req.body
+    const type = releaseType || collectionType || undefined
+
+    const result = await db.query(
+      `UPDATE collections SET
+         title        = COALESCE($3, title),
+         artist       = COALESCE($4, artist),
+         genre        = COALESCE($5, genre),
+         release_type = COALESCE($6, release_type),
+         release_date = COALESCE($7, release_date),
+         is_signed    = COALESCE($8, is_signed),
+         signed_label = COALESCE($9, signed_label),
+         signed_date  = COALESCE($10, signed_date),
+         updated_at   = NOW()
+       WHERE slug = $1 AND user_id = $2 RETURNING slug`,
+      [collectionId, req.user.id, title, artist, genre, type,
+       releaseDate || null, isSigned ?? null, signedLabel || null, signedDate || null]
+    )
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+
+    res.json({ success: true, collectionId })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-app.get('/collections/:collectionId', async (req, res) => {
+app.delete('/collections/:collectionId', authMiddleware, async (req, res) => {
   try {
-    const metadata = await readCollection(req.params.collectionId)
-    res.json({ success: true, collection: metadata })
-  } catch {
-    res.status(404).json({ success: false, error: 'Collection not found' })
-  }
-})
+    const db = require('./db')
+    const { collectionId } = req.params
 
-app.patch('/collections/:collectionId', async (req, res) => {
-  try {
-    const filePath = path.join(COLLECTIONS_PATH, req.params.collectionId, 'metadata.json')
-    const existing = await readCollection(req.params.collectionId)
-    const updated  = {
-      ...existing, ...req.body,
-      releaseId: existing.releaseId,
-      tracks: req.body.tracks || existing.tracks
-    }
-    await fs.writeFile(filePath, JSON.stringify(updated, null, 2))
-    res.json({ success: true, collection: updated })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
-  }
-})
+    const result = await db.query(
+      `DELETE FROM collections WHERE slug = $1 AND user_id = $2 RETURNING slug`,
+      [collectionId, req.user.id]
+    )
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
 
-app.delete('/collections/:collectionId', async (req, res) => {
-  try {
-    await fs.rm(path.join(COLLECTIONS_PATH, req.params.collectionId), { recursive: true, force: true })
-    res.json({ success: true })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    res.json({ success: true, message: `Collection ${collectionId} deleted` })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
@@ -2315,52 +2416,76 @@ app.delete('/collections/:collectionId/artwork', async (req, res) => {
 // COLLECTIONS — TRACKS
 // =============================================================================
 
-app.get('/collections/:collectionId/tracks', async (req, res) => {
+app.get('/collections/:collectionId/tracks', authMiddleware, async (req, res) => {
   try {
-    const collection = await readCollection(req.params.collectionId)
-    const enriched = await Promise.all((collection.tracks || []).map(async (t) => {
-      try {
-        const parsed = JSON.parse(await fs.readFile(path.join(RELEASES_DIR, t.trackReleaseId, 'metadata.json'), 'utf8'))
-        const meta = parsed.metadata || parsed
-        return { releaseId: t.trackReleaseId, title: meta.title || t.title, artist: meta.artist || '', genre: meta.genre || '', bpm: meta.bpm || null, key: meta.key || null }
-      } catch {
-        return { releaseId: t.trackReleaseId, title: t.title || t.trackReleaseId }
-      }
-    }))
-    res.json({ success: true, tracks: enriched })
-  } catch (err) {
-    res.status(404).json({ success: false, error: 'Collection not found' })
+    const db = require('./db')
+    const { collectionId } = req.params
+
+    const colResult = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (colResult.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colResult.rows[0].id
+
+    const result = await db.query(
+      `SELECT slug AS "releaseId", title, artist, genre, bpm, key
+       FROM releases WHERE collection_id = $1 AND user_id = $2
+       ORDER BY release_date ASC NULLS LAST`,
+      [collectionUUID, req.user.id]
+    )
+    res.json({ success: true, tracks: result.rows })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-app.post('/collections/:collectionId/tracks', async (req, res) => {
+app.post('/collections/:collectionId/tracks', authMiddleware, async (req, res) => {
   try {
-    const { trackReleaseId, trackOrder, title } = req.body
+    const db = require('./db')
+    const { collectionId } = req.params
+    const { trackReleaseId } = req.body
     if (!trackReleaseId) return res.status(400).json({ success: false, error: 'trackReleaseId is required' })
 
-    const filePath  = path.join(COLLECTIONS_PATH, req.params.collectionId, 'metadata.json')
-    const collection = await readCollection(req.params.collectionId)
+    const colResult = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (colResult.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colResult.rows[0].id
 
-    if (collection.tracks.some(t => t.trackReleaseId === trackReleaseId))
-      return res.status(400).json({ success: false, error: 'Track already in this collection' })
+    const result = await db.query(
+      `UPDATE releases SET collection_id = $1, updated_at = NOW()
+       WHERE slug = $2 AND user_id = $3 RETURNING slug`,
+      [collectionUUID, trackReleaseId, req.user.id]
+    )
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Release not found' })
 
-    collection.tracks.push({ trackReleaseId, trackOrder: trackOrder || collection.tracks.length + 1, title: title || trackReleaseId })
-    await fs.writeFile(filePath, JSON.stringify(collection, null, 2))
-    res.json({ success: true, collection })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    res.json({ success: true, message: `Track ${trackReleaseId} added to collection` })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-app.delete('/collections/:collectionId/tracks/:trackReleaseId', async (req, res) => {
+app.delete('/collections/:collectionId/tracks/:trackReleaseId', authMiddleware, async (req, res) => {
   try {
-    const filePath  = path.join(COLLECTIONS_PATH, req.params.collectionId, 'metadata.json')
-    const collection = await readCollection(req.params.collectionId)
-    collection.tracks = collection.tracks.filter(t => t.trackReleaseId !== req.params.trackReleaseId)
-    await fs.writeFile(filePath, JSON.stringify(collection, null, 2))
-    res.json({ success: true, collection })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    const db = require('./db')
+    const { trackReleaseId } = req.params
+
+    const result = await db.query(
+      `UPDATE releases SET collection_id = NULL, updated_at = NOW()
+       WHERE slug = $1 AND user_id = $2 RETURNING slug`,
+      [trackReleaseId, req.user.id]
+    )
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Release not found' })
+
+    res.json({ success: true, message: `Track ${trackReleaseId} removed from collection` })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
@@ -2368,118 +2493,122 @@ app.delete('/collections/:collectionId/tracks/:trackReleaseId', async (req, res)
 // COLLECTIONS — DISTRIBUTION
 // =============================================================================
 
-app.patch('/collections/:collectionId/distribution', async (req, res) => {
+app.patch('/collections/:collectionId/distribution', authMiddleware, async (req, res) => {
   try {
+    const db = require('./db')
     const { collectionId } = req.params
     const { path: distPath, entry } = req.body
     if (!['release', 'submit', 'promote'].includes(distPath))
       return res.status(400).json({ success: false, error: 'path must be release, submit, or promote' })
     if (!entry) return res.status(400).json({ success: false, error: 'entry is required' })
 
-    const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    const metadata = await readCollection(collectionId)
-    if (!metadata.distribution) metadata.distribution = { release: [], submit: [], promote: [] }
-    if (!metadata.distribution[distPath]) metadata.distribution[distPath] = []
+    const colResult = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (colResult.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colResult.rows[0].id
 
-    if (['submit', 'promote'].includes(distPath)) {
-      if (!entry.id) entry.id = randomUUID().slice(0, 8)
-      if (!entry.contacts) entry.contacts = []
-      if (!entry.documents) entry.documents = []
-      if (entry.pageNotes === undefined) entry.pageNotes = ''
-    }
-
-    entry.timestamp = entry.timestamp || new Date().toISOString()
-    metadata.distribution[distPath].push(entry)
-    metadata.updatedAt = new Date().toISOString()
-    await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true, collection: metadata })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    const ts = new Date().toISOString()
+    await db.query(
+      `INSERT INTO distribution_entries
+         (id, collection_id, path_type, platform, label, promo_name, status, url, live_date, page_notes, timestamp)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [collectionUUID, distPath,
+       entry.platform || null, entry.label || null, entry.promoName || null,
+       entry.status || null, entry.url || null,
+       entry.liveDate || null, entry.pageNotes || null, ts]
+    )
+    res.json({ success: true, message: 'Entry added' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-app.patch('/collections/:collectionId/distribution/:pathType/:timestamp', async (req, res) => {
+app.patch('/collections/:collectionId/distribution/:pathType/:timestamp', authMiddleware, async (req, res) => {
   try {
+    const db = require('./db')
     const { collectionId, pathType, timestamp } = req.params
     if (!['release', 'submit', 'promote'].includes(pathType))
       return res.status(400).json({ success: false, error: 'Invalid pathType' })
 
-    const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    const metadata = await readCollection(collectionId)
-    if (!metadata.distribution?.[pathType]) return res.status(404).json({ success: false, error: 'Distribution path not found' })
+    const colResult = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (colResult.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colResult.rows[0].id
 
-    const idx = metadata.distribution[pathType].findIndex(e => e.timestamp === timestamp)
-    if (idx === -1) return res.status(404).json({ success: false, error: 'Entry not found' })
+    const { platform, label, promoName, status, url, liveDate, pageNotes } = req.body
+    const result = await db.query(
+      `UPDATE distribution_entries SET
+         platform   = COALESCE($3, platform),
+         label      = COALESCE($4, label),
+         promo_name = COALESCE($5, promo_name),
+         status     = COALESCE($6, status),
+         url        = COALESCE($7, url),
+         live_date  = COALESCE($8, live_date),
+         page_notes = COALESCE($9, page_notes)
+       WHERE collection_id = $1 AND timestamp = $2 RETURNING id`,
+      [collectionUUID, timestamp, platform, label, promoName, status, url,
+       liveDate || null, pageNotes]
+    )
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Entry not found' })
 
-    metadata.distribution[pathType][idx] = {
-      ...metadata.distribution[pathType][idx], ...req.body,
-      timestamp: metadata.distribution[pathType][idx].timestamp,
-      updatedAt: new Date().toISOString()
-    }
-
-    const updatedEntry = metadata.distribution[pathType][idx]
-    if (pathType === 'submit' && updatedEntry.status === 'Signed' && updatedEntry.signedDate) {
-      if (!metadata.labelInfo) metadata.labelInfo = {}
-      metadata.labelInfo.isSigned = true
-      metadata.labelInfo.label = updatedEntry.label
-      metadata.labelInfo.signedDate = updatedEntry.signedDate
-    }
-
-    metadata.updatedAt = new Date().toISOString()
-    await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true, collection: metadata })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    res.json({ success: true, message: 'Entry updated' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-app.delete('/collections/:collectionId/distribution/:pathType/:timestamp', async (req, res) => {
+app.delete('/collections/:collectionId/distribution/:pathType/:timestamp', authMiddleware, async (req, res) => {
   try {
+    const db = require('./db')
     const { collectionId, pathType, timestamp } = req.params
     if (!['release', 'submit', 'promote'].includes(pathType))
       return res.status(400).json({ success: false, error: 'Invalid pathType' })
 
-    const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    const metadata = await readCollection(collectionId)
-    if (!metadata.distribution?.[pathType]) return res.status(404).json({ success: false, error: 'Distribution path not found' })
+    const colResult = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (colResult.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colResult.rows[0].id
 
-    const original = metadata.distribution[pathType].length
-    metadata.distribution[pathType] = metadata.distribution[pathType].filter(e => e.timestamp !== timestamp)
-    if (metadata.distribution[pathType].length === original) return res.status(404).json({ success: false, error: 'Entry not found' })
+    const result = await db.query(
+      `DELETE FROM distribution_entries WHERE collection_id = $1 AND timestamp = $2 RETURNING id`,
+      [collectionUUID, timestamp]
+    )
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Entry not found' })
 
-    metadata.updatedAt = new Date().toISOString()
-    await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
     res.json({ success: true, message: 'Entry deleted' })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-app.patch('/collections/:collectionId/sign', async (req, res) => {
+app.patch('/collections/:collectionId/sign', authMiddleware, async (req, res) => {
   try {
+    const db = require('./db')
     const { collectionId } = req.params
     const { labelName, signedDate } = req.body
     if (!labelName) return res.status(400).json({ success: false, error: 'Label name required' })
 
-    const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    const metadata = await readCollection(collectionId)
-    if (!metadata.distribution) metadata.distribution = { release: [], submit: [], promote: [] }
-    if (!metadata.distribution.submit) metadata.distribution.submit = []
+    const date = signedDate || new Date().toISOString()
+    const result = await db.query(
+      `UPDATE collections SET is_signed = true, signed_label = $3, signed_date = $4::date, updated_at = NOW()
+       WHERE slug = $1 AND user_id = $2 RETURNING slug`,
+      [collectionId, req.user.id, labelName, date]
+    )
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
 
-    const submission = metadata.distribution.submit.find(s => s.label === labelName)
-    if (!submission) return res.status(404).json({ success: false, error: `No submission found for label: ${labelName}` })
-
-    submission.status     = 'Signed'
-    submission.signedDate = signedDate || new Date().toISOString()
-
-    if (!metadata.labelInfo) metadata.labelInfo = {}
-    metadata.labelInfo.isSigned = true
-    metadata.labelInfo.label = labelName
-    metadata.labelInfo.signedDate = signedDate || new Date().toISOString()
-    metadata.updatedAt = new Date().toISOString()
-
-    await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true, message: `Marked as signed by ${labelName}`, submission })
+    res.json({ success: true, message: `Marked as signed by ${labelName}` })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
@@ -2489,34 +2618,54 @@ app.patch('/collections/:collectionId/sign', async (req, res) => {
 // COLLECTIONS — SONG LINKS
 // =============================================================================
 
-app.post('/collections/:collectionId/song-links', async (req, res) => {
+app.post('/collections/:collectionId/song-links', authMiddleware, async (req, res) => {
   try {
+    const db = require('./db')
     const { collectionId } = req.params
     const { label, url } = req.body
     if (!url) return res.status(400).json({ success: false, error: 'URL is required' })
 
-    const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    const metadata = await readCollection(collectionId)
-    if (!metadata.songLinks) metadata.songLinks = []
-    metadata.songLinks.push({ label: label || url, url, addedAt: new Date().toISOString() })
-    await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true, songLinks: metadata.songLinks })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    const colResult = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (colResult.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colResult.rows[0].id
+
+    await db.query(
+      `INSERT INTO song_links (id, collection_id, label, url) VALUES (gen_random_uuid(), $1, $2, $3)`,
+      [collectionUUID, label || url, url]
+    )
+    res.json({ success: true, message: 'Link added' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-app.delete('/collections/:collectionId/song-links/:index', async (req, res) => {
+app.delete('/collections/:collectionId/song-links/:linkId', authMiddleware, async (req, res) => {
   try {
-    const { collectionId, index } = req.params
-    const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    const metadata = await readCollection(collectionId)
-    if (!metadata.songLinks) return res.status(404).json({ success: false, error: 'No links found' })
-    metadata.songLinks.splice(parseInt(index), 1)
-    await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true, songLinks: metadata.songLinks })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+    const db = require('./db')
+    const { collectionId, linkId } = req.params
+
+    const colResult = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (colResult.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colResult.rows[0].id
+
+    const result = await db.query(
+      `DELETE FROM song_links WHERE id = $1 AND collection_id = $2 RETURNING id`,
+      [linkId, collectionUUID]
+    )
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Link not found' })
+
+    res.json({ success: true, message: 'Link deleted' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
@@ -2524,18 +2673,36 @@ app.delete('/collections/:collectionId/song-links/:index', async (req, res) => {
 // COLLECTIONS — NOTES
 // =============================================================================
 
-app.patch('/collections/:collectionId/notes', async (req, res) => {
+app.patch('/collections/:collectionId/notes', authMiddleware, async (req, res) => {
   try {
+    const db = require('./db')
     const { collectionId } = req.params
-    const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    const metadata = await readCollection(collectionId)
-    if (!metadata.notes) metadata.notes = { text: '', documents: [] }
-    metadata.notes.text  = req.body.notes || ''
-    metadata.updatedAt   = new Date().toISOString()
-    await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true, notes: metadata.notes.text })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
+
+    const colResult = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (colResult.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colResult.rows[0].id
+
+    const notesText = req.body.notes || ''
+    // Upsert: try update first, insert if no existing row
+    const updateResult = await db.query(
+      `UPDATE notes SET text = $2, updated_at = NOW()
+       WHERE collection_id = $1 AND release_id IS NULL AND entry_id IS NULL`,
+      [collectionUUID, notesText]
+    )
+    if (updateResult.rowCount === 0) {
+      await db.query(
+        `INSERT INTO notes (id, collection_id, text, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, NOW())`,
+        [collectionUUID, notesText]
+      )
+    }
+    res.json({ success: true, notes: notesText })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
