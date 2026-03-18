@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { fetchReleases, apiFetch, API_BASE_URL } from '@/lib/api'
 import ReleaseCard from '@/components/ReleaseCard'
 import Link from 'next/link'
@@ -12,6 +13,7 @@ const COLLECTION_BADGE_STYLES = {
 const KEY_ORDER = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B']
 
 export default function HomePage() {
+  const { status } = useSession()   // 'loading' | 'authenticated' | 'unauthenticated'
   const [releases, setReleases] = useState([])
   const [collections, setCollections] = useState([])
   const [loading, setLoading] = useState(true)
@@ -34,6 +36,10 @@ export default function HomePage() {
   const [singlesOpen, setSinglesOpen] = useState(true)
 
   useEffect(() => {
+    // Wait until NextAuth has finished loading the session.
+    // Without this, the fetch fires before the token is set → 401 → empty page.
+    if (status !== 'authenticated') return
+
     async function loadData() {
       try {
         const [releasesData, collectionsRes] = await Promise.all([
@@ -55,7 +61,7 @@ export default function HomePage() {
       }
     }
     loadData()
-  }, [])
+  }, [status])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
