@@ -4,8 +4,8 @@
 // If the user isn't signed in, it redirects them to /login.
 //
 // How it works:
-//   NextAuth's built-in middleware checks for a valid session cookie.
-//   If no cookie exists → redirect to the signIn page (/login).
+//   NextAuth's withAuth() wraps your middleware function.
+//   If no valid session cookie → redirect to the signIn page (/login).
 //   If a valid cookie exists → let the request through.
 //
 // The "matcher" config below excludes routes that should be public:
@@ -14,8 +14,19 @@
 //   - /_next/*       → Next.js internal assets (JS, CSS, etc.)
 //   - /favicon.ico   → browser icon
 //   - /logo.png      → your logo (shown on the login page before signing in)
+//
+// NOTE: Next.js 16 requires middleware to export an explicit function.
+//       The old `export { default } from 'next-auth/middleware'` no longer works.
 
-export { default } from 'next-auth/middleware'
+import { withAuth } from 'next-auth/middleware'
+
+// withAuth() returns a middleware function that checks for a valid NextAuth session.
+// If the user is NOT signed in, they get redirected to the signIn page (set in auth.js).
+export default withAuth({
+  pages: {
+    signIn: '/login',
+  },
+})
 
 export const config = {
   matcher: [
