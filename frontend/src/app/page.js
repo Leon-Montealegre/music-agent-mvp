@@ -248,7 +248,7 @@ export default function HomePage() {
     const artworkSrc = isCollection
       ? `${API_BASE_URL}/collections/${item.releaseId}/artwork`
       : `${API_BASE_URL}/releases/${item.releaseId}/artwork`
-    const hasArtwork = item.fileCounts?.artwork > 0
+    const hasArtwork = true
 
     return (
       <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
