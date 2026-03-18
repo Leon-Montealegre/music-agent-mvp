@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useEffect, useRef, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { fetchRelease, updateDistribution, deleteDistributionEntry, updateDistributionEntry, deleteRelease, apiFetch, API_BASE_URL } from '@/lib/api'
@@ -30,6 +31,7 @@ function CollectionThumb({ collectionId }) {
 export default function TrackDetailPage({ params }) {
   const unwrappedParams = use(params)
   const trackId = unwrappedParams.releaseId
+  const { data: session } = useSession()
   const router  = useRouter()
 
   const [track, setTrack]   = useState(null)
@@ -93,7 +95,9 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-  useEffect(() => { loadTrack() }, [trackId])
+  useEffect(() => { 
+    if (session?.token) loadTrack() 
+  }, [trackId, session])
 
 
   // ── File handlers ─────────────────────────────────────────────────────────
