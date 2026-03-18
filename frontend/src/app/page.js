@@ -573,10 +573,10 @@ export default function HomePage() {
         {totalAll === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">🎵</div>
-            <h2 className="text-2xl font-bold text-gray-300 mb-2">No tracks in your catalogue yet</h2>
-            <p className="text-gray-500 mb-8">Upload your first track to get started</p>
+            <h2 className="text-2xl font-bold text-gray-300 mb-2">No releases yet</h2>
+            <p className="text-gray-500 mb-8">Create your first release to get started</p>
             <Link href="/releases/new" className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
-              Add Track
+              ✚ Add your first release
             </Link>
           </div>
         ) : totalVisible === 0 ? (
@@ -596,17 +596,17 @@ export default function HomePage() {
           // ── SECTIONED VIEW (typeFilter === 'all') ──
           <div className="space-y-10">
 
-            {/* Collections section */}
-            {sortedCollections.length > 0 && (
-              <div>
-                <SectionHeader
-                  label="EPs & Albums"
-                  count={sortedCollections.length}
-                  isOpen={collectionsOpen}
-                  onToggle={() => setCollectionsOpen(o => !o)}
-                  accent="indigo"
-                />
-                {collectionsOpen && (
+            {/* Collections section — always shown; empty state if no EPs/Albums */}
+            <div>
+              <SectionHeader
+                label="EPs & Albums"
+                count={sortedCollections.length}
+                isOpen={collectionsOpen}
+                onToggle={() => setCollectionsOpen(o => !o)}
+                accent="indigo"
+              />
+              {collectionsOpen && (
+                sortedCollections.length > 0 ? (
                   viewMode === 'list' ? (
                     <div style={{ border: '1px solid #1f2937', borderRadius: '8px', overflow: 'hidden' }}>
                       {sortedCollections.map(item => <ListRow key={item.releaseId} item={item} type="collection" />)}
@@ -616,21 +616,30 @@ export default function HomePage() {
                       {sortedCollections.map(item => <CollectionCard key={item.releaseId} item={item} />)}
                     </div>
                   )
-                )}
-              </div>
-            )}
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="text-4xl mb-3">🎵</div>
+                    <h3 className="text-lg font-semibold text-gray-400 mb-1">No EPs or Albums yet</h3>
+                    <p className="text-gray-600 text-sm mb-5">Group your tracks into an EP or Album to get started</p>
+                    <Link href="/releases/new" className="inline-block px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors">
+                      ✚ Add your first release
+                    </Link>
+                  </div>
+                )
+              )}
+            </div>
 
-            {/* Singles section */}
-            {sortedSingles.length > 0 && (
-              <div>
-                <SectionHeader
-                  label="Singles"
-                  count={sortedSingles.length}
-                  isOpen={singlesOpen}
-                  onToggle={() => setSinglesOpen(o => !o)}
-                  accent="purple"
-                />
-                {singlesOpen && (
+            {/* Singles section — always shown; empty state if no singles */}
+            <div>
+              <SectionHeader
+                label="Singles"
+                count={sortedSingles.length}
+                isOpen={singlesOpen}
+                onToggle={() => setSinglesOpen(o => !o)}
+                accent="purple"
+              />
+              {singlesOpen && (
+                sortedSingles.length > 0 ? (
                   viewMode === 'list' ? (
                     <div style={{ border: '1px solid #1f2937', borderRadius: '8px', overflow: 'hidden' }}>
                       {sortedSingles.map(item => <ListRow key={item.releaseId} item={item} type="single" />)}
@@ -640,9 +649,18 @@ export default function HomePage() {
                       {sortedSingles.map(item => <ReleaseCard key={item.releaseId} release={item} />)}
                     </div>
                   )
-                )}
-              </div>
-            )}
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="text-4xl mb-3">🎵</div>
+                    <h3 className="text-lg font-semibold text-gray-400 mb-1">No singles yet</h3>
+                    <p className="text-gray-600 text-sm mb-5">Create your first single to get started</p>
+                    <Link href="/releases/new" className="inline-block px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors">
+                      ✚ Add your first release
+                    </Link>
+                  </div>
+                )
+              )}
+            </div>
           </div>
 
         ) : (
