@@ -466,12 +466,18 @@ app.delete('/releases/:releaseId', authMiddleware, async (req, res) => {
 app.get('/releases/:releaseId/artwork/', async (req, res) => {
   try {
     const { releaseId } = req.params
-    // List artwork files for this release (predictable prefix)
+    const publicUrl = process.env.R2_PUBLIC_URL
+    if (!publicUrl) {
+      // Fallback: stream through server if public URL not configured
+      const files = await r2.listFiles(`releases/${releaseId}/artwork/`)
+      if (files.length === 0) return res.status(404).json({ error: 'No artwork found' })
+      const r2Obj = await r2.getFile(files[0].Key)
+      res.set('Content-Type', r2Obj.ContentType || 'image/jpeg')
+      return r2Obj.Body.pipe(res)
+    }
     const files = await r2.listFiles(`releases/${releaseId}/artwork/`)
     if (files.length === 0) return res.status(404).json({ error: 'No artwork found' })
-    const r2Obj = await r2.getFile(files[0].Key)
-    res.set('Content-Type', r2Obj.ContentType || 'image/jpeg')
-    r2Obj.Body.pipe(res)
+    return res.redirect(302, `${publicUrl}/${files[0].Key}`)
   } catch (err) {
     res.status(404).json({ error: 'No artwork found' })
   }
@@ -1683,11 +1689,16 @@ app.post('/collections/:collectionId/artwork', authMiddleware, collectionUpload.
 
 app.get('/collections/:collectionId/artwork', async (req, res) => {
   try {
-    const files = await r2.listFiles(`collections/${req.params.collectionId}/artwork/`)
+    const { collectionId } = req.params
+    const publicUrl = process.env.R2_PUBLIC_URL
+    const files = await r2.listFiles(`collections/${collectionId}/artwork/`)
     if (files.length === 0) return res.status(404).json({ error: 'No artwork found' })
-    const r2Obj = await r2.getFile(files[0].Key)
-    res.set('Content-Type', r2Obj.ContentType || 'image/jpeg')
-    r2Obj.Body.pipe(res)
+    if (!publicUrl) {
+      const r2Obj = await r2.getFile(files[0].Key)
+      res.set('Content-Type', r2Obj.ContentType || 'image/jpeg')
+      return r2Obj.Body.pipe(res)
+    }
+    return res.redirect(302, `${publicUrl}/${files[0].Key}`)
   } catch {
     res.status(404).json({ error: 'No artwork found' })
   }
