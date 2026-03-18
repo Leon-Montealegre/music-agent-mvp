@@ -46,17 +46,15 @@ const isPromoted    = release.distribution?.promote?.some(e => e.status?.toLower
 
         {/* Artwork */}
         <div className="aspect-square bg-gradient-to-br from-gray-800 to-gray-900 overflow-hidden relative flex-shrink-0">
-          {hasArtwork ? (
-            <img
-              src={artworkUrl}
-              alt={`${release.title} artwork`}
-              className="w-full h-full object-cover"
-              onError={() => setArtworkError(true)}
-            />
-          ) : (
+          <img
+            src={`${API_BASE_URL}/releases/${release.releaseId}/artwork`}
+            alt={release.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+          />
+          <div style={{ display: 'none', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
             <VinylSVG />
-          )}
-
+          </div>
         </div>
 
         {/* Info */}

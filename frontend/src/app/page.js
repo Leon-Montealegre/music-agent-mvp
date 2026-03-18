@@ -176,10 +176,13 @@ export default function HomePage() {
         <div className="absolute inset-0 translate-x-0.5 translate-y-0.5 rounded-lg bg-indigo-900/60 border border-indigo-500/30" />
         <div className="relative flex flex-col h-full bg-gray-800/95 border-2 border-indigo-500/50 rounded-lg overflow-hidden group-hover:border-indigo-400 group-hover:shadow-lg group-hover:shadow-indigo-500/25 transition-all">
           <div className="aspect-square bg-gradient-to-br from-indigo-950 to-gray-900 relative overflow-hidden flex-shrink-0">
-            {item.fileCounts?.artwork > 0 ? (
-              <img src={`${API_BASE_URL}/collections/${item.releaseId}/artwork`} alt={item.title} className="w-full h-full object-cover" />
-            ) : (
-              <div className="flex items-center justify-center h-full">
+            <img
+              src={`${API_BASE_URL}/collections/${item.releaseId}/artwork`}
+              alt={item.title}
+              className="w-full h-full object-cover"
+              onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+            />
+            <div className="flex items-center justify-center h-full" style={{ display: 'none' }}>
                 <svg width="140" height="140" viewBox="0 0 120 120" className="opacity-60">
                   <defs>
                     <radialGradient id={`coll-${item.releaseId}`}>
@@ -197,7 +200,6 @@ export default function HomePage() {
                   <line x1="24" y1="99" x2="96"  y2="99" stroke="#4338ca" strokeWidth="0.8" opacity="0.3"/>
                 </svg>
               </div>
-            )}
             <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-bold border ${COLLECTION_BADGE_STYLES[item.collectionType] || COLLECTION_BADGE_STYLES['EP']}`}>
               {item.collectionType}
             </div>
