@@ -362,6 +362,7 @@ export default function TrackDetailPage({ params }) {
   }
 
   const hasArtwork = !sidebarArtworkError
+  const metadata = track
 
   const signedSubmission = metadata.distribution?.submit?.find(s => s.status?.toLowerCase() === 'signed')
   const isSigned         = !!signedSubmission
