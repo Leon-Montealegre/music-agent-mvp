@@ -383,6 +383,7 @@ export default function TrackDetailPage({ params }) {
   const audioFiles   = track.versions?.primary?.files?.audio  || []
   const artworkFiles = track.versions?.primary?.files?.artwork || []
   const videoFiles   = track.versions?.primary?.files?.video  || []
+  const artworkUrl   = `${API_BASE_URL}/releases/${trackId}/artwork/?t=${Date.now()}`
 
 
   // ── Render ────────────────────────────────────────────────────────────────
