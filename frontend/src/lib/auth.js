@@ -46,6 +46,14 @@ export const authOptions = {
     }),
   ],
 
+  // ─── Session ──────────────────────────────────────────────────────────────
+  // Keep the user logged in for 30 days, even if they close the browser.
+  // "jwt" strategy means the session is stored in a cookie (not a database).
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60,  // 30 days in seconds = 2,592,000
+  },
+
   // ─── Callbacks ────────────────────────────────────────────────────────────
   // These two callbacks copy the backend JWT into the NextAuth session so
   // every page can read it with useSession().
