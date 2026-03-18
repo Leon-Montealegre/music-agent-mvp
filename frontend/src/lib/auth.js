@@ -34,9 +34,10 @@ export const authOptions = {
         // Return an object — NextAuth stores this as the "user" in the session
         if (data.token) {
           return {
-            id:    data.userId || '1',
-            email: credentials.email,
-            token: data.token,       // ← the JWT from your backend
+            id:    data.user?.id || data.userId || '1',
+            email: data.user?.email || credentials.email,
+            name:  data.user?.name,
+            token: data.token,
           }
         }
 
@@ -55,12 +56,14 @@ export const authOptions = {
       if (user) {
         token.accessToken = user.token
         token.email       = user.email
+        token.name        = user.name
       }
       return token
     },
     async session({ session, token }) {
       // Expose the backend token to the browser via session.token
       session.token = token.accessToken
+      session.user.name = token.name
       return session
     },
   },
