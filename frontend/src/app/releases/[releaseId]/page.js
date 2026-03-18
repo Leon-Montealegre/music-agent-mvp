@@ -3,7 +3,7 @@
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { fetchRelease, updateDistribution, deleteDistributionEntry, updateDistributionEntry, deleteRelease, apiFetch } from '@/lib/api'
+import { fetchRelease, updateDistribution, deleteDistributionEntry, updateDistributionEntry, deleteRelease, apiFetch, API_BASE_URL } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LogPlatformForm from '@/components/LogPlatformForm'
 import LogSubmissionForm from '@/components/LogSubmissionForm'
@@ -18,7 +18,7 @@ function CollectionThumb({ collectionId }) {
   if (error) return null
   return (
     <img
-      src={`http://localhost:3001/collections/${collectionId}/artwork?t=${Date.now()}`}
+      src={`${API_BASE_URL}/collections/${collectionId}/artwork?t=${Date.now()}`}
       alt=""
       className="w-8 h-8 rounded object-cover border border-indigo-500/40 flex-shrink-0"
       onError={() => setError(true)}
@@ -358,7 +358,7 @@ export default function TrackDetailPage({ params }) {
   }
 
   const metadata   = track.metadata || track
-  const artworkUrl = `http://localhost:3001/releases/${trackId}/artwork/?t=${Date.now()}`
+  const artworkUrl = `${API_BASE_URL}/releases/${trackId}/artwork/?t=${Date.now()}`
 
   const signedSubmission = metadata.distribution?.submit?.find(s => s.status?.toLowerCase() === 'signed')
   const isSigned         = !!signedSubmission

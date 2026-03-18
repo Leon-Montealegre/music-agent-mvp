@@ -1,5 +1,7 @@
 // Base URL for your Express API
-const API_BASE_URL = 'http://localhost:3001'
+// In production this comes from Vercel's environment variables.
+// Locally, set NEXT_PUBLIC_API_URL in frontend/.env.local (already gitignored).
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 // ─── Token management ────────────────────────────────────────────────────────
 // The Providers component calls setToken() once when the session is ready.

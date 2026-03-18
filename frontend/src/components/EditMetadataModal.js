@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, API_BASE_URL } from '@/lib/api'
 
 
 export default function EditMetadataModal({ track, onClose, onSuccess }) {
@@ -48,7 +48,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
     const img = new Image()
     img.onload  = () => setArtworkExists(true)
     img.onerror = () => setArtworkExists(false)
-    img.src = `http://localhost:3001/releases/${metadata.releaseId}/artwork/?t=${Date.now()}`
+    img.src = `${API_BASE_URL}/releases/${metadata.releaseId}/artwork/?t=${Date.now()}`
   }, [])
 
   // Load collections
@@ -206,7 +206,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
       )
     }
     if (artworkExists) {
-      return <img src={`http://localhost:3001/releases/${metadata.releaseId}/artwork/`} alt="Current artwork" className="w-20 h-20 rounded-lg object-cover border border-gray-600 flex-shrink-0" />
+      return <img src={`${API_BASE_URL}/releases/${metadata.releaseId}/artwork/`} alt="Current artwork" className="w-20 h-20 rounded-lg object-cover border border-gray-600 flex-shrink-0" />
     }
     return (
       <div className="w-20 h-20 rounded-lg bg-gray-700 border border-gray-600 flex items-center justify-center text-gray-500 text-xs flex-shrink-0">

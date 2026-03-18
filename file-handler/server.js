@@ -16,11 +16,11 @@ const express        = require('express')
 const multer         = require('multer')
 const cors           = require('cors')
 const path           = require('path')
-const fs             = require('fs').promises
-const fsSync         = require('fs')
-const os             = require('os')
+// const fs          = require('fs').promises  // removed — no local file reads
+// const fsSync      = require('fs')  // removed — no more local file streaming
+// const os          = require('os')  // removed — no local paths needed
 const { randomUUID } = require('crypto')
-const checkDiskSpace = require('check-disk-space').default
+// const checkDiskSpace = require('check-disk-space').default  // removed — storage is on R2
 const musicMetadata = require('music-metadata')
 
 // =============================================================================
@@ -33,11 +33,10 @@ const PORT = 3001
 app.use(cors())
 app.use(express.json())
 
-const RELEASES_BASE   = path.join(os.homedir(), 'Documents', 'Music Agent')
-const RELEASES_DIR    = path.join(RELEASES_BASE, 'Releases')
+// Local disk paths removed — all storage is on Cloudflare R2 + PostgreSQL.
 
 
-app.use('/releases', express.static(RELEASES_BASE))
+// Static file serving removed — all files are on Cloudflare R2 now.
 
 // =============================================================================
 // HELPERS
@@ -180,20 +179,13 @@ app.patch('/settings', authMiddleware, async (req, res) => {
 // =============================================================================
 
 app.get('/storage/status', async (req, res) => {
-  try {
-    const diskSpace  = await checkDiskSpace(RELEASES_BASE)
-    const totalGB    = (diskSpace.size / 1024 ** 3).toFixed(2)
-    const freeGB     = (diskSpace.free / 1024 ** 3).toFixed(2)
-    const usedGB     = (totalGB - freeGB).toFixed(2)
-    const usedPercent = ((usedGB / totalGB) * 100).toFixed(1)
-    res.json({
-      disk: { totalGB: parseFloat(totalGB), usedGB: parseFloat(usedGB), freeGB: parseFloat(freeGB), usedPercent: parseFloat(usedPercent) },
-      warning: diskSpace.free < 10 * 1024 ** 3 ? 'Low disk space! Less than 10GB remaining.' : null,
-      releasesPath: RELEASES_BASE
-    })
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to check disk space' })
-  }
+  // Files are now on Cloudflare R2 — local disk is no longer relevant.
+  // TODO: query R2 usage stats via the Cloudflare API for a real dashboard.
+  res.json({
+    storage: 'cloudflare-r2',
+    bucket: process.env.R2_BUCKET_NAME || '(not set)',
+    message: 'File storage is on Cloudflare R2. Local disk is not used.'
+  })
 })
 app.use('/auth', authRoutes);
 
@@ -1356,28 +1348,19 @@ app.get('/releases/:releaseId/files/:fileType/:filename', async (req, res) => {
     if (!['audio', 'artwork', 'video'].includes(fileType))
       return res.status(400).json({ error: 'Invalid file type' })
 
-    const releasePath = path.join(RELEASES_DIR, releaseId)
-    const candidates  = [
-      path.join(releasePath, fileType, filename),
-      path.join(releasePath, 'versions', 'primary', fileType, filename)
-    ]
+    // Build the R2 key — audio lives under /audio/primary/, others at the top level
+    const key = fileType === 'audio'
+      ? `releases/${releaseId}/audio/primary/${filename}`
+      : `releases/${releaseId}/${fileType}/${filename}`
 
-    let filePath = null
-    for (const p of candidates) {
-      try { await fs.access(p); filePath = p; break } catch {}
-    }
-    if (!filePath) return res.status(404).json({ error: 'File not found' })
-
-    const ext = path.extname(filename).toLowerCase()
-    const contentTypes = {
-      '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.flac': 'audio/flac', '.m4a': 'audio/mp4', '.aiff': 'audio/aiff',
-      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp',
-      '.mp4': 'video/mp4', '.mov': 'video/quicktime'
-    }
-    if (contentTypes[ext]) res.setHeader('Content-Type', contentTypes[ext])
+    const r2Obj = await r2.getFile(key)
+    if (r2Obj.ContentType) res.set('Content-Type', r2Obj.ContentType)
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
-    fsSync.createReadStream(filePath).pipe(res)
+    r2Obj.Body.pipe(res)
   } catch (error) {
+    // R2 throws NoSuchKey when file doesn't exist
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404)
+      return res.status(404).json({ error: 'File not found' })
     res.status(500).json({ error: error.message })
   }
 })

@@ -8,7 +8,7 @@ import LogSubmissionForm from '@/components/LogSubmissionForm'
 import TrackNotes from '@/components/TrackNotes'
 import EditMetadataModal from '@/components/EditMetadataModal'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, API_BASE_URL } from '@/lib/api'
 
 const BADGE_STYLES = {
   EP:    'bg-indigo-600/90 border-indigo-400/50 text-white',
@@ -28,7 +28,7 @@ function TrackThumb({ releaseId }) {
   )
   return (
     <img
-      src={`http://localhost:3001/releases/${releaseId}/artwork/?t=${Date.now()}`}
+      src={`${API_BASE_URL}/releases/${releaseId}/artwork/?t=${Date.now()}`}
       alt=""
       className="w-10 h-10 rounded object-cover border border-gray-600 flex-shrink-0"
       onError={() => setError(true)}
@@ -130,7 +130,7 @@ export default function CollectionDetailPage({ params }) {
     const img = new Image()
     img.onload  = () => { setCollectionHasArtwork(true); setArtworkError(false) }
     img.onerror = () => { setCollectionHasArtwork(false); setArtworkError(true) }
-    img.src = `http://localhost:3001/collections/${collectionId}/artwork?t=${Date.now()}`
+    img.src = `${API_BASE_URL}/collections/${collectionId}/artwork?t=${Date.now()}`
   }, [collectionId])
 
   // Pre-fill edit form
@@ -356,7 +356,7 @@ export default function CollectionDetailPage({ params }) {
   }
 
   const badgeStyle       = BADGE_STYLES[collection.collectionType] || BADGE_STYLES['EP']
-  const artworkUrl       = `http://localhost:3001/collections/${collectionId}/artwork?t=${Date.now()}`
+  const artworkUrl       = `${API_BASE_URL}/collections/${collectionId}/artwork?t=${Date.now()}`
   const dist             = collection.distribution || {}
   const signedSubmission = dist.submit?.find(s => s.status?.toLowerCase() === 'signed')
   const isSigned         = !!signedSubmission
@@ -978,7 +978,7 @@ export default function CollectionDetailPage({ params }) {
             {/* Notes */}
             <TrackNotes
               releaseId={collectionId}
-              baseUrl={`http://localhost:3001/collections/${collectionId}`}
+              baseUrl={`${API_BASE_URL}/collections/${collectionId}`}
               initialNotes={collection.notes?.text || ''}
               initialDocuments={collection.notes?.documents || []}
               onUpdate={loadCollection}
@@ -1181,7 +1181,7 @@ export default function CollectionDetailPage({ params }) {
                 ) : artworkAction === 'delete' ? (
                   <span className="text-red-400 text-xs text-center px-1">Will be removed</span>
                 ) : collectionHasArtwork ? (
-                  <img src={`http://localhost:3001/collections/${collectionId}/artwork?t=${Date.now()}`} alt="" className="w-full h-full object-cover" />
+                  <img src={`${API_BASE_URL}/collections/${collectionId}/artwork?t=${Date.now()}`} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-gray-500 text-2xl">🖼</span>
                 )}

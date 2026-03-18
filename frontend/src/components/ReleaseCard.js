@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { useState } from 'react'
+import { API_BASE_URL } from '@/lib/api'
 
 export default function ReleaseCard({ release }) {
-  const artworkUrl = `http://localhost:3001/releases/${release.releaseId}/artwork/`
+  const artworkUrl = `${API_BASE_URL}/releases/${release.releaseId}/artwork/`
   const [artworkError, setArtworkError] = useState(false)
 
 const signedSubmission = release.distribution?.submit?.find(s => s.status?.toLowerCase() === 'signed')

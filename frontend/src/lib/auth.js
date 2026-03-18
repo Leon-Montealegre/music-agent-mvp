@@ -1,8 +1,10 @@
 // lib/auth.js — NextAuth configuration
 // This is the central config for authentication.
-// It tells NextAuth to use your own backend (localhost:3001) for login.
+// It calls your Express backend's /auth/login endpoint.
 
 import CredentialsProvider from 'next-auth/providers/credentials'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 export const authOptions = {
   // ─── Providers ────────────────────────────────────────────────────────────
@@ -16,7 +18,7 @@ export const authOptions = {
       },
       async authorize(credentials) {
         // Call your existing Express login endpoint
-        const res = await fetch('http://localhost:3001/auth/login', {
+        const res = await fetch(`${API_URL}/auth/login`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({

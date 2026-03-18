@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { fetchReleases, apiFetch } from '@/lib/api'
+import { fetchReleases, apiFetch, API_BASE_URL } from '@/lib/api'
 import ReleaseCard from '@/components/ReleaseCard'
 import Link from 'next/link'
 
@@ -177,7 +177,7 @@ export default function HomePage() {
         <div className="relative flex flex-col h-full bg-gray-800/95 border-2 border-indigo-500/50 rounded-lg overflow-hidden group-hover:border-indigo-400 group-hover:shadow-lg group-hover:shadow-indigo-500/25 transition-all">
           <div className="aspect-square bg-gradient-to-br from-indigo-950 to-gray-900 relative overflow-hidden flex-shrink-0">
             {item.fileCounts?.artwork > 0 ? (
-              <img src={`http://localhost:3001/collections/${item.releaseId}/artwork`} alt={item.title} className="w-full h-full object-cover" />
+              <img src={`${API_BASE_URL}/collections/${item.releaseId}/artwork`} alt={item.title} className="w-full h-full object-cover" />
             ) : (
               <div className="flex items-center justify-center h-full">
                 <svg width="140" height="140" viewBox="0 0 120 120" className="opacity-60">
@@ -246,8 +246,8 @@ export default function HomePage() {
     const isCollection = type === 'collection'
     const href = isCollection ? `/collections/${item.releaseId}` : `/releases/${item.releaseId}`
     const artworkSrc = isCollection
-      ? `http://localhost:3001/collections/${item.releaseId}/artwork`
-      : `http://localhost:3001/releases/${item.releaseId}/artwork`
+      ? `${API_BASE_URL}/collections/${item.releaseId}/artwork`
+      : `${API_BASE_URL}/releases/${item.releaseId}/artwork`
     const hasArtwork = item.fileCounts?.artwork > 0
 
     return (

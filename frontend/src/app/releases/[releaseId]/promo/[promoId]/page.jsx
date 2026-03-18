@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchPromoEntry, fetchRelease, apiFetch } from '@/lib/api'
+import { fetchPromoEntry, fetchRelease, apiFetch, API_BASE_URL } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
@@ -45,7 +45,7 @@ export default function PromoEntryPage({ params }) {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteEntryModal, setShowDeleteEntryModal] = useState(false)
 
-  const apiBase = `http://localhost:3001/releases/${releaseId}`
+  const apiBase = `${API_BASE_URL}/releases/${releaseId}`
 
   async function loadData() {
     try {

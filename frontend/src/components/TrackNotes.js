@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, API_BASE_URL } from '@/lib/api';
 
 export default function TrackNotes({
   releaseId,
@@ -19,7 +19,7 @@ export default function TrackNotes({
   const [saveMessage, setSaveMessage] = useState('');
 
   // Derive the API base — works for both releases and collections
-  const apiBase = baseUrl || `http://localhost:3001/releases/${releaseId}`
+  const apiBase = baseUrl || `${API_BASE_URL}/releases/${releaseId}`
 
   useEffect(() => { setNotes(initialNotes) },     [initialNotes])
   useEffect(() => { setDocuments(initialDocuments) }, [initialDocuments])

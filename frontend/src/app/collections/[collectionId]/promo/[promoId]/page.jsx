@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchCollectionPromoEntry, apiFetch } from '@/lib/api'
+import { fetchCollectionPromoEntry, apiFetch, API_BASE_URL } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
@@ -45,7 +45,7 @@ export default function CollectionPromoEntryPage({ params }) {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteEntryModal, setShowDeleteEntryModal] = useState(false)
 
-  const apiBase = `http://localhost:3001/collections/${collectionId}`
+  const apiBase = `${API_BASE_URL}/collections/${collectionId}`
 
   async function loadData() {
     try {

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, API_BASE_URL } from '@/lib/api'
 
 export default function CreateTrackPage() {
   const router = useRouter()
@@ -90,7 +90,7 @@ export default function CreateTrackPage() {
         if (artworkFile) formData.append('artwork', artworkFile)
         if (videoFile)   formData.append('video', videoFile)
 
-        let uploadUrl = `http://localhost:3001/upload?releaseId=${encodeURIComponent(trackId)}&artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&genre=${encodeURIComponent(genre)}`
+        let uploadUrl = `${API_BASE_URL}/upload?releaseId=${encodeURIComponent(trackId)}&artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&genre=${encodeURIComponent(genre)}`
         if (bpm) uploadUrl += `&bpm=${encodeURIComponent(bpm)}`
         if (key) uploadUrl += `&key=${encodeURIComponent(key)}`
 

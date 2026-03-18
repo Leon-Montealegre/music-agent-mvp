@@ -3,9 +3,7 @@
  * from releases and collections using existing APIs. No new backend endpoints.
  */
 
-import { apiFetch } from '@/lib/api'
-
-const API_BASE = 'http://localhost:3001'
+import { apiFetch, API_BASE_URL } from '@/lib/api'
 
 /**
  * Extract contacts from a release or collection object.
@@ -141,7 +139,7 @@ function extractFilesFromItem(item, sourceId, sourceType) {
   const sourceName = item.title || item.metadata?.title || 'Untitled'
   const sourceHref = sourceType === 'release' ? `/releases/${sourceId}` : `/collections/${sourceId}`
   const meta = item.metadata || item
-  const base = `${API_BASE}/${sourceType === 'release' ? 'releases' : 'collections'}/${sourceId}`
+  const base = `${API_BASE_URL}/${sourceType === 'release' ? 'releases' : 'collections'}/${sourceId}`
 
   // 1. versions.primary.files.audio[] → category: 'Audio' (releases only)
   if (sourceType === 'release') {
@@ -157,7 +155,7 @@ function extractFilesFromItem(item, sourceId, sourceType) {
         sourceName,
         sourceType,
         sourceHref,
-        downloadUrl: `${API_BASE}/releases/${sourceId}/files/audio/${encodeURIComponent(filename)}`
+        downloadUrl: `${API_BASE_URL}/releases/${sourceId}/files/audio/${encodeURIComponent(filename)}`
       })
     }
   }
@@ -176,7 +174,7 @@ function extractFilesFromItem(item, sourceId, sourceType) {
         sourceName,
         sourceType,
         sourceHref,
-        downloadUrl: `${API_BASE}/releases/${sourceId}/video/${encodeURIComponent(filename)}`
+        downloadUrl: `${API_BASE_URL}/releases/${sourceId}/video/${encodeURIComponent(filename)}`
       })
     }
   }

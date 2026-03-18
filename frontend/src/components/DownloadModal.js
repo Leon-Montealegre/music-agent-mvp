@@ -1,10 +1,12 @@
 'use client'
 
+import { API_BASE_URL } from '@/lib/api'
+
 export default function DownloadModal({ isOpen, onClose, file, releaseId, fileType }) {
   if (!isOpen || !file) return null
 
   const handleDownload = () => {
-    const downloadUrl = `http://localhost:3001/releases/${releaseId}/files/${fileType}/${encodeURIComponent(file.filename)}`
+    const downloadUrl = `${API_BASE_URL}/releases/${releaseId}/files/${fileType}/${encodeURIComponent(file.filename)}`
     
     // Create a temporary link and trigger download
     const link = document.createElement('a')
