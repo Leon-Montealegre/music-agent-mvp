@@ -20,19 +20,24 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    // "redirect: false" means NextAuth won't auto-redirect — we handle it ourselves
-    const result = await signIn('credentials', {
-      email,
-      password,
-      redirect: false,
-    })
+    try {
+      // "redirect: false" means NextAuth won't auto-redirect — we handle it ourselves
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
 
-    if (result?.error) {
-      setError('Invalid email or password. Please try again.')
+      if (result?.error) {
+        setError('Invalid email or password. Please try again.')
+      } else {
+        // Login successful — go to the main catalogue
+        router.push('/')
+      }
+    } catch {
+      setError('Could not connect to server. Please try again.')
+    } finally {
       setLoading(false)
-    } else {
-      // Login successful — go to the main catalogue
-      router.push('/')
     }
   }
 
@@ -63,7 +68,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={e => { setEmail(e.target.value); setError('') }}
                 placeholder="you@example.com"
                 required
                 autoFocus
@@ -79,7 +84,7 @@ export default function LoginPage() {
               <input
                 type="password"
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={e => { setPassword(e.target.value); setError('') }}
                 placeholder="••••••••"
                 required
                 className="w-full px-4 py-2.5 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
