@@ -1425,7 +1425,7 @@ app.post('/releases/:releaseId/notes/files', authMiddleware, releaseNotesUpload.
   }
 })
 
-app.get('/releases/:releaseId/notes/files/:filename', authMiddleware, async (req, res) => {
+app.get('/releases/:releaseId/notes/files/:filename', async (req, res) => {
   try {
     const { releaseId, filename } = req.params
     const key = `releases/${releaseId}/notes/${filename}`
