@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { fetchReleases } from '@/lib/api'
+import { fetchReleases, apiFetch } from '@/lib/api'
 import ReleaseCard from '@/components/ReleaseCard'
 import Link from 'next/link'
 
@@ -38,7 +38,7 @@ export default function HomePage() {
       try {
         const [releasesData, collectionsRes] = await Promise.all([
           fetchReleases(),
-          fetch('http://localhost:3001/collections').then(r => r.json())
+          apiFetch('/collections').then(r => r.json())
         ])
         setReleases(releasesData)
         setCollections(collectionsRes.collections || [])

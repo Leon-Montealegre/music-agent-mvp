@@ -3,6 +3,8 @@
  * from releases and collections using existing APIs. No new backend endpoints.
  */
 
+import { apiFetch } from '@/lib/api'
+
 const API_BASE = 'http://localhost:3001'
 
 /**
@@ -84,8 +86,8 @@ function extractContactsFromItem(item, sourceId, sourceType) {
  */
 export async function fetchAllContacts() {
   const [releasesRes, collectionsRes] = await Promise.all([
-    fetch(`${API_BASE}/releases`).then(r => r.json()),
-    fetch(`${API_BASE}/collections`).then(r => r.json())
+    apiFetch('/releases').then(r => r.json()),
+    apiFetch('/collections').then(r => r.json())
   ])
 
   const releases = releasesRes.releases || []
@@ -95,7 +97,7 @@ export async function fetchAllContacts() {
 
   for (const r of releases) {
     const releaseId = r.releaseId
-    const fullRes = await fetch(`${API_BASE}/releases/${releaseId}`).then(x => x.json())
+    const fullRes = await apiFetch(`/releases/${releaseId}`).then(x => x.json())
     const release = fullRes.release || fullRes
     const extracted = extractContactsFromItem(release, releaseId, 'release')
     allContacts.push(...extracted)
@@ -103,7 +105,7 @@ export async function fetchAllContacts() {
 
   for (const c of collections) {
     const collectionId = c.releaseId || c.collectionId
-    const fullRes = await fetch(`${API_BASE}/collections/${collectionId}`).then(x => x.json())
+    const fullRes = await apiFetch(`/collections/${collectionId}`).then(x => x.json())
     const collection = fullRes.collection || fullRes
     const extracted = extractContactsFromItem(collection, collectionId, 'collection')
     allContacts.push(...extracted)
@@ -246,8 +248,8 @@ function extractFilesFromItem(item, sourceId, sourceType) {
  */
 export async function fetchAllFiles() {
   const [releasesRes, collectionsRes] = await Promise.all([
-    fetch(`${API_BASE}/releases`).then(r => r.json()),
-    fetch(`${API_BASE}/collections`).then(r => r.json())
+    apiFetch('/releases').then(r => r.json()),
+    apiFetch('/collections').then(r => r.json())
   ])
 
   const releases = releasesRes.releases || []
@@ -257,7 +259,7 @@ export async function fetchAllFiles() {
 
   for (const r of releases) {
     const releaseId = r.releaseId
-    const fullRes = await fetch(`${API_BASE}/releases/${releaseId}`).then(x => x.json())
+    const fullRes = await apiFetch(`/releases/${releaseId}`).then(x => x.json())
     const release = fullRes.release || fullRes
     const extracted = extractFilesFromItem(release, releaseId, 'release')
     allFiles.push(...extracted)
@@ -265,7 +267,7 @@ export async function fetchAllFiles() {
 
   for (const c of collections) {
     const collectionId = c.releaseId || c.collectionId
-    const fullRes = await fetch(`${API_BASE}/collections/${collectionId}`).then(x => x.json())
+    const fullRes = await apiFetch(`/collections/${collectionId}`).then(x => x.json())
     const collection = fullRes.collection || fullRes
     const extracted = extractFilesFromItem(collection, collectionId, 'collection')
     allFiles.push(...extracted)

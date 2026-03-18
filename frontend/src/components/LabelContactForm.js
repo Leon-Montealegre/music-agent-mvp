@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { apiFetch } from '@/lib/api'
 
 export default function LabelContactForm({
   releaseId,
@@ -48,7 +49,7 @@ export default function LabelContactForm({
         ? `${apiBase}/${contactPath}/${existingContact.id}`
         : `${apiBase}/${contactPath}`
 
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method: existingContact?.id ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

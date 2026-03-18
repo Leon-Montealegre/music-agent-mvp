@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { apiFetch } from '@/lib/api'
 
 
 export default function EditMetadataModal({ track, onClose, onSuccess }) {
@@ -52,7 +53,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
 
   // Load collections
   useEffect(() => {
-    fetch('http://localhost:3001/collections')
+    apiFetch('/collections')
       .then(r => r.json())
       .then(data => setCollections(data.collections || []))
       .catch(() => {})
@@ -84,7 +85,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
 
     try {
       // Step 1: Save core track metadata
-      const res = await fetch(`http://localhost:3001/releases/${metadata.releaseId}/metadata`, {
+      const res = await apiFetch(`/releases/${metadata.releaseId}/metadata`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,13 +104,13 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
       if (artworkAction === 'replace' && newArtworkFile) {
         const fd = new FormData()
         fd.append('artwork', newArtworkFile)
-        const artRes = await fetch(`http://localhost:3001/releases/${metadata.releaseId}/artwork`, {
+        const artRes = await apiFetch(`/releases/${metadata.releaseId}/artwork`, {
           method: 'POST',
           body: fd
         })
         if (!artRes.ok) throw new Error('Failed to upload artwork')
       } else if (artworkAction === 'delete') {
-        const delRes = await fetch(`http://localhost:3001/releases/${metadata.releaseId}/artwork`, {
+        const delRes = await apiFetch(`/releases/${metadata.releaseId}/artwork`, {
           method: 'DELETE'
         })
         if (!delRes.ok) throw new Error('Failed to delete artwork')
@@ -117,7 +118,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
 
       // Step 3: Handle collection grouping
       if (grouping === 'new') {
-        const createRes = await fetch('http://localhost:3001/collections', {
+        const createRes = await apiFetch('/collections', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -134,11 +135,11 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
         if (newCollectionArtwork) {
           const fd = new FormData()
           fd.append('artwork', newCollectionArtwork)
-          await fetch(`http://localhost:3001/collections/${collection.releaseId}/artwork`, { method: 'POST', body: fd })
+          await apiFetch(`/collections/${collection.releaseId}/artwork`, { method: 'POST', body: fd })
         }
 
         if (currentCollectionId) {
-          await fetch(`http://localhost:3001/collections/${currentCollectionId}/tracks/${metadata.releaseId}`, { method: 'DELETE' })
+          await apiFetch(`/collections/${currentCollectionId}/tracks/${metadata.releaseId}`, { method: 'DELETE' })
         }
 
         await addTrackToCollection(collection.releaseId)
@@ -147,7 +148,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
       } else if (grouping === 'existing') {
         if (selectedCollectionId !== currentCollectionId) {
           if (currentCollectionId) {
-            await fetch(`http://localhost:3001/collections/${currentCollectionId}/tracks/${metadata.releaseId}`, { method: 'DELETE' })
+            await apiFetch(`/collections/${currentCollectionId}/tracks/${metadata.releaseId}`, { method: 'DELETE' })
           }
           await addTrackToCollection(selectedCollectionId)
           const col = collections.find(c => c.releaseId === selectedCollectionId)
@@ -156,7 +157,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
 
       } else if (grouping === 'standalone') {
         if (currentCollectionId) {
-          await fetch(`http://localhost:3001/collections/${currentCollectionId}/tracks/${metadata.releaseId}`, { method: 'DELETE' })
+          await apiFetch(`/collections/${currentCollectionId}/tracks/${metadata.releaseId}`, { method: 'DELETE' })
         }
         await patchTrackCollectionId(null, 'Single')
       }
@@ -170,7 +171,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
   }
 
   async function addTrackToCollection(collectionId) {
-    await fetch(`http://localhost:3001/collections/${collectionId}/tracks`, {
+    await apiFetch(`/collections/${collectionId}/tracks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ trackReleaseId: metadata.releaseId, title: title || metadata.title })
@@ -178,7 +179,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
   }
 
   async function patchTrackCollectionId(collectionId, releaseFormat) {
-    await fetch(`http://localhost:3001/releases/${metadata.releaseId}/metadata`, {
+    await apiFetch(`/releases/${metadata.releaseId}/metadata`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

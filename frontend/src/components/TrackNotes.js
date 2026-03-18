@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api';
 
 export default function TrackNotes({
   releaseId,
@@ -26,7 +27,7 @@ export default function TrackNotes({
   const handleSaveNotes = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch(`${apiBase}/notes`, {
+      const res = await apiFetch(`${apiBase}/notes`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes })
@@ -50,7 +51,7 @@ export default function TrackNotes({
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch(`${apiBase}/notes/files`, {
+      const res = await apiFetch(`${apiBase}/notes/files`, {
         method: 'POST',
         body: formData
       });
@@ -70,7 +71,7 @@ export default function TrackNotes({
   const handleDeleteDocument = async (filename) => {
     if (!confirm(`Delete ${filename}?`)) return;
     try {
-      const res = await fetch(`${apiBase}/notes/files/${encodeURIComponent(filename)}`, {
+      const res = await apiFetch(`${apiBase}/notes/files/${encodeURIComponent(filename)}`, {
         method: 'DELETE'
       });
       if (!res.ok) throw new Error('Failed to delete file');

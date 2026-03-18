@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { fetchAllFiles } from '@/lib/contacts'
+import { apiFetch } from '@/lib/api'
 
 const CATEGORY_CHIPS = [
   { label: 'All', value: 'all' },
@@ -49,7 +50,7 @@ const CATEGORY_BADGE_STYLES = {
 
 async function handleDownload(downloadUrl, filename) {
   try {
-    const res = await fetch(downloadUrl)
+    const res = await apiFetch(downloadUrl)
     if (!res.ok) throw new Error('Download failed')
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)

@@ -1,5 +1,41 @@
 // Base URL for your Express API
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = 'http://localhost:3001'
+
+// ─── Token management ────────────────────────────────────────────────────────
+// The Providers component calls setToken() once when the session is ready.
+// After that, every fetch in this file automatically sends the auth header.
+let _token = null
+
+export function setToken(token) {
+  _token = token
+}
+
+// Returns the Authorization header if a token is available, or an empty object.
+function authHeaders() {
+  return _token ? { 'Authorization': `Bearer ${_token}` } : {}
+}
+
+// ─── apiFetch ─────────────────────────────────────────────────────────────────
+// A drop-in replacement for fetch() that automatically adds the auth header.
+// Used by pages that call the backend directly (not through the functions below).
+//
+// Usage example (in any page):
+//   import { apiFetch } from '@/lib/api'
+//   const res = await apiFetch('/settings')                  ← GET
+//   const res = await apiFetch('/settings', {               ← PATCH
+//     method: 'PATCH',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ defaultArtistName: 'DJ X' }),
+//   })
+export async function apiFetch(url, options = {}) {
+  const headers = {
+    ...authHeaders(),
+    ...(options.headers || {}),
+  }
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`
+  return fetch(fullUrl, { ...options, headers })
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Fetch all releases from the API
@@ -7,7 +43,7 @@ const API_BASE_URL = 'http://localhost:3001';
  */
 export async function fetchReleases() {
   try {
-    const response = await fetch(`${API_BASE_URL}/releases/`);
+    const response = await fetch(`${API_BASE_URL}/releases/`, { headers: authHeaders() });
     
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
@@ -46,7 +82,7 @@ export async function fetchReleases() {
  */
 export async function fetchRelease(releaseId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/`);
+    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/`, { headers: authHeaders() });
     
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
@@ -67,7 +103,7 @@ export async function fetchRelease(releaseId) {
  */
 export async function fetchPromoEntry(releaseId, promoId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/promo/${promoId}`);
+    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/promo/${promoId}`, { headers: authHeaders() });
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
@@ -86,7 +122,7 @@ export async function fetchPromoEntry(releaseId, promoId) {
  */
 export async function fetchLabelEntry(releaseId, labelId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/label/${labelId}`);
+    const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/label/${labelId}`, { headers: authHeaders() });
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
@@ -105,7 +141,7 @@ export async function fetchLabelEntry(releaseId, labelId) {
  */
 export async function fetchCollectionLabelEntry(collectionId, labelId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/label/${labelId}`);
+    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/label/${labelId}`, { headers: authHeaders() });
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
@@ -131,6 +167,7 @@ export async function updateDistribution(releaseId, path, entry) {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders(),
         },
         body: JSON.stringify({ path, entry }),
       }
@@ -160,7 +197,7 @@ export async function deleteDistributionEntry(releaseId, pathType, timestamp) {
   try {
     const response = await fetch(
       `${API_BASE_URL}/releases/${releaseId}/distribution/${pathType}/${timestamp}`,
-      { method: 'DELETE' }
+      { method: 'DELETE', headers: authHeaders() }
     );
     
     if (!response.ok) {
@@ -188,7 +225,7 @@ export async function updateDistributionEntry(releaseId, pathType, timestamp, up
       `${API_BASE_URL}/releases/${releaseId}/distribution/${pathType}/${timestamp}`,
       {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(updatedData)
       }
     );
@@ -210,7 +247,7 @@ export async function updateDistributionEntry(releaseId, pathType, timestamp, up
  */
 export async function checkHealth() {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`);
+    const response = await fetch(`${API_BASE_URL}/health`, { headers: authHeaders() });
     const data = await response.json();
     return data;
   } catch (error) {
@@ -225,7 +262,7 @@ export async function checkHealth() {
  */
 export async function fetchCollectionPromoEntry(collectionId, promoId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/promo/${promoId}`);
+    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/promo/${promoId}`, { headers: authHeaders() });
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
@@ -245,7 +282,7 @@ export async function deleteRelease(releaseId) {
   try {
     const response = await fetch(
       `${API_BASE_URL}/releases/${releaseId}`,
-      { method: 'DELETE' }
+      { method: 'DELETE', headers: authHeaders() }
     )
     
     if (!response.ok) {

@@ -8,6 +8,7 @@ import LogSubmissionForm from '@/components/LogSubmissionForm'
 import TrackNotes from '@/components/TrackNotes'
 import EditMetadataModal from '@/components/EditMetadataModal'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
+import { apiFetch } from '@/lib/api'
 
 const BADGE_STYLES = {
   EP:    'bg-indigo-600/90 border-indigo-400/50 text-white',
@@ -104,8 +105,8 @@ export default function CollectionDetailPage({ params }) {
   async function loadCollection() {
     try {
       const [colRes, tracksRes] = await Promise.all([
-        fetch(`http://localhost:3001/collections/${collectionId}`),
-        fetch(`http://localhost:3001/collections/${collectionId}/tracks`)
+        apiFetch(`/collections/${collectionId}`),
+        apiFetch(`/collections/${collectionId}/tracks`)
       ])
       if (!colRes.ok) throw new Error(`Collection not found (${colRes.status})`)
       const colData    = await colRes.json()
@@ -173,7 +174,7 @@ export default function CollectionDetailPage({ params }) {
         if ((pStatus === 'Live' || pStatus === 'Scheduled') && pReleaseDate) {
           editPayload.releaseDate = pReleaseDate
         }
-        await fetch(`http://localhost:3001/collections/${collectionId}/distribution/release/${editingEntry.timestamp}`, {
+        await apiFetch(`/collections/${collectionId}/distribution/release/${editingEntry.timestamp}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editPayload)
@@ -184,7 +185,7 @@ export default function CollectionDetailPage({ params }) {
         if ((pStatus === 'Live' || pStatus === 'Scheduled') && pReleaseDate) {
           releaseEntry.releaseDate = pReleaseDate
         }
-        await fetch(`http://localhost:3001/collections/${collectionId}/distribution`, {
+        await apiFetch(`/collections/${collectionId}/distribution`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path: 'release', entry: releaseEntry })
@@ -202,7 +203,7 @@ export default function CollectionDetailPage({ params }) {
 
   const handleMarkAsSigned = async (labelName) => {
     try {
-      const response = await fetch(`http://localhost:3001/collections/${collectionId}/sign`, {
+      const response = await apiFetch(`/collections/${collectionId}/sign`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ labelName, signedDate: signingDate })
@@ -219,7 +220,7 @@ export default function CollectionDetailPage({ params }) {
   const handleDeleteEntry = async () => {
     if (!entryToDelete) return
     try {
-      await fetch(`http://localhost:3001/collections/${collectionId}/distribution/${entryToDelete.pathType}/${entryToDelete.timestamp}`, {
+      await apiFetch(`/collections/${collectionId}/distribution/${entryToDelete.pathType}/${entryToDelete.timestamp}`, {
         method: 'DELETE'
       })
       await loadCollection()
@@ -238,7 +239,7 @@ export default function CollectionDetailPage({ params }) {
   const handleAddLink = async () => {
     if (!newLinkUrl) return
     try {
-      const res = await fetch(`http://localhost:3001/collections/${collectionId}/song-links`, {
+      const res = await apiFetch(`/collections/${collectionId}/song-links`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: newLinkLabel || newLinkUrl, url: newLinkUrl })
@@ -253,7 +254,7 @@ export default function CollectionDetailPage({ params }) {
 
   const handleDeleteLink = async (linkId) => {
     try {
-      const res = await fetch(`http://localhost:3001/collections/${collectionId}/song-links/${linkId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/collections/${collectionId}/song-links/${linkId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete link')
       await loadCollection()
     } catch (err) {
@@ -266,7 +267,7 @@ export default function CollectionDetailPage({ params }) {
     setEditSaving(true)
     setEditError('')
     try {
-      const res = await fetch(`http://localhost:3001/collections/${collectionId}`, {
+      const res = await apiFetch(`/collections/${collectionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: editTitle, artist: editArtist, genre: editGenre })
@@ -276,10 +277,10 @@ export default function CollectionDetailPage({ params }) {
       if (artworkAction === 'replace' && newArtworkFile) {
         const fd = new FormData()
         fd.append('artwork', newArtworkFile)
-        await fetch(`http://localhost:3001/collections/${collectionId}/artwork`, { method: 'POST', body: fd })
+        await apiFetch(`/collections/${collectionId}/artwork`, { method: 'POST', body: fd })
         setCollectionHasArtwork(true); setArtworkError(false)
       } else if (artworkAction === 'delete') {
-        await fetch(`http://localhost:3001/collections/${collectionId}/artwork`, { method: 'DELETE' })
+        await apiFetch(`/collections/${collectionId}/artwork`, { method: 'DELETE' })
         setCollectionHasArtwork(false); setArtworkError(true)
       }
       await loadCollection()
@@ -294,7 +295,7 @@ export default function CollectionDetailPage({ params }) {
   const handleDeleteCollection = async () => {
     setIsDeleting(true)
     try {
-      await fetch(`http://localhost:3001/collections/${collectionId}`, { method: 'DELETE' })
+      await apiFetch(`/collections/${collectionId}`, { method: 'DELETE' })
       router.push('/')
     } catch (err) {
       alert(`Failed: ${err.message}`)
@@ -317,7 +318,7 @@ export default function CollectionDetailPage({ params }) {
     try {
       const fd = new FormData()
       fd.append('artwork', file)
-      const res = await fetch(`http://localhost:3001/collections/${collectionId}/artwork`, {
+      const res = await apiFetch(`/collections/${collectionId}/artwork`, {
         method: 'POST', body: fd
       })
       if (!res.ok) throw new Error('Upload failed')
@@ -434,7 +435,7 @@ export default function CollectionDetailPage({ params }) {
         <button
           onClick={async () => {
             if (!confirm('Delete artwork? This cannot be undone.')) return
-            await fetch(`http://localhost:3001/collections/${collectionId}/artwork`, { method: 'DELETE' })
+            await apiFetch(`/collections/${collectionId}/artwork`, { method: 'DELETE' })
             setCollectionHasArtwork(false)
             setArtworkError(true)
           }}
@@ -739,8 +740,8 @@ export default function CollectionDetailPage({ params }) {
                               ...editingPromo,
                               ...basePayload
                             }
-                            const res = await fetch(
-                              `http://localhost:3001/collections/${collectionId}/distribution/promote/${editingPromo.timestamp}`,
+                            const res = await apiFetch(
+                              `/collections/${collectionId}/distribution/promote/${editingPromo.timestamp}`,
                               {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
@@ -756,8 +757,8 @@ export default function CollectionDetailPage({ params }) {
                               ...basePayload,
                               timestamp: new Date().toISOString()
                             }
-                            const res = await fetch(
-                              `http://localhost:3001/collections/${collectionId}/distribution`,
+                            const res = await apiFetch(
+                              `/collections/${collectionId}/distribution`,
                               {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
@@ -1060,7 +1061,7 @@ export default function CollectionDetailPage({ params }) {
           existingEntry={editingEntry}
           onSubmit={async (formData) => {
             if (editingEntry?.pathType === 'submit') {
-              const res = await fetch(`http://localhost:3001/collections/${collectionId}/distribution/submit/${editingEntry.timestamp}`, {
+              const res = await apiFetch(`/collections/${collectionId}/distribution/submit/${editingEntry.timestamp}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -1069,7 +1070,7 @@ export default function CollectionDetailPage({ params }) {
             } else {
               const entry = { ...formData, timestamp: new Date().toISOString() }
               if (!entry.notes) delete entry.notes
-              const res = await fetch(`http://localhost:3001/collections/${collectionId}/distribution`, {
+              const res = await apiFetch(`/collections/${collectionId}/distribution`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: 'submit', entry })

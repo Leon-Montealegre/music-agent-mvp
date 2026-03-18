@@ -3,7 +3,7 @@
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { fetchRelease, updateDistribution, deleteDistributionEntry, updateDistributionEntry, deleteRelease } from '@/lib/api'
+import { fetchRelease, updateDistribution, deleteDistributionEntry, updateDistributionEntry, deleteRelease, apiFetch } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LogPlatformForm from '@/components/LogPlatformForm'
 import LogSubmissionForm from '@/components/LogSubmissionForm'
@@ -107,8 +107,8 @@ export default function TrackDetailPage({ params }) {
   const handleDeleteAudio = async (filename) => {
     if (!confirm(`Delete ${filename}? This cannot be undone.`)) return
     try {
-      const res = await fetch(
-        `http://localhost:3001/releases/${trackId}/versions/primary/audio/${encodeURIComponent(filename)}`,
+      const res = await apiFetch(
+        `/releases/${trackId}/versions/primary/audio/${encodeURIComponent(filename)}`,
         { method: 'DELETE' }
       )
       if (!res.ok) throw new Error('Failed to delete audio')
@@ -121,7 +121,7 @@ export default function TrackDetailPage({ params }) {
   const handleDeleteArtwork = async () => {
     if (!confirm('Delete artwork? This cannot be undone.')) return
     try {
-      const res = await fetch(`http://localhost:3001/releases/${trackId}/artwork`, { method: 'DELETE' })
+      const res = await apiFetch(`/releases/${trackId}/artwork`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete artwork')
       setSidebarArtworkError(true)
       await loadTrack()
@@ -133,8 +133,8 @@ export default function TrackDetailPage({ params }) {
   const handleDeleteVideo = async (filename) => {
     if (!confirm(`Delete ${filename}? This cannot be undone.`)) return
     try {
-      const res = await fetch(
-        `http://localhost:3001/releases/${trackId}/video/${encodeURIComponent(filename)}`,
+      const res = await apiFetch(
+        `/releases/${trackId}/video/${encodeURIComponent(filename)}`,
         { method: 'DELETE' }
       )
       if (!res.ok) throw new Error('Failed to delete video')
@@ -152,8 +152,8 @@ export default function TrackDetailPage({ params }) {
       const formData = new FormData()
       formData.append('file', file)
       // Use dedicated endpoint — no version-conflict check
-      const res = await fetch(
-        `http://localhost:3001/releases/${trackId}/versions/primary/audio`,
+      const res = await apiFetch(
+        `/releases/${trackId}/versions/primary/audio`,
         { method: 'POST', body: formData }
       )
       const data = await res.json()
@@ -174,7 +174,7 @@ export default function TrackDetailPage({ params }) {
     try {
       const formData = new FormData()
       formData.append('artwork', file)
-      const res = await fetch(`http://localhost:3001/releases/${trackId}/artwork`, {
+      const res = await apiFetch(`/releases/${trackId}/artwork`, {
         method: 'POST', body: formData
       })
       const data = await res.json()
@@ -197,8 +197,8 @@ export default function TrackDetailPage({ params }) {
       const formData = new FormData()
       formData.append('file', file)
       // Use dedicated endpoint — bypasses versions entirely
-      const res = await fetch(
-        `http://localhost:3001/releases/${trackId}/video`,
+      const res = await apiFetch(
+        `/releases/${trackId}/video`,
         { method: 'POST', body: formData }
       )
       const data = await res.json()
@@ -219,7 +219,7 @@ export default function TrackDetailPage({ params }) {
   const handleAddLink = async () => {
     if (!newLinkUrl) return
     try {
-      const res = await fetch(`http://localhost:3001/releases/${trackId}/song-links`, {
+      const res = await apiFetch(`/releases/${trackId}/song-links`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -241,8 +241,8 @@ export default function TrackDetailPage({ params }) {
   // FIX: pass link.id (not array index) — server filters by link.id
   const handleDeleteLink = async (linkId) => {
     try {
-      const res = await fetch(
-        `http://localhost:3001/releases/${trackId}/song-links/${linkId}`,
+      const res = await apiFetch(
+        `/releases/${trackId}/song-links/${linkId}`,
         { method: 'DELETE' }
       )
       if (!res.ok) throw new Error('Failed to delete link')
@@ -291,7 +291,7 @@ export default function TrackDetailPage({ params }) {
 
   const handleMarkAsSigned = async (labelName) => {
     try {
-      const response = await fetch(`http://localhost:3001/releases/${trackId}/sign`, {
+      const response = await apiFetch(`/releases/${trackId}/sign`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ labelName, signedDate: signingDate })
@@ -379,7 +379,7 @@ export default function TrackDetailPage({ params }) {
   const audioFiles   = track.versions?.primary?.files?.audio  || []
   const artworkFiles = track.versions?.primary?.files?.artwork || []
   const videoFiles   = track.versions?.primary?.files?.video  || []
-  const hasArtwork   = !sidebarArtworkError
+  const hasArtwork   = artworkFiles.length > 0 && !sidebarArtworkError
 
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -441,7 +441,7 @@ export default function TrackDetailPage({ params }) {
 
               {/* Artwork */}
               <div className="aspect-square bg-gray-900/50 rounded-lg overflow-hidden mb-6 relative group">
-                {!sidebarArtworkError ? (
+                {hasArtwork ? (
                   <>
                     <img
                       src={artworkUrl}

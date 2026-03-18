@@ -1,13 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { apiFetch } from '@/lib/api'
 
 export default function SettingsPage() {
   const [defaultArtist, setDefaultArtist] = useState('')
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    fetch('http://localhost:3001/settings')
+    apiFetch('/settings')
       .then(res => res.json())
       .then(data => {
         if (data.settings?.defaultArtistName) {
@@ -17,7 +18,7 @@ export default function SettingsPage() {
   }, [])
 
   async function handleSave() {
-    await fetch('http://localhost:3001/settings', {
+    await apiFetch('/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ defaultArtistName: defaultArtist })

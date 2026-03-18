@@ -3,6 +3,7 @@ import Link from 'next/link'
 import ScrollToTop from '@/components/ScrollToTop'
 import FeedbackButton from '@/components/FeedbackButton'
 import HeaderNav from '@/components/HeaderNav'
+import Providers from '@/components/Providers'
 
 
 export const metadata = {
@@ -15,8 +16,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className="bg-gray-900">
+        <Providers>
         <ScrollToTop />
-        
+
         <header className="bg-gray-900/95 backdrop-blur-lg border-b border-gray-700/50 sticky top-0 z-50 shadow-xl">
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
@@ -59,6 +61,7 @@ export default function RootLayout({ children }) {
 
 
         {children}
+        </Providers>
       </body>
     </html>
   )

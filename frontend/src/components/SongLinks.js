@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { apiFetch } from '@/lib/api';
 
 export default function SongLinks({ releaseId, initialLinks = [] }) {
   const [links, setLinks] = useState(initialLinks);
@@ -33,7 +34,7 @@ export default function SongLinks({ releaseId, initialLinks = [] }) {
     };
 
     try {
-      const res = await fetch(`http://localhost:3001/releases/${releaseId}/song-links`, {
+      const res = await apiFetch(`/releases/${releaseId}/song-links`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(linkToAdd)
@@ -56,7 +57,7 @@ export default function SongLinks({ releaseId, initialLinks = [] }) {
     if (!confirm('Delete this link?')) return;
 
     try {
-      const res = await fetch(`http://localhost:3001/releases/${releaseId}/song-links/${linkId}`, {
+      const res = await apiFetch(`/releases/${releaseId}/song-links/${linkId}`, {
         method: 'DELETE'
       });
 

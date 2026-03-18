@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { apiFetch } from '@/lib/api'
 
 export default function CreateTrackPage() {
   const router = useRouter()
@@ -41,7 +42,7 @@ export default function CreateTrackPage() {
   useEffect(() => {
     async function loadDefaults() {
       try {
-        const res = await fetch('http://localhost:3001/settings')
+        const res = await apiFetch('/settings')
         const data = await res.json()
         if (data.settings?.defaultArtistName) setArtist(data.settings.defaultArtistName)
       } catch (err) {
@@ -49,7 +50,7 @@ export default function CreateTrackPage() {
       }
     }
     loadDefaults()
-    fetch('http://localhost:3001/collections')
+    apiFetch('/collections')
       .then(r => r.json())
       .then(data => setCollections(data.collections || []))
       .catch(() => {})
@@ -93,7 +94,7 @@ export default function CreateTrackPage() {
         if (bpm) uploadUrl += `&bpm=${encodeURIComponent(bpm)}`
         if (key) uploadUrl += `&key=${encodeURIComponent(key)}`
 
-        const uploadResponse = await fetch(uploadUrl, { method: 'POST', body: formData })
+        const uploadResponse = await apiFetch(uploadUrl, { method: 'POST', body: formData })
         if (!uploadResponse.ok) throw new Error((await uploadResponse.json()).error || 'Upload failed')
         uploadData = await uploadResponse.json()
       }
@@ -118,7 +119,7 @@ export default function CreateTrackPage() {
           labelInfo: { isSigned: false, label: null, signedDate: null, contractDocuments: [] },
         }
       }
-      const metadataResponse = await fetch('http://localhost:3001/metadata', {
+      const metadataResponse = await apiFetch('/metadata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(metadataPayload)
@@ -127,7 +128,7 @@ export default function CreateTrackPage() {
 
       // Step 3: Handle collection grouping
       if (grouping === 'new') {
-        const createRes = await fetch('http://localhost:3001/collections', {
+        const createRes = await apiFetch('/collections', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -144,16 +145,16 @@ export default function CreateTrackPage() {
         if (newCollectionArtwork) {
           const fd = new FormData()
           fd.append('artwork', newCollectionArtwork)
-          await fetch(`http://localhost:3001/collections/${collection.releaseId}/artwork`, { method: 'POST', body: fd })
+          await apiFetch(`/collections/${collection.releaseId}/artwork`, { method: 'POST', body: fd })
         }
 
-        await fetch(`http://localhost:3001/collections/${collection.releaseId}/tracks`, {
+        await apiFetch(`/collections/${collection.releaseId}/tracks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ trackReleaseId: trackId, title })
         })
 
-        await fetch(`http://localhost:3001/releases/${trackId}/metadata`, {
+        await apiFetch(`/releases/${trackId}/metadata`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -166,13 +167,13 @@ export default function CreateTrackPage() {
       } else if (grouping === 'existing') {
         const col = collections.find(c => c.releaseId === selectedCollectionId)
 
-        await fetch(`http://localhost:3001/collections/${selectedCollectionId}/tracks`, {
+        await apiFetch(`/collections/${selectedCollectionId}/tracks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ trackReleaseId: trackId, title })
         })
 
-        await fetch(`http://localhost:3001/releases/${trackId}/metadata`, {
+        await apiFetch(`/releases/${trackId}/metadata`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

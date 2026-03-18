@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchCollectionPromoEntry } from '@/lib/api'
+import { fetchCollectionPromoEntry, apiFetch } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
@@ -99,7 +99,7 @@ export default function CollectionPromoEntryPage({ params }) {
         payload.liveDate = null
       }
 
-      const res = await fetch(`${apiBase}/promo/${promoId}`, {
+      const res = await apiFetch(`${apiBase}/promo/${promoId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -129,7 +129,7 @@ export default function CollectionPromoEntryPage({ params }) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch(`${apiBase}/promo/${promoId}/files`, {
+      const res = await apiFetch(`${apiBase}/promo/${promoId}/files`, {
         method: 'POST',
         body: formData
       })
@@ -190,7 +190,7 @@ export default function CollectionPromoEntryPage({ params }) {
   const handleSavePageNotes = async () => {
     setSavingNotes(true)
     try {
-      const res = await fetch(`${apiBase}/promo/${promoId}/notes`, {
+      const res = await apiFetch(`${apiBase}/promo/${promoId}/notes`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: pageNotes })
@@ -232,7 +232,7 @@ export default function CollectionPromoEntryPage({ params }) {
 
   const handleDeleteEntry = async () => {
     try {
-      const res = await fetch(`${apiBase}/promo/${promoId}`, { method: 'DELETE' })
+      const res = await apiFetch(`${apiBase}/promo/${promoId}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to delete entry')
       router.push(`/collections/${collectionId}`)

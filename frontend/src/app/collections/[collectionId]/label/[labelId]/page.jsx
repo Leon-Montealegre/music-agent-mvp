@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchCollectionLabelEntry } from '@/lib/api'
+import { fetchCollectionLabelEntry, apiFetch } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
@@ -92,7 +92,7 @@ export default function CollectionLabelEntryPage({ params }) {
         payload.signedDate = null
       }
 
-      const res = await fetch(`${apiBase}/label/${labelId}`, {
+      const res = await apiFetch(`${apiBase}/label/${labelId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -122,7 +122,7 @@ export default function CollectionLabelEntryPage({ params }) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch(`${apiBase}/label/${labelId}/files`, {
+      const res = await apiFetch(`${apiBase}/label/${labelId}/files`, {
         method: 'POST',
         body: formData
       })
@@ -183,7 +183,7 @@ export default function CollectionLabelEntryPage({ params }) {
   const handleSavePageNotes = async () => {
     setSavingNotes(true)
     try {
-      const res = await fetch(`${apiBase}/label/${labelId}/notes`, {
+      const res = await apiFetch(`${apiBase}/label/${labelId}/notes`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: pageNotes })
@@ -225,7 +225,7 @@ export default function CollectionLabelEntryPage({ params }) {
 
   const handleDeleteEntry = async () => {
     try {
-      const res = await fetch(`${apiBase}/label/${labelId}`, { method: 'DELETE' })
+      const res = await apiFetch(`${apiBase}/label/${labelId}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to delete entry')
       router.push(`/collections/${collectionId}`)
