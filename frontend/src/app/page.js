@@ -43,8 +43,13 @@ export default function HomePage() {
         setReleases(releasesData)
         setCollections(collectionsRes.collections || [])
       } catch (err) {
-        console.error('Error loading catalogue:', err)
-        setError('Could not connect to backend. Make sure the server is running on port 3001.')
+        // Only show the error screen for actual network failures (TypeError = fetch failed).
+        // HTTP errors like 401 throw differently and should not block the UI.
+        if (err instanceof TypeError) {
+          setError('Could not connect to backend. Make sure the server is running.')
+        } else {
+          console.error('Error loading catalogue:', err)
+        }
       } finally {
         setLoading(false)
       }

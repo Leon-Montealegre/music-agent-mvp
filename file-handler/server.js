@@ -130,15 +130,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Release management API is running' })
 })
 
-app.get('/debug-r2', (req, res) => {
-  res.json({
-    account_id: process.env.R2_ACCOUNT_ID ? 'set(' + process.env.R2_ACCOUNT_ID.length + ' chars)' : 'MISSING',
-    access_key: process.env.R2_ACCESS_KEY_ID ? 'set(' + process.env.R2_ACCESS_KEY_ID.length + ' chars)' : 'MISSING',
-    secret_key: process.env.R2_SECRET_ACCESS_KEY ? 'set(' + process.env.R2_SECRET_ACCESS_KEY.length + ' chars)' : 'MISSING',
-    bucket: process.env.R2_BUCKET_NAME || 'MISSING'
-  })
-})
-
 // =============================================================================
 // SETTINGS
 // =============================================================================
