@@ -10,6 +10,7 @@ require('dotenv').config()
 
 const authRoutes = require('./routes/auth')
 const authMiddleware = require('./authMiddleware')
+const r2 = require('./r2')
 
 const express        = require('express')
 const multer         = require('multer')
@@ -64,9 +65,12 @@ function classify(file) {
   return 'other'
 }
 
-async function validateAudioFile(filePath) {
+async function validateAudioFile(bufferOrPath, mimetype) {
   try {
-    const metadata = await musicMetadata.parseFile(filePath)
+    // Accepts either a Buffer (from memoryStorage) or a file path (legacy)
+    const metadata = Buffer.isBuffer(bufferOrPath)
+      ? await musicMetadata.parseBuffer(bufferOrPath, { mimeType: mimetype })
+      : await musicMetadata.parseFile(bufferOrPath)
     if (!metadata.format?.duration) return { valid: false, error: 'Could not read audio metadata' }
     if (metadata.format.duration <= 0 || metadata.format.duration > 3600)
       return { valid: false, error: `Invalid audio duration: ${metadata.format.duration}s` }
@@ -115,177 +119,25 @@ async function readSettings() {
 }
 
 // =============================================================================
-// MULTER INSTANCES
+// MULTER — memory storage (files land in req.file.buffer, then go straight to R2)
 // =============================================================================
 
-// Main upload (audio / artwork / video for releases)
-const upload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const releaseId  = requireReleaseId(req)
-      const fileType   = classify(file)
-      const releasePath = path.join(RELEASES_DIR, releaseId)
-      let targetFolder
-      if (fileType === 'audio') {
-        const { versionId } = getVersionInfo(req)
-        targetFolder = path.join(releasePath, 'versions', versionId, 'audio')
-      } else if (fileType === 'artwork') {
-        targetFolder = path.join(releasePath, 'artwork')
-      } else if (fileType === 'video') {
-        targetFolder = path.join(releasePath, 'video')
-      } else {
-        targetFolder = releasePath
-      }
-      fsSync.mkdirSync(targetFolder, { recursive: true })
-      cb(null, targetFolder)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
+// One instance covers every upload route — no disk writes at all.
+const upload              = multer({ storage: multer.memoryStorage() })
+const trackArtworkUpload  = upload
+const releaseNotesUpload  = upload
+const releaseLabelDealUpload  = upload
+const releasePromoDealUpload  = upload
+const promoEntryUpload    = upload
+const labelEntryUpload    = upload
+const collectionUpload    = upload
+const collectionNotesUpload   = upload
+const collectionLabelDealUpload   = upload
+const collectionPromoDealUpload   = upload
+const collectionPromoEntryUpload  = upload
+const collectionLabelEntryUpload  = multer({ storage: multer.memoryStorage() /* placeholder — same instance */ })
 
-// Track artwork (saves as artwork.ext, replaces old)
-const trackArtworkUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'artwork')
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, `artwork${path.extname(file.originalname)}`) }
-  })
-})
-
-// Release notes files
-const releaseNotesUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'notes')
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-// Release label-deal files
-const releaseLabelDealUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'label-deal')
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-// Per-promo-entry files
-const promoEntryUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'promo', req.params.promoId)
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-// Per-label-entry files
-const labelEntryUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'label', req.params.labelId)
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-// Release promo-deal files
-const releasePromoDealUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'promo-deal')
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-// Collection artwork
-const collectionUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(COLLECTIONS_PATH, req.params.collectionId, 'artwork')
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, `artwork${path.extname(file.originalname)}`) }
-  })
-})
-
-// Collection notes files
-const collectionNotesUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(COLLECTIONS_PATH, req.params.collectionId, 'notes')
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-// Collection label-deal files
-const collectionLabelDealUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(COLLECTIONS_PATH, req.params.collectionId, 'label-deal')
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-// Collection promo-deal files
-const collectionPromoDealUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(COLLECTIONS_PATH, req.params.collectionId, 'promo-deal')
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-// Per-collection-promo-entry files
-const collectionPromoEntryUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(COLLECTIONS_PATH, req.params.collectionId, 'promo', req.params.promoId)
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-// Per-collection-label-entry files
-const collectionLabelEntryUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(COLLECTIONS_PATH, req.params.collectionId, 'label', req.params.labelId)
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
+// All aliases point to the same memoryStorage instance — no disk writes anywhere.
 
 // =============================================================================
 // HEALTH
@@ -365,7 +217,7 @@ app.use('/auth', authRoutes);
 // FILE UPLOAD
 // =============================================================================
 
-app.post('/upload', upload.any(), async (req, res) => {
+app.post('/upload', authMiddleware, upload.any(), async (req, res) => {
   try {
     const releaseId = requireReleaseId(req)
     const { artist, title, genre } = req.query
@@ -374,46 +226,31 @@ app.post('/upload', upload.any(), async (req, res) => {
     if (!req.files || req.files.length === 0)
       return res.status(400).json({ success: false, error: 'No files uploaded' })
 
-    const releasePath  = path.join(RELEASES_DIR, releaseId)
-    const metadataPath = path.join(releasePath, 'metadata.json')
-
-    let metadata = {}
-    try {
-      metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-    } catch {}
-
-    if (!metadata.versions) metadata.versions = {}
-
-    if (metadata.versions[versionId]) {
-      const audioPath = path.join(releasePath, 'versions', versionId, 'audio')
-      let existing = []
-      try { existing = await fs.readdir(audioPath) } catch {}
-      if (existing.length > 0)
-        return res.status(409).json({ success: false, error: `Version "${versionName}" already exists`, existingVersion: metadata.versions[versionId] })
-    }
-
     const savedFiles = { audio: [], artwork: [], video: [] }
 
     for (const file of req.files) {
       const fileType = classify(file)
       if (fileType === 'audio') {
-        const validation = await validateAudioFile(file.path)
-        if (!validation.valid) {
-          await fs.unlink(file.path)
+        const validation = await validateAudioFile(file.buffer, file.mimetype)
+        if (!validation.valid)
           return res.status(400).json({ success: false, error: validation.error, file: file.originalname })
-        }
+        const key = `releases/${releaseId}/audio/${versionId}/${file.originalname}`
+        await r2.uploadFile(key, file.buffer, file.mimetype)
         savedFiles.audio.push({
           filename: file.originalname, size: file.size, mimetype: file.mimetype,
           duration: validation.metadata.duration, bitrate: validation.metadata.bitrate,
           sampleRate: validation.metadata.sampleRate, channels: validation.metadata.channels, codec: validation.metadata.codec
         })
-      } else {
-        savedFiles[fileType]?.push({ filename: file.originalname, size: file.size, mimetype: file.mimetype })
+      } else if (fileType === 'artwork') {
+        const key = `releases/${releaseId}/artwork/artwork${path.extname(file.originalname).toLowerCase()}`
+        await r2.uploadFile(key, file.buffer, file.mimetype)
+        savedFiles.artwork.push({ filename: file.originalname, size: file.size, mimetype: file.mimetype })
+      } else if (fileType === 'video') {
+        const key = `releases/${releaseId}/video/${file.originalname}`
+        await r2.uploadFile(key, file.buffer, file.mimetype)
+        savedFiles.video.push({ filename: file.originalname, size: file.size, mimetype: file.mimetype })
       }
     }
-
-    metadata.versions[versionId] = { versionName, versionId, createdAt: new Date().toISOString(), files: savedFiles }
-    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
 
     res.json({ success: true, message: `Files uploaded for ${versionName}`, releaseId, versionId, versionName, files: savedFiles, artist, title, genre })
   } catch (error) {
@@ -650,59 +487,45 @@ app.delete('/releases/:releaseId', authMiddleware, async (req, res) => {
 // RELEASES — ARTWORK
 // =============================================================================
 
-app.get('/releases/:releaseId/artwork/', (req, res) => {
-  const artworkPath  = path.join(RELEASES_DIR, req.params.releaseId, 'artwork')
-  if (!fsSync.existsSync(artworkPath)) return res.status(404).json({ error: 'No artwork found' })
-  const files = fsSync.readdirSync(artworkPath)
-  if (files.length === 0) return res.status(404).json({ error: 'No artwork files found' })
-  res.sendFile(path.join(artworkPath, files[0]))
+app.get('/releases/:releaseId/artwork/', async (req, res) => {
+  try {
+    const { releaseId } = req.params
+    // List artwork files for this release (predictable prefix)
+    const files = await r2.listFiles(`releases/${releaseId}/artwork/`)
+    if (files.length === 0) return res.status(404).json({ error: 'No artwork found' })
+    const r2Obj = await r2.getFile(files[0].Key)
+    res.set('Content-Type', r2Obj.ContentType || 'image/jpeg')
+    r2Obj.Body.pipe(res)
+  } catch (err) {
+    res.status(404).json({ error: 'No artwork found' })
+  }
 })
 
-app.post('/releases/:releaseId/artwork', trackArtworkUpload.single('artwork'), async (req, res) => {
+app.post('/releases/:releaseId/artwork', authMiddleware, trackArtworkUpload.single('artwork'), async (req, res) => {
   try {
     const { releaseId } = req.params
     if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' })
 
-    const artworkDir = path.join(RELEASES_DIR, releaseId, 'artwork')
-    try {
-      const files = await fs.readdir(artworkDir)
-      for (const file of files) {
-        if (file !== req.file.filename) await fs.unlink(path.join(artworkDir, file))
-      }
-    } catch {}
+    const ext = path.extname(req.file.originalname).toLowerCase()
+    const key = `releases/${releaseId}/artwork/artwork${ext}`
 
-    try {
-      const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
-      const raw = await fs.readFile(metadataPath, 'utf8')
-      const metadata = JSON.parse(raw)
-      const meta = metadata.metadata || metadata
-      meta.fileCounts = { ...(meta.fileCounts || {}), artwork: 1 }
-      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-    } catch {}
+    // Delete any existing artwork files first (clean replace)
+    const existing = await r2.listFiles(`releases/${releaseId}/artwork/`)
+    await Promise.all(existing.map(f => r2.deleteFile(f.Key)))
 
-    res.json({ success: true, filename: req.file.filename })
+    await r2.uploadFile(key, req.file.buffer, req.file.mimetype)
+    res.json({ success: true, key })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
   }
 })
 
-app.delete('/releases/:releaseId/artwork', async (req, res) => {
+app.delete('/releases/:releaseId/artwork', authMiddleware, async (req, res) => {
   try {
-    const artworkDir   = path.join(RELEASES_DIR, req.params.releaseId, 'artwork')
-    const metadataPath = path.join(RELEASES_DIR, req.params.releaseId, 'metadata.json')
-    try {
-      const files = await fs.readdir(artworkDir)
-      for (const file of files) await fs.unlink(path.join(artworkDir, file))
-    } catch { return res.status(404).json({ success: false, error: 'No artwork found' }) }
-
-    try {
-      const raw = await fs.readFile(metadataPath, 'utf8')
-      const metadata = JSON.parse(raw)
-      const meta = metadata.metadata || metadata
-      meta.fileCounts = { ...(meta.fileCounts || {}), artwork: 0 }
-      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-    } catch {}
-
+    const { releaseId } = req.params
+    const existing = await r2.listFiles(`releases/${releaseId}/artwork/`)
+    if (existing.length === 0) return res.status(404).json({ success: false, error: 'No artwork found' })
+    await Promise.all(existing.map(f => r2.deleteFile(f.Key)))
     res.json({ success: true, message: 'Artwork deleted' })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
@@ -714,49 +537,33 @@ app.delete('/releases/:releaseId/artwork', async (req, res) => {
 // =============================================================================
 
 app.post('/releases/:releaseId/versions',
-  (req, res, next) => {
-    try { requireReleaseId(req); next() }
-    catch (error) { res.status(error.statusCode || 500).json({ success: false, error: error.message }) }
-  },
+  authMiddleware,
   upload.any(),
   async (req, res) => {
     try {
-      const releaseId   = requireReleaseId(req)
+      const releaseId = requireReleaseId(req)
       const { versionName, versionId } = getVersionInfo(req)
 
       if (!req.files || req.files.length === 0)
         return res.status(400).json({ success: false, error: 'No audio files uploaded' })
 
-      const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
-      const metadata     = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-
-      if (metadata.versions?.[versionId])
-        return res.status(409).json({ success: false, error: `Version "${versionName}" already exists`, existingVersion: metadata.versions[versionId] })
-
       const savedFiles = { audio: [], artwork: [], video: [] }
 
       for (const file of req.files) {
         const fileType = classify(file)
-        if (fileType === 'audio') {
-          const validation = await validateAudioFile(file.path)
-          if (!validation.valid) {
-            await fs.unlink(file.path)
-            return res.status(400).json({ success: false, error: validation.error, file: file.originalname })
-          }
-          savedFiles.audio.push({
-            filename: file.originalname, size: file.size, mimetype: file.mimetype,
-            duration: validation.metadata.duration, bitrate: validation.metadata.bitrate,
-            sampleRate: validation.metadata.sampleRate, channels: validation.metadata.channels, codec: validation.metadata.codec
-          })
-        } else {
-          await fs.unlink(file.path)
+        if (fileType !== 'audio')
           return res.status(400).json({ success: false, error: `Only audio files allowed. Received: ${fileType}`, file: file.originalname })
-        }
+        const validation = await validateAudioFile(file.buffer, file.mimetype)
+        if (!validation.valid)
+          return res.status(400).json({ success: false, error: validation.error, file: file.originalname })
+        const key = `releases/${releaseId}/audio/${versionId}/${file.originalname}`
+        await r2.uploadFile(key, file.buffer, file.mimetype)
+        savedFiles.audio.push({
+          filename: file.originalname, size: file.size, mimetype: file.mimetype,
+          duration: validation.metadata.duration, bitrate: validation.metadata.bitrate,
+          sampleRate: validation.metadata.sampleRate, channels: validation.metadata.channels, codec: validation.metadata.codec
+        })
       }
-
-      if (!metadata.versions) metadata.versions = {}
-      metadata.versions[versionId] = { versionName, versionId, createdAt: new Date().toISOString(), files: savedFiles }
-      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
 
       res.json({ success: true, message: `Version "${versionName}" added`, releaseId, versionId, versionName, files: savedFiles })
     } catch (error) {
@@ -765,45 +572,22 @@ app.post('/releases/:releaseId/versions',
   }
 )
 
-app.delete('/releases/:releaseId/versions/primary/audio/:filename', async (req, res) => {
+app.delete('/releases/:releaseId/versions/primary/audio/:filename', authMiddleware, async (req, res) => {
   try {
     const { releaseId, filename } = req.params
-    const filePath = path.join(RELEASES_DIR, releaseId, 'versions', 'primary', 'audio', filename)
-    try { await fs.access(filePath) }
-    catch { return res.status(404).json({ success: false, error: 'File not found' }) }
-    await fs.unlink(filePath)
-
-    try {
-      const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
-      const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-      if (metadata.versions?.primary?.files?.audio) {
-        metadata.versions.primary.files.audio = metadata.versions.primary.files.audio.filter(f => f.filename !== filename)
-        await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-      }
-    } catch {}
-
+    const key = `releases/${releaseId}/audio/primary/${filename}`
+    await r2.deleteFile(key)
     res.json({ success: true, message: `${filename} deleted` })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
   }
 })
-// DELETE /releases/:releaseId/video/:filename
-app.delete('/releases/:releaseId/video/:filename', async (req, res) => {
+
+app.delete('/releases/:releaseId/video/:filename', authMiddleware, async (req, res) => {
   try {
     const { releaseId, filename } = req.params
-    const filePath = path.join(RELEASES_DIR, releaseId, 'video', filename)
-    try { await fs.access(filePath) }
-    catch { return res.status(404).json({ success: false, error: 'File not found' }) }
-    await fs.unlink(filePath)
-    try {
-      const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
-      const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-      if (metadata.versions?.primary?.files?.video) {
-        metadata.versions.primary.files.video =
-          metadata.versions.primary.files.video.filter(f => f.filename !== filename)
-        await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-      }
-    } catch {}
+    const key = `releases/${releaseId}/video/${filename}`
+    await r2.deleteFile(key)
     res.json({ success: true, message: `${filename} deleted` })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
@@ -812,10 +596,7 @@ app.delete('/releases/:releaseId/video/:filename', async (req, res) => {
 // POST /releases/:releaseId/versions/primary/audio
 // Add audio file(s) to an existing primary version (no duplicate-version check)
 app.post('/releases/:releaseId/versions/primary/audio',
-  (req, res, next) => {
-    try { requireReleaseId(req); next() }
-    catch (err) { res.status(err.statusCode || 500).json({ success: false, error: err.message }) }
-  },
+  authMiddleware,
   upload.any(),
   async (req, res) => {
     try {
@@ -823,50 +604,22 @@ app.post('/releases/:releaseId/versions/primary/audio',
       if (!req.files || req.files.length === 0)
         return res.status(400).json({ success: false, error: 'No files uploaded' })
 
-      const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
-      const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-
-      if (!metadata.versions) metadata.versions = {}
-      if (!metadata.versions.primary) {
-        metadata.versions.primary = {
-          versionName: 'Primary Version',
-          versionId: 'primary',
-          createdAt: new Date().toISOString(),
-          files: { audio: [], artwork: [], video: [] }
-        }
-      }
-      if (!metadata.versions.primary.files)        metadata.versions.primary.files = {}
-      if (!metadata.versions.primary.files.audio)  metadata.versions.primary.files.audio = []
-
       const added = []
       for (const file of req.files) {
-        const fileType = classify(file)
-        if (fileType !== 'audio') {
-          await fs.unlink(file.path)
+        if (classify(file) !== 'audio')
           return res.status(400).json({ success: false, error: `Only audio files allowed. Got: ${file.originalname}` })
-        }
-        const validation = await validateAudioFile(file.path)
-        if (!validation.valid) {
-          await fs.unlink(file.path)
+        const validation = await validateAudioFile(file.buffer, file.mimetype)
+        if (!validation.valid)
           return res.status(400).json({ success: false, error: validation.error, file: file.originalname })
-        }
-        const fileEntry = {
-          filename:   file.originalname,
-          size:       file.size,
-          mimetype:   file.mimetype,
-          duration:   validation.metadata.duration,
-          bitrate:    validation.metadata.bitrate,
-          sampleRate: validation.metadata.sampleRate,
-          channels:   validation.metadata.channels,
-          codec:      validation.metadata.codec
-        }
-        metadata.versions.primary.files.audio.push(fileEntry)
-        added.push(fileEntry)
+        const key = `releases/${releaseId}/audio/primary/${file.originalname}`
+        await r2.uploadFile(key, file.buffer, file.mimetype)
+        added.push({
+          filename: file.originalname, size: file.size, mimetype: file.mimetype,
+          duration: validation.metadata.duration, bitrate: validation.metadata.bitrate,
+          sampleRate: validation.metadata.sampleRate, channels: validation.metadata.channels, codec: validation.metadata.codec
+        })
       }
-
-      metadata.updatedAt = new Date().toISOString()
-      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-      res.json({ success: true, added, totalAudioFiles: metadata.versions.primary.files.audio.length })
+      res.json({ success: true, added })
     } catch (err) {
       res.status(500).json({ success: false, error: err.message })
     }
@@ -874,37 +627,13 @@ app.post('/releases/:releaseId/versions/primary/audio',
 )
 
 // POST /releases/:releaseId/video
-// Upload a video file — completely separate from the versions system
-const videoUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, cb) {
-      const dir = path.join(RELEASES_DIR, req.params.releaseId, 'video')
-      fsSync.mkdirSync(dir, { recursive: true })
-      cb(null, dir)
-    },
-    filename(req, file, cb) { cb(null, file.originalname) }
-  })
-})
-
-app.post('/releases/:releaseId/video', videoUpload.single('file'), async (req, res) => {
+app.post('/releases/:releaseId/video', authMiddleware, upload.single('file'), async (req, res) => {
   try {
     const { releaseId } = req.params
     if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' })
-
-    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
-    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-
-    if (!metadata.versions)                          metadata.versions = {}
-    if (!metadata.versions.primary)                  metadata.versions.primary = { versionName: 'Primary Version', versionId: 'primary', createdAt: new Date().toISOString(), files: { audio: [], artwork: [], video: [] } }
-    if (!metadata.versions.primary.files)            metadata.versions.primary.files = {}
-    if (!metadata.versions.primary.files.video)      metadata.versions.primary.files.video = []
-
-    const fileEntry = { filename: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype }
-    metadata.versions.primary.files.video.push(fileEntry)
-    metadata.updatedAt = new Date().toISOString()
-    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-
-    res.json({ success: true, file: fileEntry })
+    const key = `releases/${releaseId}/video/${req.file.originalname}`
+    await r2.uploadFile(key, req.file.buffer, req.file.mimetype)
+    res.json({ success: true, file: { filename: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype } })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
   }
@@ -1783,48 +1512,36 @@ app.patch('/releases/:releaseId/notes', authMiddleware, async (req, res) => {
   }
 })
 
-app.post('/releases/:releaseId/notes/files', releaseNotesUpload.single('file'), async (req, res) => {
+app.post('/releases/:releaseId/notes/files', authMiddleware, releaseNotesUpload.single('file'), async (req, res) => {
   try {
     const { releaseId } = req.params
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
-
-    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
-    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-    if (!metadata.notes) metadata.notes = { text: '', documents: [] }
-    if (!metadata.notes.documents) metadata.notes.documents = []
-
-    metadata.notes.documents.push({ filename: req.file.originalname, size: req.file.size, uploadedAt: new Date().toISOString() })
-    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-    res.json({ documents: metadata.notes.documents })
+    const key = `releases/${releaseId}/notes/${req.file.originalname}`
+    await r2.uploadFile(key, req.file.buffer, req.file.mimetype)
+    res.json({ success: true, filename: req.file.originalname, size: req.file.size })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-app.get('/releases/:releaseId/notes/files/:filename', async (req, res) => {
-  try {
-    const filePath = path.join(RELEASES_DIR, req.params.releaseId, 'notes', req.params.filename)
-    try { await fs.access(filePath) }
-    catch { return res.status(404).json({ error: 'File not found' }) }
-    res.download(filePath)
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
-})
-
-app.delete('/releases/:releaseId/notes/files/:filename', async (req, res) => {
+app.get('/releases/:releaseId/notes/files/:filename', authMiddleware, async (req, res) => {
   try {
     const { releaseId, filename } = req.params
-    const filePath     = path.join(RELEASES_DIR, releaseId, 'notes', filename)
-    const metadataPath = path.join(RELEASES_DIR, releaseId, 'metadata.json')
+    const key = `releases/${releaseId}/notes/${filename}`
+    const r2Obj = await r2.getFile(key)
+    res.set('Content-Disposition', `attachment; filename="${filename}"`)
+    res.set('Content-Type', r2Obj.ContentType || 'application/octet-stream')
+    r2Obj.Body.pipe(res)
+  } catch (error) {
+    res.status(404).json({ error: 'File not found' })
+  }
+})
 
-    await fs.unlink(filePath)
-    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-    if (metadata.notes?.documents) {
-      metadata.notes.documents = metadata.notes.documents.filter(d => d.filename !== filename)
-    }
-    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-    res.json({ documents: metadata.notes?.documents || [] })
+app.delete('/releases/:releaseId/notes/files/:filename', authMiddleware, async (req, res) => {
+  try {
+    const { releaseId, filename } = req.params
+    await r2.deleteFile(`releases/${releaseId}/notes/${filename}`)
+    res.json({ success: true, message: `${filename} deleted` })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -2364,16 +2081,17 @@ app.delete('/collections/:collectionId', authMiddleware, async (req, res) => {
 // COLLECTIONS — ARTWORK
 // =============================================================================
 
-app.post('/collections/:collectionId/artwork', collectionUpload.single('artwork'), async (req, res) => {
+app.post('/collections/:collectionId/artwork', authMiddleware, collectionUpload.single('artwork'), async (req, res) => {
   try {
     const { collectionId } = req.params
     if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' })
-    const metadataPath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'))
-    metadata.fileCounts = { artwork: 1 }
-    metadata.artworkFilename = req.file.filename
-    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true })
+    const ext = path.extname(req.file.originalname).toLowerCase()
+    const key = `collections/${collectionId}/artwork/artwork${ext}`
+    // Delete existing artwork first
+    const existing = await r2.listFiles(`collections/${collectionId}/artwork/`)
+    await Promise.all(existing.map(f => r2.deleteFile(f.Key)))
+    await r2.uploadFile(key, req.file.buffer, req.file.mimetype)
+    res.json({ success: true, key })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
   }
@@ -2381,31 +2099,22 @@ app.post('/collections/:collectionId/artwork', collectionUpload.single('artwork'
 
 app.get('/collections/:collectionId/artwork', async (req, res) => {
   try {
-    const artworkDir = path.join(COLLECTIONS_PATH, req.params.collectionId, 'artwork')
-    const files = await fs.readdir(artworkDir)
-    const imageFile = files.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
-    if (!imageFile) return res.status(404).json({ error: 'No artwork found' })
-    res.sendFile(path.join(artworkDir, imageFile))
+    const files = await r2.listFiles(`collections/${req.params.collectionId}/artwork/`)
+    if (files.length === 0) return res.status(404).json({ error: 'No artwork found' })
+    const r2Obj = await r2.getFile(files[0].Key)
+    res.set('Content-Type', r2Obj.ContentType || 'image/jpeg')
+    r2Obj.Body.pipe(res)
   } catch {
     res.status(404).json({ error: 'No artwork found' })
   }
 })
 
-app.delete('/collections/:collectionId/artwork', async (req, res) => {
+app.delete('/collections/:collectionId/artwork', authMiddleware, async (req, res) => {
   try {
     const { collectionId } = req.params
-    const artworkDir   = path.join(COLLECTIONS_PATH, collectionId, 'artwork')
-    const metadataPath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-
-    try {
-      const files = await fs.readdir(artworkDir)
-      for (const file of files) await fs.unlink(path.join(artworkDir, file))
-    } catch { return res.status(404).json({ success: false, error: 'No artwork found' }) }
-
-    const metadata = await readCollection(collectionId)
-    metadata.fileCounts = { artwork: 0 }
-    delete metadata.artworkFilename
-    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+    const existing = await r2.listFiles(`collections/${collectionId}/artwork/`)
+    if (existing.length === 0) return res.status(404).json({ success: false, error: 'No artwork found' })
+    await Promise.all(existing.map(f => r2.deleteFile(f.Key)))
     res.json({ success: true, message: 'Artwork deleted' })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
@@ -2706,43 +2415,35 @@ app.patch('/collections/:collectionId/notes', authMiddleware, async (req, res) =
   }
 })
 
-app.post('/collections/:collectionId/notes/files', collectionNotesUpload.single('file'), async (req, res) => {
+app.post('/collections/:collectionId/notes/files', authMiddleware, collectionNotesUpload.single('file'), async (req, res) => {
   try {
     const { collectionId } = req.params
     if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' })
-
-    const filePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    const metadata = await readCollection(collectionId)
-    if (!metadata.notes) metadata.notes = { text: '', documents: [] }
-    if (!metadata.notes.documents) metadata.notes.documents = []
-
-    metadata.notes.documents.push({ filename: req.file.originalname, size: req.file.size, uploadedAt: new Date().toISOString() })
-    await fs.writeFile(filePath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true, documents: metadata.notes.documents })
+    const key = `collections/${collectionId}/notes/${req.file.originalname}`
+    await r2.uploadFile(key, req.file.buffer, req.file.mimetype)
+    res.json({ success: true, filename: req.file.originalname, size: req.file.size })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
   }
 })
 
-app.get('/collections/:collectionId/notes/files/:filename', (req, res) => {
-  const filePath = path.join(COLLECTIONS_PATH, req.params.collectionId, 'notes', req.params.filename)
-  if (!fsSync.existsSync(filePath)) return res.status(404).json({ error: 'File not found' })
-  res.setHeader('Content-Disposition', `attachment; filename="${req.params.filename}"`)
-  fsSync.createReadStream(filePath).pipe(res)
-})
-
-app.delete('/collections/:collectionId/notes/files/:filename', async (req, res) => {
+app.get('/collections/:collectionId/notes/files/:filename', authMiddleware, async (req, res) => {
   try {
     const { collectionId, filename } = req.params
-    const filePath     = path.join(COLLECTIONS_PATH, collectionId, 'notes', filename)
-    const metaFilePath = path.join(COLLECTIONS_PATH, collectionId, 'metadata.json')
-    try { await fs.unlink(filePath) } catch {}
-    const metadata = await readCollection(collectionId)
-    if (metadata.notes?.documents) {
-      metadata.notes.documents = metadata.notes.documents.filter(d => d.filename !== filename)
-    }
-    await fs.writeFile(metaFilePath, JSON.stringify(metadata, null, 2))
-    res.json({ success: true, documents: metadata.notes?.documents || [] })
+    const r2Obj = await r2.getFile(`collections/${collectionId}/notes/${filename}`)
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.set('Content-Type', r2Obj.ContentType || 'application/octet-stream')
+    r2Obj.Body.pipe(res)
+  } catch {
+    res.status(404).json({ error: 'File not found' })
+  }
+})
+
+app.delete('/collections/:collectionId/notes/files/:filename', authMiddleware, async (req, res) => {
+  try {
+    const { collectionId, filename } = req.params
+    await r2.deleteFile(`collections/${collectionId}/notes/${filename}`)
+    res.json({ success: true, message: `${filename} deleted` })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
   }
