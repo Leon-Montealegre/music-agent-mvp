@@ -361,8 +361,7 @@ export default function TrackDetailPage({ params }) {
     )
   }
 
-  const metadata   = track.metadata || track
-  const artworkUrl = `${API_BASE_URL}/releases/${trackId}/artwork/?t=${Date.now()}`
+  const hasArtwork = !sidebarArtworkError
 
   const signedSubmission = metadata.distribution?.submit?.find(s => s.status?.toLowerCase() === 'signed')
   const isSigned         = !!signedSubmission
