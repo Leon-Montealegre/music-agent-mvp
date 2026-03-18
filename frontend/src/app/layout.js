@@ -2,6 +2,7 @@ import './globals.css'
 import Link from 'next/link'
 import ScrollToTop from '@/components/ScrollToTop'
 import FeedbackButton from '@/components/FeedbackButton'
+import UserPill from '@/components/UserPill'
 import HeaderNav from '@/components/HeaderNav'
 import Providers from '@/components/Providers'
 
@@ -42,7 +43,9 @@ export default function RootLayout({ children }) {
                   <span className="text-base">⚙️</span>
                   <span>Settings</span>
                 </Link>
-                
+
+                <UserPill />
+
                 <a
                   href="https://www.buymeacoffee.com/musicagent"
                   target="_blank"
