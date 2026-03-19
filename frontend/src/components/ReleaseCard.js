@@ -17,8 +17,8 @@ export default function ReleaseCard({ release }) {
     <Link href={`/releases/${release.releaseId}`} className="block group">
       <div className="flex flex-col bg-gray-800/80 border border-gray-700 group-hover:border-purple-500 rounded-xl overflow-hidden shadow-lg transition-all duration-200 group-hover:shadow-purple-500/20 group-hover:-translate-y-0.5">
 
-        {/* Artwork — fixed height, not aspect-square */}
-        <div className="h-44 bg-gradient-to-br from-gray-800 to-gray-900 relative overflow-hidden flex-shrink-0">
+        {/* Artwork — square ratio so album art always looks correct */}
+        <div className="aspect-square bg-gradient-to-br from-gray-800 to-gray-900 relative overflow-hidden flex-shrink-0">
           <img
             src={`${API_BASE_URL}/releases/${release.releaseId}/artwork`}
             alt={release.title}
@@ -42,14 +42,14 @@ export default function ReleaseCard({ release }) {
         </div>
 
         {/* Info strip */}
-        <div className="p-3 flex flex-col gap-1.5">
+        <div className="p-2.5 flex flex-col gap-1">
 
           {/* Title + artist */}
           <div>
-            <h3 className="font-semibold text-base text-gray-100 truncate leading-snug">
+            <h3 className="font-semibold text-sm text-gray-100 truncate leading-snug">
               {release.title}
             </h3>
-            <p className="text-sm text-gray-400 truncate">{release.artist}</p>
+            <p className="text-xs text-gray-400 truncate">{release.artist}</p>
             {collectionName && (
               <p className="text-xs text-indigo-400/70 truncate mt-0.5">Part of {collectionName}</p>
             )}

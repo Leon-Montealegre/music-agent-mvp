@@ -191,8 +191,8 @@ export default function HomePage() {
       <Link href={`/collections/${item.releaseId}`} className="block group">
         <div className="flex flex-col bg-gray-800/95 border-2 border-indigo-500/40 group-hover:border-indigo-400 rounded-xl overflow-hidden shadow-lg transition-all duration-200 group-hover:shadow-indigo-500/25 group-hover:-translate-y-0.5">
 
-          {/* Artwork — same fixed height as ReleaseCard */}
-          <div className="h-44 bg-gradient-to-br from-indigo-950 to-gray-900 relative overflow-hidden flex-shrink-0">
+          {/* Artwork — square ratio so album art always looks correct */}
+          <div className="aspect-square bg-gradient-to-br from-indigo-950 to-gray-900 relative overflow-hidden flex-shrink-0">
             <img
               src={`${API_BASE_URL}/collections/${item.releaseId}/artwork`}
               alt={item.title}
@@ -221,14 +221,14 @@ export default function HomePage() {
           </div>
 
           {/* Info strip */}
-          <div className="p-3 flex flex-col gap-1.5">
+          <div className="p-2.5 flex flex-col gap-1">
 
             {/* Title + artist */}
             <div>
-              <h3 className="font-semibold text-base text-indigo-100 truncate leading-snug group-hover:text-indigo-300 transition-colors">
+              <h3 className="font-semibold text-sm text-indigo-100 truncate leading-snug group-hover:text-indigo-300 transition-colors">
                 {item.title}
               </h3>
-              <p className="text-sm text-indigo-300/70 truncate">{item.artist}</p>
+              <p className="text-xs text-indigo-300/70 truncate">{item.artist}</p>
             </div>
 
             {/* Genre */}
@@ -394,7 +394,7 @@ export default function HomePage() {
     return (
       <button
         onClick={onToggle}
-        className={`w-full flex items-center justify-between py-3 border-b ${colors[accent]} hover:opacity-80 transition-opacity mb-6`}
+        className={`w-full flex items-center justify-between py-2 border-b ${colors[accent]} hover:opacity-80 transition-opacity mb-4`}
       >
         <div className="flex items-center gap-3">
           <span className={`text-lg font-bold ${colors[accent].split(' ')[0]}`}>{label}</span>
@@ -409,12 +409,12 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
 
       {/* Header */}
-      <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700 mb-8">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700 mb-4">
+        <div className="max-w-7xl mx-auto px-4 py-4">
 
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h1 className="text-4xl font-bold text-gray-100 mb-2">Catalogue Dashboard</h1>
+              <h1 className="text-2xl font-bold text-gray-100 mb-1">Catalogue Dashboard</h1>
               <div className="flex items-center gap-3 flex-wrap text-sm">
                 <span className="text-gray-400">{totalAll} total</span>
                 <span className="text-gray-600">•</span>
@@ -485,76 +485,73 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="space-y-4">
+          {/* Filters — all on two compact rows */}
+          <div className="space-y-2">
 
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search by title, artist, label, genre, BPM, or key..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-lg">×</button>
-              )}
-            </div>
+            {/* Row 1: search + type + status all inline */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="relative flex-grow min-w-[180px]">
+                <input
+                  type="text"
+                  placeholder="Search title, artist, genre, BPM, key…"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">×</button>
+                )}
+              </div>
 
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              <div className="h-5 w-px bg-gray-600" />
 
               {/* Type filter */}
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 text-sm font-medium whitespace-nowrap">Show:</span>
-                {[
-                  { value: 'all',     label: 'All' },
-                  { value: 'singles', label: 'Singles' },
-                  { value: 'eps',     label: 'EPs' },
-                  { value: 'albums',  label: 'Albums' },
-                ].map(({ value, label }) => (
-                  <button
-                    key={value}
-                    onClick={() => setTypeFilter(value)}
-                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-sm ${
-                      typeFilter === value ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {[
+                { value: 'all',     label: 'All' },
+                { value: 'singles', label: 'Singles' },
+                { value: 'eps',     label: 'EPs' },
+                { value: 'albums',  label: 'Albums' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setTypeFilter(value)}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-colors text-xs ${
+                    typeFilter === value ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
 
-              <div className="h-6 w-px bg-gray-600 hidden sm:block" />
+              <div className="h-5 w-px bg-gray-600" />
 
               {/* Status filter */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-gray-500 text-sm font-medium whitespace-nowrap">Status:</span>
-                {[
-                  { value: 'all',      label: 'All' },
-                  { value: 'signed',   label: 'Signed' },
-                  { value: 'released', label: 'Released' },
-                  { value: 'promoted', label: 'Promoted' },
-                ].map(({ value, label }) => (
-                  <button
-                    key={value}
-                    onClick={() => setStatusFilter(value)}
-                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-sm ${
-                      statusFilter === value ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {[
+                { value: 'all',      label: 'All' },
+                { value: 'signed',   label: 'Signed' },
+                { value: 'released', label: 'Released' },
+                { value: 'promoted', label: 'Promoted' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setStatusFilter(value)}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-colors text-xs ${
+                    statusFilter === value ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            {/* Sort */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-gray-500 text-sm font-medium">Sort:</span>
+            {/* Row 2: Sort */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-gray-500 text-xs font-medium">Sort:</span>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value)}
-                className="px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="px-2.5 py-1 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 <option value="date-newest">Date (Newest First)</option>
                 <option value="date-oldest">Date (Oldest First)</option>
@@ -568,7 +565,7 @@ export default function HomePage() {
               {!sortBy.startsWith('date-') && (
                 <button
                   onClick={() => setSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
-                  className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-white text-sm transition-colors"
+                  className="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-white text-xs transition-colors"
                 >
                   {sortDirection === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
                 </button>
@@ -623,7 +620,7 @@ export default function HomePage() {
                       {sortedCollections.map(item => <ListRow key={item.releaseId} item={item} type="collection" />)}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 items-start">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 items-start">
                       {sortedCollections.map(item => <CollectionCard key={item.releaseId} item={item} />)}
                     </div>
                   )
@@ -647,7 +644,7 @@ export default function HomePage() {
                       {sortedSingles.map(item => <ListRow key={item.releaseId} item={item} type="single" />)}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 items-start">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 items-start">
                       {sortedSingles.map(item => <ReleaseCard key={item.releaseId} release={item} />)}
                     </div>
                   )
@@ -665,7 +662,7 @@ export default function HomePage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 items-start">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 items-start">
               {flatItems.map(item =>
                 item._type === 'collection'
                   ? <CollectionCard key={item.releaseId} item={item} />
