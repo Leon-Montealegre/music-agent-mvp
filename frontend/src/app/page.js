@@ -76,12 +76,16 @@ export default function HomePage() {
   const totalAll     = releases.length + collections.length
 
   // --- Shared status helper ---
-  function matchesStatusFilter(dist) {
+  function matchesStatusFilter(dist, item) {
     if (statusFilter === 'all') return true
-    const isSigned    = dist?.submit?.some(e => e.status?.toLowerCase() === 'signed')
+    const isSigned    = item?.isSigned || dist?.submit?.some(e => e.status?.toLowerCase() === 'signed')
     const isSubmitted = dist?.submit?.some(e => e.status?.toLowerCase() === 'submitted')
+    const isReleased  = dist?.release?.some(e => e.status?.toLowerCase() === 'live')
+    const isPromoted  = dist?.promote?.some(e => e.status?.toLowerCase() === 'live')
     if (statusFilter === 'signed')    return isSigned
     if (statusFilter === 'submitted') return isSubmitted
+    if (statusFilter === 'released')  return isReleased
+    if (statusFilter === 'promoted')  return isPromoted
     return true
   }
 
@@ -90,7 +94,7 @@ export default function HomePage() {
     if (!release) return false
     if (typeFilter === 'eps' || typeFilter === 'albums') return false
     if (typeFilter === 'singles' && release.collectionId) return false
-    if (!matchesStatusFilter(release.distribution)) return false
+    if (!matchesStatusFilter(release.distribution, release)) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       return (
@@ -110,7 +114,7 @@ export default function HomePage() {
     if (typeFilter === 'singles') return false
     if (typeFilter === 'eps'    && collection.collectionType !== 'EP')    return false
     if (typeFilter === 'albums' && collection.collectionType !== 'Album') return false
-    if (!matchesStatusFilter(collection.distribution)) return false
+    if (!matchesStatusFilter(collection.distribution, collection)) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       return (
@@ -248,7 +252,7 @@ export default function HomePage() {
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/60 text-green-300 border border-green-700/40">Signed</span>
                 )}
                 {isItemSubmitted && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/60 text-blue-300 border border-blue-700/40">Submitted</span>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-900/60 text-yellow-300 border border-yellow-700/40">Submitted</span>
                 )}
               </div>
             )}
@@ -377,7 +381,7 @@ export default function HomePage() {
                   <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(21,128,61,0.4)', color: '#86efac', border: '1px solid rgba(21,128,61,0.5)' }}>Signed</span>
                 )}
                 {rowSubmitted && (
-                  <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(29,78,216,0.4)', color: '#93c5fd', border: '1px solid rgba(29,78,216,0.5)' }}>Submitted</span>
+                  <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(161,120,0,0.4)', color: '#fde047', border: '1px solid rgba(161,120,0,0.5)' }}>Submitted</span>
                 )}
               </div>
             )
@@ -533,6 +537,8 @@ export default function HomePage() {
                 { value: 'all',       label: 'All' },
                 { value: 'signed',    label: 'Signed' },
                 { value: 'submitted', label: 'Submitted' },
+                { value: 'released',  label: 'Released' },
+                { value: 'promoted',  label: 'Promoted' },
               ].map(({ value, label }) => (
                 <button
                   key={value}

@@ -329,6 +329,7 @@ export default function TrackDetailPage({ params }) {
 
       setShowLabelSigningModal(false)
       await loadTrack()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       alert(`Error: ${err.message}`)
     }
@@ -435,7 +436,7 @@ export default function TrackDetailPage({ params }) {
                   <div className="px-3 py-1 rounded-md text-sm font-semibold bg-green-500/20 border border-green-500/50 text-green-300">Signed</div>
                 )}
                 {isSubmittedOnly && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">Submitted</div>
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-yellow-500/20 border border-yellow-400/60 text-yellow-200">Submitted</div>
                 )}
               </div>
               <p className="text-xl text-gray-300">{metadata.artist}</p>
@@ -1147,7 +1148,7 @@ export default function TrackDetailPage({ params }) {
       <Modal isOpen={showPlatformModal || editingEntry?.pathType === 'release'} onClose={() => { setShowPlatformModal(false); setEditingEntry(null) }} title={editingEntry?.pathType === 'release' ? 'Edit Platform' : 'Add Platform'}>
         <LogPlatformForm
           releaseId={trackId}
-          onSuccess={() => { setShowPlatformModal(false); setEditingEntry(null); loadTrack() }}
+          onSuccess={() => { setShowPlatformModal(false); setEditingEntry(null); loadTrack(); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
           onCancel={() => { setShowPlatformModal(false); setEditingEntry(null) }}
           editMode={editingEntry?.pathType === 'release'}
           existingEntry={editingEntry}
@@ -1157,7 +1158,7 @@ export default function TrackDetailPage({ params }) {
       <Modal isOpen={showSubmissionModal || editingEntry?.pathType === 'submit'} onClose={() => { setShowSubmissionModal(false); setEditingEntry(null) }} title={editingEntry?.pathType === 'submit' ? 'Edit Label Submission' : 'Log Label Submission'}>
         <LogSubmissionForm
           releaseId={trackId}
-          onSuccess={() => { setShowSubmissionModal(false); setEditingEntry(null); loadTrack() }}
+          onSuccess={() => { setShowSubmissionModal(false); setEditingEntry(null); loadTrack(); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
           onCancel={() => { setShowSubmissionModal(false); setEditingEntry(null) }}
           editMode={editingEntry?.pathType === 'submit'}
           existingEntry={editingEntry}
@@ -1214,11 +1215,11 @@ export default function TrackDetailPage({ params }) {
 
       <DeleteTrackModal isOpen={showDeleteTrackModal} onClose={() => setShowDeleteTrackModal(false)} onConfirm={handleDeleteTrack} trackTitle={metadata.title} trackArtist={metadata.artist} />
 
-      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Track Metadata">
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Track">
         <EditMetadataModal
           track={track}
           onClose={() => setShowEditModal(false)}
-          onSuccess={() => { setShowEditModal(false); loadTrack() }}
+          onSuccess={() => { setShowEditModal(false); loadTrack(); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
         />
       </Modal>
 

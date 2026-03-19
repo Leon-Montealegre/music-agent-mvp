@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { API_BASE_URL } from '@/lib/api'
 
 export default function ReleaseCard({ release, collectionsMap }) {
-  const isSigned    = release.isSigned || release.distribution?.submit?.some(s => s.status?.toLowerCase() === 'signed')
+  const isSigned    = release.distribution?.submit?.some(s => s.status?.toLowerCase() === 'signed')
   const isSubmitted = !isSigned && release.distribution?.submit?.some(s => s.status?.toLowerCase() === 'submitted')
   const hasAnyBadge = isSigned || isSubmitted
 
@@ -78,7 +78,7 @@ export default function ReleaseCard({ release, collectionsMap }) {
                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">Signed</span>
               )}
               {isSubmitted && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-600/25 text-blue-300 border border-blue-500/30">Submitted</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-900/60 text-yellow-300 border border-yellow-700/40">Submitted</span>
               )}
             </div>
           )}

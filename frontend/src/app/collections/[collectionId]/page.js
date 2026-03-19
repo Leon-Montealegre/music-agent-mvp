@@ -349,7 +349,6 @@ export default function CollectionDetailPage({ params }) {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-300 mb-4">Collection not found</p>
-          <Link href="/" className="text-purple-400 hover:text-purple-300">← Back to Catalogue</Link>
         </div>
       </div>
     )
@@ -359,7 +358,7 @@ export default function CollectionDetailPage({ params }) {
   const artworkUrl       = `${API_BASE_URL}/collections/${collectionId}/artwork?t=${Date.now()}`
   const dist             = collection.distribution || {}
   const signedSubmission = dist.submit?.find(s => s.status?.toLowerCase() === 'signed')
-  const isSigned         = !!(collection.isSigned || signedSubmission)
+  const isSigned         = !!signedSubmission
   const signedLabel      = signedSubmission?.label || collection.signedLabel || null
   const hasPromoDeals    = dist.promote?.length > 0
   const isSubmittedOnly  = !isSigned && dist.submit?.some(s => s.status?.toLowerCase() === 'submitted')
@@ -381,7 +380,7 @@ export default function CollectionDetailPage({ params }) {
                   <div className="px-3 py-1 rounded-md text-sm font-semibold bg-green-500/20 border border-green-500/50 text-green-300">Signed</div>
                 )}
                 {isSubmittedOnly && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">Submitted</div>
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-yellow-500/20 border border-yellow-400/60 text-yellow-200">Submitted</div>
                 )}
               </div>
               <p className="text-xl text-gray-300">{collection.artist}</p>

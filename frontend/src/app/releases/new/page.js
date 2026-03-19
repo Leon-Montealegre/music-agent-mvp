@@ -102,22 +102,15 @@ export default function CreateTrackPage() {
       // Step 2: Save metadata
       const metadataPayload = {
         releaseId: trackId,
-        metadata: {
-          releaseId: trackId,
-          artist,
-          title,
-          genre,
-          releaseFormat: 'Single',
-          releaseType: 'Single',
-          trackDate,
-          releaseDate: trackDate,
-          ...(bpm && { bpm: parseInt(bpm) }),
-          ...(key && { key }),
-          createdAt: new Date().toISOString(),
-          files: uploadData.files,
-          distribution: { release: [], submit: [], promote: [] },
-          labelInfo: { isSigned: false, label: null, signedDate: null, contractDocuments: [] },
-        }
+        artist,
+        title,
+        genre,
+        releaseFormat: 'Single',
+        releaseType: 'Single',
+        trackDate,
+        releaseDate: trackDate,
+        ...(bpm && { bpm: parseInt(bpm) }),
+        ...(key && { key }),
       }
       const metadataResponse = await apiFetch('/metadata', {
         method: 'POST',
@@ -201,7 +194,6 @@ export default function CreateTrackPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-gray-100">Add New Track</h1>
-            <Link href="/" className="text-purple-400 hover:text-purple-300 transition-colors">← Back to Catalogue</Link>
           </div>
           <p className="text-gray-300">Upload your track and add it to your catalogue</p>
         </div>

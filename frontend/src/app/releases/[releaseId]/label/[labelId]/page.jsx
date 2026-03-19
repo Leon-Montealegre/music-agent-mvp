@@ -57,7 +57,7 @@ export default function LabelEntryPage({ params }) {
       setDetailsForm({
         label: fetchedEntry.label || fetchedEntry.labelName || '',
         platform: fetchedEntry.platform || '',
-        status: fetchedEntry.status || 'Pending',
+        status: fetchedEntry.status || 'Submitted',
         signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : (fetchedEntry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
         notes: fetchedEntry.notes || ''
       })
@@ -104,10 +104,11 @@ export default function LabelEntryPage({ params }) {
       setDetailsForm({
         label: data.entry.label || data.entry.labelName || '',
         platform: data.entry.platform || '',
-        status: data.entry.status || 'Pending',
+        status: data.entry.status || 'Submitted',
         signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : (data.entry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
         notes: data.entry.notes || ''
       })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       console.error('Error saving label details:', err)
       alert(`Failed to save label details: ${err.message}`)
@@ -247,7 +248,7 @@ export default function LabelEntryPage({ params }) {
   }
 
   const metadata = track.metadata || track
-  const status = (entry.status || 'Pending').toLowerCase()
+  const status = (entry.status || 'Submitted').toLowerCase()
   let statusClasses = 'bg-gray-700/60 border border-gray-500/60 text-gray-200'
   if (status === 'signed') statusClasses = 'bg-green-500/20 border border-green-400/60 text-green-200'
   else if (status === 'completed') statusClasses = 'bg-gray-600/40 border border-gray-400/60 text-gray-100'
@@ -277,7 +278,7 @@ export default function LabelEntryPage({ params }) {
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Status</p>
                   <span className={`inline-block px-3 py-1 rounded-md text-sm font-semibold ${statusClasses}`}>
-                    {entry.status || 'Pending'}
+                    {entry.status || 'Submitted'}
                   </span>
                 </div>
 

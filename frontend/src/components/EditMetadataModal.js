@@ -76,7 +76,6 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
 
   const handleSave = async () => {
     if (!artist || !title) return setError('Artist and Title are required')
-    if (!genre) return setError('Genre is required')
     if (grouping === 'existing' && !selectedCollectionId) return setError('Please select a collection')
     if (grouping === 'new' && !newCollectionName) return setError('Please enter a name for the new EP/Album')
 
@@ -232,7 +231,7 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
 
       {/* Genre */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Genre <span className="text-red-400">*</span></label>
+        <label className="block text-sm font-medium text-gray-300 mb-1">Genre <span className="text-gray-500 font-normal">(Optional)</span></label>
         <select value={genre} onChange={e => setGenre(e.target.value)} className={inputClass}>
           <option value="">Choose Genre</option>
           {genres.map(g => <option key={g} value={g}>{g}</option>)}

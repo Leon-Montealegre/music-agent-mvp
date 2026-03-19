@@ -108,6 +108,7 @@ export default function CollectionLabelEntryPage({ params }) {
         signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : (data.entry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
         notes: data.entry.notes || ''
       })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       console.error('Error saving label details:', err)
       alert(`Failed to save label details: ${err.message}`)

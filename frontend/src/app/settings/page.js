@@ -35,7 +35,6 @@ export default function SettingsPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-gray-100">⚙️ Settings</h1>
-            <Link href="/" className="text-purple-400 hover:text-purple-300 transition-colors">← Back to Catalogue</Link>
           </div>
           <p className="text-gray-300">Manage your default preferences</p>
         </div>
