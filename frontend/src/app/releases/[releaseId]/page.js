@@ -53,6 +53,7 @@ export default function TrackDetailPage({ params }) {
   const [isDeleting, setIsDeleting]                       = useState(false)
   const [sidebarArtworkError, setSidebarArtworkError]     = useState(false)
   const [uploadingFile, setUploadingFile]                 = useState(null) // 'audio'|'artwork'|'video'|null
+  const [collectionTitle, setCollectionTitle]             = useState(null)
 
   // Links
   const [showAddLink, setShowAddLink]   = useState(false)
@@ -95,9 +96,22 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-  useEffect(() => { 
-    if (session?.token) loadTrack() 
+  useEffect(() => {
+    if (session?.token) loadTrack()
   }, [trackId, session])
+
+  // Fetch the collection's real title whenever the track has a collectionId.
+  // We can't rely on parsing the ID string because newer collections use UUIDs.
+  useEffect(() => {
+    const collId = track?.metadata?.collectionId || track?.collectionId
+    if (!collId) return
+    apiFetch(`/collections/${collId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) setCollectionTitle(data.title || data.collection?.title || null)
+      })
+      .catch(() => {})
+  }, [track])
 
 
   // ── File handlers ─────────────────────────────────────────────────────────
@@ -376,9 +390,12 @@ export default function TrackDetailPage({ params }) {
   const hasPromoDeals  = metadata.distribution?.promote?.length > 0
   const displayLabel   = signedLabel || submittedLabel
   const collectionType = metadata.releaseFormat || metadata.releaseType || 'Single'
-  const collectionName = metadata.collectionId
+  // collectionTitle is fetched from the API (see useEffect above).
+  // collectionNameFallback parses the old date-prefix ID format as a last resort.
+  const collectionNameFallback = metadata.collectionId
     ? metadata.collectionId.replace(/^\d{4}-\d{2}-\d{2}_[^_]+_/, '').replace(/_/g, ' ')
     : null
+  const collectionName = collectionTitle || collectionNameFallback
 
   const audioFiles   = track.versions?.primary?.files?.audio  || []
   const artworkFiles = track.versions?.primary?.files?.artwork || []
@@ -518,10 +535,6 @@ export default function TrackDetailPage({ params }) {
                     </div>
                   </div>
                 )}
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Track ID</p>
-                  <p className="text-xs font-mono text-gray-500 break-all">{metadata.releaseId}</p>
-                </div>
               </div>
 
               {/* ── Links ── */}

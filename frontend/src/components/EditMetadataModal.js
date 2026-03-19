@@ -409,12 +409,6 @@ export default function EditMetadataModal({ track, onClose, onSuccess }) {
         </div>
       </div>
 
-      {/* Track ID — read only */}
-      <div className="bg-gray-900/50 rounded-lg p-3">
-        <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Track ID (cannot be changed)</p>
-        <p className="text-xs font-mono text-gray-400">{metadata.releaseId}</p>
-      </div>
-
       {error && (
         <div className="bg-red-500/10 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg">
           {error}

@@ -272,7 +272,6 @@ export default function HomePage() {
     const artworkSrc = isCollection
       ? `${API_BASE_URL}/collections/${item.releaseId}/artwork`
       : `${API_BASE_URL}/releases/${item.releaseId}/artwork`
-    const hasArtwork = true
 
     return (
       <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
@@ -290,20 +289,32 @@ export default function HomePage() {
           onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
-          {/* Artwork */}
+          {/* Artwork — with vinyl SVG fallback if image fails to load */}
           <div style={{
             width: '40px', height: '40px', borderRadius: '6px',
-            overflow: 'hidden', flexShrink: 0,
+            overflow: 'hidden', flexShrink: 0, position: 'relative',
             background: isCollection ? '#1e1b4b' : '#1a1a2e',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            {hasArtwork ? (
-              <img src={artworkSrc} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isCollection ? '#6366f1' : '#7c3aed'} strokeWidth="1.5">
-                <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+            <img
+              src={artworkSrc}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              onError={e => {
+                e.target.style.display = 'none'
+                e.target.nextSibling.style.display = 'flex'
+              }}
+            />
+            <div style={{
+              display: 'none', position: 'absolute', inset: 0,
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="28" height="28" viewBox="0 0 120 120" opacity="0.5">
+                <circle cx="60" cy="60" r="55" fill={isCollection ? '#1e1b4b' : '#2a2a2a'} stroke={isCollection ? '#6366f1' : '#6b7280'} strokeWidth="2"/>
+                <circle cx="60" cy="60" r="38" fill="none" stroke={isCollection ? '#4338ca' : '#4b5563'} strokeWidth="1"/>
+                <circle cx="60" cy="60" r="22" fill={isCollection ? '#0f0e2a' : '#1a1a2e'} stroke={isCollection ? '#6366f1' : '#7c3aed'} strokeWidth="2"/>
+                <circle cx="60" cy="60" r="8"  fill="#000" stroke="#9ca3af" strokeWidth="2"/>
               </svg>
-            )}
+            </div>
           </div>
 
           {/* Title */}
