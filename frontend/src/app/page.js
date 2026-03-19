@@ -190,7 +190,9 @@ export default function HomePage() {
   const CollectionCard = ({ item }) => {
     const isItemSigned    = item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed')
     const isItemSubmitted = !isItemSigned && item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'submitted')
-    const hasAnyBadge     = isItemSigned || isItemSubmitted
+    const isItemReleased  = item.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
+    const isItemPromoted  = item.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live')
+    const hasAnyBadge     = isItemSigned || isItemSubmitted || isItemReleased || isItemPromoted
 
     return (
       <Link href={`/collections/${item.releaseId}`} className="block group">
@@ -253,6 +255,12 @@ export default function HomePage() {
                 )}
                 {isItemSubmitted && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-900/60 text-yellow-300 border border-yellow-700/40">Submitted</span>
+                )}
+                {isItemReleased && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-900/60 text-orange-300 border border-orange-700/40">Released</span>
+                )}
+                {isItemPromoted && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-pink-900/60 text-pink-300 border border-pink-700/40">Promoted</span>
                 )}
               </div>
             )}
@@ -341,35 +349,12 @@ export default function HomePage() {
             {item.artist}
           </div>
 
-          {/* Genre */}
-          {item.genre ? (
-            <span style={{
-              padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
-              background: isCollection ? 'rgba(99,102,241,0.2)' : 'rgba(124,58,237,0.2)',
-              color: isCollection ? '#a5b4fc' : '#c4b5fd',
-              border: `1px solid ${isCollection ? 'rgba(99,102,241,0.4)' : 'rgba(124,58,237,0.4)'}`,
-              whiteSpace: 'nowrap', flexShrink: 0,
-            }}>
-              {item.genre}
-            </span>
-          ) : (
-            <div style={{ width: '60px', flexShrink: 0 }} />
-          )}
-
-          {/* BPM */}
-          <div style={{ color: '#9ca3af', fontSize: '12px', width: '48px', flexShrink: 0 }}>
-            {item.bpm ? `${item.bpm} BPM` : ''}
-          </div>
-
-          {/* Key */}
-          <div style={{ color: '#9ca3af', fontSize: '12px', width: '36px', flexShrink: 0 }}>
-            {item.key || ''}
-          </div>
-
           {/* Badges — right-aligned */}
           {(() => {
             const rowSigned    = item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed')
             const rowSubmitted = !rowSigned && item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'submitted')
+            const rowReleased  = item.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
+            const rowPromoted  = item.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live')
             return (
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 {rowSigned && (
@@ -377,6 +362,12 @@ export default function HomePage() {
                 )}
                 {rowSubmitted && (
                   <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(161,120,0,0.4)', color: '#fde047', border: '1px solid rgba(161,120,0,0.5)' }}>Submitted</span>
+                )}
+                {rowReleased && (
+                  <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(194,65,12,0.4)', color: '#fdba74', border: '1px solid rgba(194,65,12,0.5)' }}>Released</span>
+                )}
+                {rowPromoted && (
+                  <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(157,23,77,0.4)', color: '#f9a8d4', border: '1px solid rgba(157,23,77,0.5)' }}>Promoted</span>
                 )}
               </div>
             )

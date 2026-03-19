@@ -5,7 +5,9 @@ import { API_BASE_URL } from '@/lib/api'
 export default function ReleaseCard({ release, collectionsMap }) {
   const isSigned    = release.distribution?.submit?.some(s => s.status?.toLowerCase() === 'signed')
   const isSubmitted = !isSigned && release.distribution?.submit?.some(s => s.status?.toLowerCase() === 'submitted')
-  const hasAnyBadge = isSigned || isSubmitted
+  const isReleased  = release.distribution?.release?.some(s => s.status?.toLowerCase() === 'live')
+  const isPromoted  = release.distribution?.promote?.some(s => s.status?.toLowerCase() === 'live')
+  const hasAnyBadge = isSigned || isSubmitted || isReleased || isPromoted
 
   const collectionName = release.collectionId
     ? (collectionsMap?.[release.collectionId] ||
@@ -79,6 +81,12 @@ export default function ReleaseCard({ release, collectionsMap }) {
               )}
               {isSubmitted && (
                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-900/60 text-yellow-300 border border-yellow-700/40">Submitted</span>
+              )}
+              {isReleased && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30">Released</span>
+              )}
+              {isPromoted && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-pink-500/20 text-pink-300 border border-pink-500/30">Promoted</span>
               )}
             </div>
           )}

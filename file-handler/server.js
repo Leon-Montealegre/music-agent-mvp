@@ -411,10 +411,12 @@ app.get('/releases/:releaseId/', authMiddleware, async (req, res) => {
     const r = result.rows[0]
     const releaseUUID = r.id
 
-    const [distResult, notesResult, songLinksResult] = await Promise.all([
+    const [distResult, notesResult, songLinksResult, audioFiles, videoFiles] = await Promise.all([
       db.query(`SELECT * FROM distribution_entries WHERE release_id = $1`, [releaseUUID]),
       db.query(`SELECT text FROM notes WHERE release_id = $1 LIMIT 1`, [releaseUUID]),
-      db.query(`SELECT id, label, url FROM song_links WHERE release_id = $1`, [releaseUUID])
+      db.query(`SELECT id, label, url FROM song_links WHERE release_id = $1`, [releaseUUID]),
+      r2.listFiles(`releases/${releaseId}/audio/primary/`),
+      r2.listFiles(`releases/${releaseId}/video/`)
     ])
 
     const distribution = { release: [], submit: [], promote: [] }
@@ -432,6 +434,19 @@ app.get('/releases/:releaseId/', authMiddleware, async (req, res) => {
         contacts:  [],
         documents: []
       })
+    }
+
+    // Check if artwork exists
+    const artworkList = await r2.listFiles(`releases/${releaseId}/artwork/`)
+
+    const versions = {
+      primary: {
+        files: {
+          audio:   audioFiles.map(f => ({ filename: f.Key.split('/').pop(), size: f.Size, lastModified: f.LastModified })),
+          artwork: artworkList.map(f => ({ filename: f.Key.split('/').pop(), size: f.Size, lastModified: f.LastModified })),
+          video:   videoFiles.map(f => ({ filename: f.Key.split('/').pop(), size: f.Size, lastModified: f.LastModified }))
+        }
+      }
     }
 
     res.json({
@@ -452,7 +467,7 @@ app.get('/releases/:releaseId/', authMiddleware, async (req, res) => {
         signedLabel:   r.signedLabel,
         signedDate:    r.signedDate,
         updatedAt:     r.updatedAt,
-        versions:      {},
+        versions,
         distribution,
         notes:         { text: notesResult.rows[0]?.text || '', documents: [] },
         songLinks:     songLinksResult.rows

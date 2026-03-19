@@ -398,6 +398,8 @@ export default function TrackDetailPage({ params }) {
     ? metadata.distribution.submit.find(s => s.status !== 'signed')?.label || metadata.distribution.submit[0].label
     : null
   const isSubmittedOnly = !isSigned && hasSubmissions && metadata.distribution?.submit?.some(s => s.status?.toLowerCase() === 'submitted')
+  const isReleased     = metadata.distribution?.release?.some(s => s.status?.toLowerCase() === 'live')
+  const isPromoted     = metadata.distribution?.promote?.some(s => s.status?.toLowerCase() === 'live')
   const hasPromoDeals  = metadata.distribution?.promote?.length > 0
   const displayLabel   = signedLabel || submittedLabel
   const collectionType = metadata.releaseFormat || metadata.releaseType || 'Single'
@@ -437,6 +439,12 @@ export default function TrackDetailPage({ params }) {
                 )}
                 {isSubmittedOnly && (
                   <div className="px-3 py-1 rounded-md text-sm font-semibold bg-yellow-500/20 border border-yellow-400/60 text-yellow-200">Submitted</div>
+                )}
+                {isReleased && (
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-orange-500/20 border border-orange-400/60 text-orange-200">Released</div>
+                )}
+                {isPromoted && (
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-pink-500/20 border border-pink-400/60 text-pink-200">Promoted</div>
                 )}
               </div>
               <p className="text-xl text-gray-300">{metadata.artist}</p>

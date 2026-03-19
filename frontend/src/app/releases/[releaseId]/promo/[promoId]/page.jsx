@@ -115,6 +115,7 @@ export default function PromoEntryPage({ params }) {
         platform: data.entry.platform || '',
         notes: data.entry.notes || ''
       })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       console.error('Error saving promo details:', err)
       alert(`Failed to save promo details: ${err.message}`)
@@ -265,7 +266,7 @@ export default function PromoEntryPage({ params }) {
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold text-gray-100 mb-6">
-          {(metadata.releaseType || metadata.releaseFormat || '')} Promotion Details
+          {entry.promoName || entry.platform || ''} Promo Details
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column: Promo Details (read-only) */}

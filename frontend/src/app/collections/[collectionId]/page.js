@@ -362,6 +362,8 @@ export default function CollectionDetailPage({ params }) {
   const signedLabel      = signedSubmission?.label || collection.signedLabel || null
   const hasPromoDeals    = dist.promote?.length > 0
   const isSubmittedOnly  = !isSigned && dist.submit?.some(s => s.status?.toLowerCase() === 'submitted')
+  const isReleased       = dist.release?.some(s => s.status?.toLowerCase() === 'live')
+  const isPromoted       = dist.promote?.some(s => s.status?.toLowerCase() === 'live')
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
@@ -381,6 +383,12 @@ export default function CollectionDetailPage({ params }) {
                 )}
                 {isSubmittedOnly && (
                   <div className="px-3 py-1 rounded-md text-sm font-semibold bg-yellow-500/20 border border-yellow-400/60 text-yellow-200">Submitted</div>
+                )}
+                {isReleased && (
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-orange-500/20 border border-orange-400/60 text-orange-200">Released</div>
+                )}
+                {isPromoted && (
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-pink-500/20 border border-pink-400/60 text-pink-200">Promoted</div>
                 )}
               </div>
               <p className="text-xl text-gray-300">{collection.artist}</p>
