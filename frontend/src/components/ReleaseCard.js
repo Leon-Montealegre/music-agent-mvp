@@ -3,11 +3,9 @@ import Link from 'next/link'
 import { API_BASE_URL } from '@/lib/api'
 
 export default function ReleaseCard({ release, collectionsMap }) {
-  const isSigned       = release.distribution?.submit?.some(s => s.status?.toLowerCase() === 'signed')
-  const hasSubmissions = release.distribution?.submit?.length > 0
-  const isReleased     = release.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
-  const isPromoted     = release.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live')
-  const hasAnyBadge    = isSigned || hasSubmissions || isReleased || isPromoted
+  const isSigned    = release.isSigned || release.distribution?.submit?.some(s => s.status?.toLowerCase() === 'signed')
+  const isSubmitted = !isSigned && release.distribution?.submit?.some(s => s.status?.toLowerCase() === 'submitted')
+  const hasAnyBadge = isSigned || isSubmitted
 
   const collectionName = release.collectionId
     ? (collectionsMap?.[release.collectionId] ||
@@ -73,20 +71,14 @@ export default function ReleaseCard({ release, collectionsMap }) {
             </div>
           )}
 
-          {/* Status badges — only rendered if at least one is active */}
+          {/* Status badges */}
           {hasAnyBadge && (
             <div className="flex flex-wrap gap-1">
               {isSigned && (
                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">Signed</span>
               )}
-              {!isSigned && hasSubmissions && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">Submitted</span>
-              )}
-              {isReleased && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-600/25 text-blue-300 border border-blue-500/30">Released</span>
-              )}
-              {isPromoted && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-pink-500/25 via-rose-500/25 to-orange-400/25 text-pink-200 border border-pink-400/40">Promoted</span>
+              {isSubmitted && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-600/25 text-blue-300 border border-blue-500/30">Submitted</span>
               )}
             </div>
           )}

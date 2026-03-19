@@ -186,11 +186,9 @@ export default function HomePage() {
 
   // --- Collection card — artwork on top, info strip below (matches ReleaseCard layout) ---
   const CollectionCard = ({ item }) => {
-    const hasAnyBadge =
-      item.distribution?.release?.some(e => e.status?.toLowerCase() === 'live') ||
-      item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed') ||
-      (item.distribution?.submit?.length > 0 && !item.distribution.release?.some(e => e.status?.toLowerCase() === 'live')) ||
-      item.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live')
+    const isItemSigned    = item.isSigned || item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed')
+    const isItemSubmitted = !isItemSigned && item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'submitted')
+    const hasAnyBadge     = isItemSigned || isItemSubmitted
 
     return (
       <Link href={`/collections/${item.releaseId}`} className="block group">
@@ -248,19 +246,11 @@ export default function HomePage() {
             {/* Status badges */}
             {hasAnyBadge && (
               <div className="flex flex-wrap gap-1">
-                {item.distribution?.release?.some(e => e.status?.toLowerCase() === 'live') && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/60 text-green-300 border border-green-700/40">Released</span>
+                {isItemSigned && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/60 text-green-300 border border-green-700/40">Signed</span>
                 )}
-                {item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed') && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-900/60 text-yellow-300 border border-yellow-700/40">Signed</span>
-                )}
-                {item.distribution?.submit?.length > 0 &&
-                 !item.distribution.submit.some(e => e.status?.toLowerCase() === 'signed') &&
-                 !item.distribution.release?.some(e => e.status?.toLowerCase() === 'live') && (
+                {isItemSubmitted && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/60 text-blue-300 border border-blue-700/40">Submitted</span>
-                )}
-                {item.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live') && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-pink-500/25 via-rose-500/25 to-orange-400/25 text-pink-200 border border-pink-400/40">Promoted</span>
                 )}
               </div>
             )}
@@ -380,22 +370,20 @@ export default function HomePage() {
           </div>
 
           {/* Badges — right-aligned */}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {item.distribution?.release?.some(e => e.status?.toLowerCase() === 'live') && (
-              <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(21,128,61,0.4)', color: '#86efac', border: '1px solid rgba(21,128,61,0.5)' }}>Released</span>
-            )}
-            {item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed') && (
-              <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(161,98,7,0.4)', color: '#fde68a', border: '1px solid rgba(161,98,7,0.5)' }}>Signed</span>
-            )}
-            {item.distribution?.submit?.length > 0 &&
-             !item.distribution.submit.some(e => e.status?.toLowerCase() === 'signed') &&
-             !item.distribution.release?.some(e => e.status?.toLowerCase() === 'live') && (
-              <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(29,78,216,0.4)', color: '#93c5fd', border: '1px solid rgba(29,78,216,0.5)' }}>Submitted</span>
-            )}
-            {item.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live') && (
-              <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(236,72,153,0.2)', color: '#fbcfe8', border: '1px solid rgba(236,72,153,0.4)' }}>Promoted</span>
-            )}
-          </div>
+          {(() => {
+            const rowSigned    = item.isSigned || item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed')
+            const rowSubmitted = !rowSigned && item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'submitted')
+            return (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {rowSigned && (
+                  <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(21,128,61,0.4)', color: '#86efac', border: '1px solid rgba(21,128,61,0.5)' }}>Signed</span>
+                )}
+                {rowSubmitted && (
+                  <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, background: 'rgba(29,78,216,0.4)', color: '#93c5fd', border: '1px solid rgba(29,78,216,0.5)' }}>Submitted</span>
+                )}
+              </div>
+            )
+          })()}
         </div>
       </Link>
     )

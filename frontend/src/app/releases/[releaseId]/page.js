@@ -307,7 +307,7 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-  const handleMarkAsSigned = async (labelName) => {
+  const handleMarkAsSigned = async (labelName, submissionTimestamp) => {
     try {
       const response = await apiFetch(`/releases/${trackId}/sign`, {
         method: 'PATCH',
@@ -316,6 +316,13 @@ export default function TrackDetailPage({ params }) {
       })
       const data = await response.json()
       if (!response.ok) { alert(`Failed to mark as signed: ${data.error || 'Unknown error'}`); return }
+
+      // Also flip the matching distribution entry status to "signed" so the badge
+      // is computed correctly (isSigned reads from distribution entries, not the releases table).
+      if (submissionTimestamp) {
+        await updateDistributionEntry(trackId, 'submit', submissionTimestamp, { status: 'signed' })
+      }
+
       setShowLabelSigningModal(false)
       await loadTrack()
     } catch (err) {
@@ -385,8 +392,7 @@ export default function TrackDetailPage({ params }) {
   const submittedLabel   = hasSubmissions
     ? metadata.distribution.submit.find(s => s.status !== 'signed')?.label || metadata.distribution.submit[0].label
     : null
-  const isReleased     = metadata.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
-  const isPromoted     = metadata.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live')
+  const isSubmittedOnly = !isSigned && hasSubmissions && metadata.distribution?.submit?.some(s => s.status?.toLowerCase() === 'submitted')
   const hasPromoDeals  = metadata.distribution?.promote?.length > 0
   const displayLabel   = signedLabel || submittedLabel
   const collectionType = metadata.releaseFormat || metadata.releaseType || 'Single'
@@ -424,16 +430,8 @@ export default function TrackDetailPage({ params }) {
                 {isSigned && (
                   <div className="px-3 py-1 rounded-md text-sm font-semibold bg-green-500/20 border border-green-500/50 text-green-300">Signed</div>
                 )}
-                {!isSigned && hasSubmissions && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-yellow-500/20 border border-yellow-500/50 text-yellow-300">Submitted</div>
-                )}
-                {isReleased && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">Released</div>
-                )}
-                {isPromoted && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-gradient-to-r from-pink-500/30 via-rose-500/30 to-orange-400/30 border border-pink-400/60 text-pink-200">
-                    Promoted
-                  </div>
+                {isSubmittedOnly && (
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">Submitted</div>
                 )}
               </div>
               <p className="text-xl text-gray-300">{metadata.artist}</p>
@@ -1177,7 +1175,7 @@ export default function TrackDetailPage({ params }) {
           {metadata.distribution?.submit?.length > 0 ? (
             <div className="space-y-2">
               {metadata.distribution.submit.map((submission, index) => (
-                <button key={index} onClick={() => handleMarkAsSigned(submission.label)} disabled={submitting}
+                <button key={index} onClick={() => handleMarkAsSigned(submission.label, submission.timestamp)} disabled={submitting}
                   className="w-full text-left p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50">
                   <p className="font-medium text-gray-100">{submission.label}</p>
                   <p className="text-sm text-gray-400">Submitted via {submission.platform}</p>

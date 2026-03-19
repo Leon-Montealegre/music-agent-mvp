@@ -105,9 +105,8 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, edit
   >
     {!editMode && <option value="">Select status</option>}
     <option value="Submitted">Submitted</option>
-    <option value="In Discussion">In Discussion</option>
-    <option value="Passed">Passed</option>
-    <option value="No Response">No Response</option>
+    <option value="Signed">Signed</option>
+    <option value="Cancelled">Cancelled</option>
   </select>
 </div>
 

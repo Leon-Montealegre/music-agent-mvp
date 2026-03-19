@@ -333,20 +333,40 @@ app.patch('/releases/:releaseId/metadata', authMiddleware, async (req, res) => {
 app.get('/releases/', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
-    const result = await db.query(`
-      SELECT
-        r.id, r.slug AS "releaseId", r.title, r.artist, r.genre, r.bpm, r.key,
-        r.track_date AS "trackDate", r.release_date AS "releaseDate",
-        r.release_type AS "releaseType", r.release_format AS "releaseFormat",
-        col.slug AS "collectionId", r.is_signed AS "isSigned",
-        r.signed_label AS "signedLabel", r.signed_date AS "signedDate",
-        r.updated_at AS "updatedAt"
-      FROM releases r
-      LEFT JOIN collections col ON r.collection_id = col.id
-      WHERE r.user_id = $1
-      ORDER BY r.release_date DESC NULLS LAST
-    `, [req.user.id])
-    const releases = result.rows.map(r => ({
+
+    // Fetch releases + their distribution entries in two queries, then merge.
+    const [relResult, distResult] = await Promise.all([
+      db.query(`
+        SELECT
+          r.id, r.slug AS "releaseId", r.title, r.artist, r.genre, r.bpm, r.key,
+          r.track_date AS "trackDate", r.release_date AS "releaseDate",
+          r.release_type AS "releaseType", r.release_format AS "releaseFormat",
+          col.slug AS "collectionId", r.is_signed AS "isSigned",
+          r.signed_label AS "signedLabel", r.signed_date AS "signedDate",
+          r.updated_at AS "updatedAt"
+        FROM releases r
+        LEFT JOIN collections col ON r.collection_id = col.id
+        WHERE r.user_id = $1
+        ORDER BY r.release_date DESC NULLS LAST
+      `, [req.user.id]),
+      db.query(`
+        SELECT de.release_id, de.path_type, de.platform, de.label, de.status, de.timestamp
+        FROM distribution_entries de
+        JOIN releases r ON r.id = de.release_id
+        WHERE r.user_id = $1
+      `, [req.user.id])
+    ])
+
+    // Build a map: release UUID → { release: [], submit: [], promote: [] }
+    const distMap = {}
+    for (const e of distResult.rows) {
+      if (!distMap[e.release_id]) distMap[e.release_id] = { release: [], submit: [], promote: [] }
+      distMap[e.release_id][e.path_type]?.push({
+        platform: e.platform, label: e.label, status: e.status, timestamp: e.timestamp
+      })
+    }
+
+    const releases = relResult.rows.map(r => ({
       releaseId:     r.releaseId,
       artist:        r.artist,
       title:         r.title,
@@ -357,8 +377,9 @@ app.get('/releases/', authMiddleware, async (req, res) => {
       releaseType:   r.releaseType,
       releaseFormat: r.releaseFormat,
       collectionId:  r.collectionId,
+      isSigned:      r.isSigned,
       updatedAt:     r.updatedAt,
-      distribution:  { release: [], submit: [], promote: [] }
+      distribution:  distMap[r.id] || { release: [], submit: [], promote: [] }
     }))
     res.json({ success: true, count: releases.length, releases })
   } catch (error) {
@@ -1544,19 +1565,39 @@ app.post('/collections', authMiddleware, async (req, res) => {
 app.get('/collections', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
-    const result = await db.query(
-      `SELECT id, slug AS "collectionId", title, artist, genre,
-              release_type AS "releaseType", release_date AS "releaseDate",
-              is_signed AS "isSigned", signed_label AS "signedLabel",
-              signed_date AS "signedDate", updated_at AS "updatedAt"
-       FROM collections WHERE user_id = $1 ORDER BY release_date DESC NULLS LAST`,
-      [req.user.id]
-    )
-    const collections = result.rows.map(c => ({
+
+    const [colResult, distResult] = await Promise.all([
+      db.query(
+        `SELECT id, slug AS "collectionId", title, artist, genre,
+                release_type AS "releaseType", release_date AS "releaseDate",
+                is_signed AS "isSigned", signed_label AS "signedLabel",
+                signed_date AS "signedDate", updated_at AS "updatedAt"
+         FROM collections WHERE user_id = $1 ORDER BY release_date DESC NULLS LAST`,
+        [req.user.id]
+      ),
+      db.query(
+        `SELECT de.collection_id, de.path_type, de.platform, de.label, de.status, de.timestamp
+         FROM distribution_entries de
+         JOIN collections c ON c.id = de.collection_id
+         WHERE c.user_id = $1`,
+        [req.user.id]
+      )
+    ])
+
+    // Build a map: collection UUID → { release: [], submit: [], promote: [] }
+    const distMap = {}
+    for (const e of distResult.rows) {
+      if (!distMap[e.collection_id]) distMap[e.collection_id] = { release: [], submit: [], promote: [] }
+      distMap[e.collection_id][e.path_type]?.push({
+        platform: e.platform, label: e.label, status: e.status, timestamp: e.timestamp
+      })
+    }
+
+    const collections = colResult.rows.map(c => ({
       ...c,
       releaseId:      c.collectionId,   // frontend uses item.releaseId
       collectionType: c.releaseType,    // frontend uses item.collectionType
-      distribution: { release: [], submit: [], promote: [] }
+      distribution:   distMap[c.id] || { release: [], submit: [], promote: [] }
     }))
     res.json({ success: true, count: collections.length, collections })
   } catch (error) {

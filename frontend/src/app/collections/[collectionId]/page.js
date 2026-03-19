@@ -359,11 +359,10 @@ export default function CollectionDetailPage({ params }) {
   const artworkUrl       = `${API_BASE_URL}/collections/${collectionId}/artwork?t=${Date.now()}`
   const dist             = collection.distribution || {}
   const signedSubmission = dist.submit?.find(s => s.status?.toLowerCase() === 'signed')
-  const isSigned         = !!signedSubmission
-  const signedLabel      = signedSubmission?.label || null
-  const hasSubmissions   = dist.submit?.length > 0
-  const isReleased       = dist.release?.some(e => e.status?.toLowerCase() === 'live')
+  const isSigned         = !!(collection.isSigned || signedSubmission)
+  const signedLabel      = signedSubmission?.label || collection.signedLabel || null
   const hasPromoDeals    = dist.promote?.length > 0
+  const isSubmittedOnly  = !isSigned && dist.submit?.some(s => s.status?.toLowerCase() === 'submitted')
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
@@ -381,11 +380,8 @@ export default function CollectionDetailPage({ params }) {
                 {isSigned && (
                   <div className="px-3 py-1 rounded-md text-sm font-semibold bg-green-500/20 border border-green-500/50 text-green-300">Signed</div>
                 )}
-                {!isSigned && hasSubmissions && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-yellow-500/20 border border-yellow-500/50 text-yellow-300">Submitted</div>
-                )}
-                {isReleased && (
-                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">Released</div>
+                {isSubmittedOnly && (
+                  <div className="px-3 py-1 rounded-md text-sm font-semibold bg-blue-600/30 border border-blue-500/50 text-blue-300">Submitted</div>
                 )}
               </div>
               <p className="text-xl text-gray-300">{collection.artist}</p>
