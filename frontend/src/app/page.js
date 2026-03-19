@@ -78,12 +78,10 @@ export default function HomePage() {
   // --- Shared status helper ---
   function matchesStatusFilter(dist) {
     if (statusFilter === 'all') return true
-    const isSigned   = dist?.submit?.some(e => e.status?.toLowerCase() === 'signed')
-    const isReleased = dist?.release?.some(e => e.status?.toLowerCase() === 'live')
-    const isPromoted = dist?.promote?.some(e => e.status?.toLowerCase() === 'live')
-    if (statusFilter === 'signed')   return isSigned
-    if (statusFilter === 'released') return isReleased
-    if (statusFilter === 'promoted') return isPromoted
+    const isSigned    = dist?.submit?.some(e => e.status?.toLowerCase() === 'signed')
+    const isSubmitted = dist?.submit?.some(e => e.status?.toLowerCase() === 'submitted')
+    if (statusFilter === 'signed')    return isSigned
+    if (statusFilter === 'submitted') return isSubmitted
     return true
   }
 
@@ -186,7 +184,7 @@ export default function HomePage() {
 
   // --- Collection card — artwork on top, info strip below (matches ReleaseCard layout) ---
   const CollectionCard = ({ item }) => {
-    const isItemSigned    = item.isSigned || item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed')
+    const isItemSigned    = item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed')
     const isItemSubmitted = !isItemSigned && item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'submitted')
     const hasAnyBadge     = isItemSigned || isItemSubmitted
 
@@ -219,7 +217,7 @@ export default function HomePage() {
             </div>
             {/* Track count — bottom right */}
             <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/60 text-indigo-200 text-xs font-medium border border-indigo-500/30">
-              {item.tracks?.length || 0} {item.tracks?.length === 1 ? 'track' : 'tracks'}
+              {item.trackCount || 0} {item.trackCount === 1 ? 'track' : 'tracks'}
             </div>
           </div>
 
@@ -371,7 +369,7 @@ export default function HomePage() {
 
           {/* Badges — right-aligned */}
           {(() => {
-            const rowSigned    = item.isSigned || item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed')
+            const rowSigned    = item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed')
             const rowSubmitted = !rowSigned && item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'submitted')
             return (
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -532,10 +530,9 @@ export default function HomePage() {
 
               {/* Status filter */}
               {[
-                { value: 'all',      label: 'All' },
-                { value: 'signed',   label: 'Signed' },
-                { value: 'released', label: 'Released' },
-                { value: 'promoted', label: 'Promoted' },
+                { value: 'all',       label: 'All' },
+                { value: 'signed',    label: 'Signed' },
+                { value: 'submitted', label: 'Submitted' },
               ].map(({ value, label }) => (
                 <button
                   key={value}

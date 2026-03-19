@@ -317,10 +317,14 @@ export default function TrackDetailPage({ params }) {
       const data = await response.json()
       if (!response.ok) { alert(`Failed to mark as signed: ${data.error || 'Unknown error'}`); return }
 
-      // Also flip the matching distribution entry status to "signed" so the badge
-      // is computed correctly (isSigned reads from distribution entries, not the releases table).
+      // Also flip the matching distribution entry status to "Signed" so the badge
+      // is computed correctly from distribution entries (not from the releases table flag).
+      // Use apiFetch + encodeURIComponent so the ISO timestamp survives in the URL path.
       if (submissionTimestamp) {
-        await updateDistributionEntry(trackId, 'submit', submissionTimestamp, { status: 'signed' })
+        await apiFetch(
+          `/releases/${trackId}/distribution/submit/${encodeURIComponent(submissionTimestamp)}`,
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Signed' }) }
+        )
       }
 
       setShowLabelSigningModal(false)

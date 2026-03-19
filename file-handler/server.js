@@ -1571,7 +1571,8 @@ app.get('/collections', authMiddleware, async (req, res) => {
         `SELECT id, slug AS "collectionId", title, artist, genre,
                 release_type AS "releaseType", release_date AS "releaseDate",
                 is_signed AS "isSigned", signed_label AS "signedLabel",
-                signed_date AS "signedDate", updated_at AS "updatedAt"
+                signed_date AS "signedDate", updated_at AS "updatedAt",
+                (SELECT COUNT(*) FROM releases r WHERE r.collection_id = collections.id)::int AS "trackCount"
          FROM collections WHERE user_id = $1 ORDER BY release_date DESC NULLS LAST`,
         [req.user.id]
       ),

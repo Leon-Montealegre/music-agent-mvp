@@ -7,7 +7,7 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, edit
   const [formData, setFormData] = useState({
     label: '',
     platform: '',
-    status: '',
+    status: 'Submitted',
     notes: ''
   })
 
@@ -103,7 +103,6 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, edit
     className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
     required
   >
-    {!editMode && <option value="">Select status</option>}
     <option value="Submitted">Submitted</option>
     <option value="Signed">Signed</option>
     <option value="Cancelled">Cancelled</option>

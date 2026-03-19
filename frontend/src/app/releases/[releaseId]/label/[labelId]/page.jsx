@@ -20,7 +20,7 @@ export default function LabelEntryPage({ params }) {
   const [detailsForm, setDetailsForm] = useState({
     label: '',
     platform: '',
-    status: 'Pending',
+    status: 'Submitted',
     signedDate: '',
     notes: ''
   })
@@ -631,11 +631,8 @@ export default function LabelEntryPage({ params }) {
               onChange={e => setDetailsForm({ ...detailsForm, status: e.target.value })}
               className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
             >
-              <option>Pending</option>
               <option>Submitted</option>
-              <option>In Discussion</option>
               <option>Signed</option>
-              <option>Passed</option>
               <option>Cancelled</option>
             </select>
           </div>
