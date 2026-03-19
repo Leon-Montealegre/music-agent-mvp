@@ -335,15 +335,16 @@ app.get('/releases/', authMiddleware, async (req, res) => {
     const db = require('./db')
     const result = await db.query(`
       SELECT
-        id, slug AS "releaseId", title, artist, genre, bpm, key,
-        track_date AS "trackDate", release_date AS "releaseDate",
-        release_type AS "releaseType", release_format AS "releaseFormat",
-        collection_id AS "collectionId", is_signed AS "isSigned",
-        signed_label AS "signedLabel", signed_date AS "signedDate",
-        updated_at AS "updatedAt"
-      FROM releases
-      WHERE user_id = $1
-      ORDER BY release_date DESC NULLS LAST
+        r.id, r.slug AS "releaseId", r.title, r.artist, r.genre, r.bpm, r.key,
+        r.track_date AS "trackDate", r.release_date AS "releaseDate",
+        r.release_type AS "releaseType", r.release_format AS "releaseFormat",
+        col.slug AS "collectionId", r.is_signed AS "isSigned",
+        r.signed_label AS "signedLabel", r.signed_date AS "signedDate",
+        r.updated_at AS "updatedAt"
+      FROM releases r
+      LEFT JOIN collections col ON r.collection_id = col.id
+      WHERE r.user_id = $1
+      ORDER BY r.release_date DESC NULLS LAST
     `, [req.user.id])
     const releases = result.rows.map(r => ({
       releaseId:     r.releaseId,
@@ -372,14 +373,15 @@ app.get('/releases/:releaseId/', authMiddleware, async (req, res) => {
 
     const result = await db.query(`
       SELECT
-        id, slug AS "releaseId", title, artist, genre, bpm, key,
-        track_date AS "trackDate", release_date AS "releaseDate",
-        release_type AS "releaseType", release_format AS "releaseFormat",
-        collection_id AS "collectionId", is_signed AS "isSigned",
-        signed_label AS "signedLabel", signed_date AS "signedDate",
-        updated_at AS "updatedAt"
-      FROM releases
-      WHERE slug = $1 AND user_id = $2
+        r.id, r.slug AS "releaseId", r.title, r.artist, r.genre, r.bpm, r.key,
+        r.track_date AS "trackDate", r.release_date AS "releaseDate",
+        r.release_type AS "releaseType", r.release_format AS "releaseFormat",
+        col.slug AS "collectionId", r.is_signed AS "isSigned",
+        r.signed_label AS "signedLabel", r.signed_date AS "signedDate",
+        r.updated_at AS "updatedAt"
+      FROM releases r
+      LEFT JOIN collections col ON r.collection_id = col.id
+      WHERE r.slug = $1 AND r.user_id = $2
     `, [releaseId, req.user.id])
 
     if (result.rows.length === 0)

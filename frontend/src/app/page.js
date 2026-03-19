@@ -148,6 +148,11 @@ export default function HomePage() {
   const sortedCollections = [...filteredCollections].sort(sortItems)
   const sortedSingles     = [...filteredReleases].sort(sortItems)
 
+  // Build a slug → title lookup so ReleaseCard / ListRow can show the real EP/Album name
+  const collectionsMap = Object.fromEntries(
+    collections.map(c => [c.collectionId || c.releaseId, c.title])
+  )
+
   // Flat merged list — used only when a specific type filter is active
   const flatItems = [
     ...filteredReleases.map(r  => ({ ...r, _type: 'single' })),
@@ -331,7 +336,7 @@ export default function HomePage() {
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 marginTop: '1px',
               }}>
-                {item.collectionId.replace(/^\d{4}-\d{2}-\d{2}_[^_]+_/, '').replace(/_/g, ' ')}
+                {collectionsMap[item.collectionId] || item.collectionId.replace(/^\d{4}-\d{2}-\d{2}_[^_]+_/, '').replace(/_/g, ' ')}
               </div>
             )}
           </div>
@@ -656,7 +661,7 @@ export default function HomePage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 items-start">
-                      {sortedSingles.map(item => <ReleaseCard key={item.releaseId} release={item} />)}
+                      {sortedSingles.map(item => <ReleaseCard key={item.releaseId} release={item} collectionsMap={collectionsMap} />)}
                     </div>
                   )
                 )}
@@ -677,7 +682,7 @@ export default function HomePage() {
               {flatItems.map(item =>
                 item._type === 'collection'
                   ? <CollectionCard key={item.releaseId} item={item} />
-                  : <ReleaseCard key={item.releaseId} release={item} />
+                  : <ReleaseCard key={item.releaseId} release={item} collectionsMap={collectionsMap} />
               )}
             </div>
           )

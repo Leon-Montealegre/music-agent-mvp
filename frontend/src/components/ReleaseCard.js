@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { API_BASE_URL } from '@/lib/api'
 
-export default function ReleaseCard({ release }) {
+export default function ReleaseCard({ release, collectionsMap }) {
   const isSigned       = release.distribution?.submit?.some(s => s.status?.toLowerCase() === 'signed')
   const hasSubmissions = release.distribution?.submit?.length > 0
   const isReleased     = release.distribution?.release?.some(e => e.status?.toLowerCase() === 'live')
@@ -10,7 +10,8 @@ export default function ReleaseCard({ release }) {
   const hasAnyBadge    = isSigned || hasSubmissions || isReleased || isPromoted
 
   const collectionName = release.collectionId
-    ? release.collectionId.replace(/^\d{4}-\d{2}-\d{2}_[^_]+_/, '').replace(/_/g, ' ')
+    ? (collectionsMap?.[release.collectionId] ||
+       release.collectionId.replace(/^\d{4}-\d{2}-\d{2}_[^_]+_/, '').replace(/_/g, ' '))
     : null
 
   return (
