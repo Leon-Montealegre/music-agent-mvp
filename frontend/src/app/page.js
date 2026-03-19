@@ -76,9 +76,9 @@ export default function HomePage() {
   const totalAll     = releases.length + collections.length
 
   // --- Shared status helper ---
-  function matchesStatusFilter(dist, item) {
+  function matchesStatusFilter(dist) {
     if (statusFilter === 'all') return true
-    const isSigned    = item?.isSigned || dist?.submit?.some(e => e.status?.toLowerCase() === 'signed')
+    const isSigned    = dist?.submit?.some(e => e.status?.toLowerCase() === 'signed')
     const isSubmitted = dist?.submit?.some(e => e.status?.toLowerCase() === 'submitted')
     const isReleased  = dist?.release?.some(e => e.status?.toLowerCase() === 'live')
     const isPromoted  = dist?.promote?.some(e => e.status?.toLowerCase() === 'live')
@@ -94,7 +94,7 @@ export default function HomePage() {
     if (!release) return false
     if (typeFilter === 'eps' || typeFilter === 'albums') return false
     if (typeFilter === 'singles' && release.collectionId) return false
-    if (!matchesStatusFilter(release.distribution, release)) return false
+    if (!matchesStatusFilter(release.distribution)) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       return (
@@ -114,7 +114,7 @@ export default function HomePage() {
     if (typeFilter === 'singles') return false
     if (typeFilter === 'eps'    && collection.collectionType !== 'EP')    return false
     if (typeFilter === 'albums' && collection.collectionType !== 'Album') return false
-    if (!matchesStatusFilter(collection.distribution, collection)) return false
+    if (!matchesStatusFilter(collection.distribution)) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       return (
@@ -364,11 +364,6 @@ export default function HomePage() {
           {/* Key */}
           <div style={{ color: '#9ca3af', fontSize: '12px', width: '36px', flexShrink: 0 }}>
             {item.key || ''}
-          </div>
-
-          {/* Date */}
-          <div style={{ color: '#6b7280', fontSize: '12px', width: '90px', flexShrink: 0 }}>
-            {item.releaseDate || ''}
           </div>
 
           {/* Badges — right-aligned */}
