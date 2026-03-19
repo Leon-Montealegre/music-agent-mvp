@@ -179,77 +179,81 @@ export default function HomePage() {
     )
   }
 
-  // --- Collection card (inline, same as before) ---
+  // --- Date formatter ---
+  const formatDate = (dateStr) => {
+    if (!dateStr) return ''
+    try {
+      return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    } catch {
+      return dateStr
+    }
+  }
+
+  // --- Collection card — compact horizontal layout ---
   const CollectionCard = ({ item }) => (
-    <Link href={`/collections/${item.releaseId}`} className="group block h-full">
-      <div className="relative h-full">
-        <div className="absolute inset-0 translate-x-1.5 translate-y-1.5 rounded-lg bg-indigo-900/40 border border-indigo-500/20" />
-        <div className="absolute inset-0 translate-x-0.5 translate-y-0.5 rounded-lg bg-indigo-900/60 border border-indigo-500/30" />
-        <div className="relative flex flex-col h-full bg-gray-800/95 border-2 border-indigo-500/50 rounded-lg overflow-hidden group-hover:border-indigo-400 group-hover:shadow-lg group-hover:shadow-indigo-500/25 transition-all">
-          <div className="aspect-square bg-gradient-to-br from-indigo-950 to-gray-900 relative overflow-hidden flex-shrink-0">
-            <img
-              src={`${API_BASE_URL}/collections/${item.releaseId}/artwork`}
-              alt={item.title}
-              className="w-full h-full object-cover"
-              onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
-            />
-            <div className="flex items-center justify-center h-full" style={{ display: 'none' }}>
-                <svg width="140" height="140" viewBox="0 0 120 120" className="opacity-60">
-                  <defs>
-                    <radialGradient id={`coll-${item.releaseId}`}>
-                      <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3"/>
-                      <stop offset="100%" stopColor="#6366f1" stopOpacity="0"/>
-                    </radialGradient>
-                  </defs>
-                  <circle cx="60" cy="60" r="58" fill={`url(#coll-${item.releaseId})`}/>
-                  <circle cx="60" cy="60" r="55" fill="#1e1b4b" stroke="#6366f1" strokeWidth="1.5"/>
-                  <circle cx="60" cy="60" r="42" fill="none" stroke="#4338ca" strokeWidth="0.8"/>
-                  <circle cx="60" cy="60" r="30" fill="none" stroke="#4338ca" strokeWidth="0.8"/>
-                  <circle cx="60" cy="60" r="18" fill="#0f0e2a" stroke="#6366f1" strokeWidth="1.5"/>
-                  <circle cx="60" cy="60" r="6"  fill="#000" stroke="#818cf8" strokeWidth="1.5"/>
-                  <line x1="20" y1="95" x2="100" y2="95" stroke="#4338ca" strokeWidth="1" opacity="0.5"/>
-                  <line x1="24" y1="99" x2="96"  y2="99" stroke="#4338ca" strokeWidth="0.8" opacity="0.3"/>
-                </svg>
-              </div>
-            <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-bold border ${COLLECTION_BADGE_STYLES[item.collectionType] || COLLECTION_BADGE_STYLES['EP']}`}>
-              {item.collectionType}
-            </div>
-            <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 border border-indigo-500/50 text-indigo-300 text-xs font-medium">
-              {item.tracks?.length || 0} {item.tracks?.length === 1 ? 'track' : 'tracks'}
-            </div>
+    <Link href={`/collections/${item.releaseId}`} className="group block">
+      <div className="flex bg-gray-800/95 border-2 border-indigo-500/50 group-hover:border-indigo-400 rounded-lg overflow-hidden shadow transition-all group-hover:shadow-lg group-hover:shadow-indigo-500/20 cursor-pointer">
+
+        {/* Artwork — compact square thumbnail */}
+        <div className="w-[88px] h-[88px] flex-shrink-0 bg-gradient-to-br from-indigo-950 to-gray-900 relative overflow-hidden">
+          <img
+            src={`${API_BASE_URL}/collections/${item.releaseId}/artwork`}
+            alt={item.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+          />
+          {/* Fallback disc — scaled to thumbnail size */}
+          <div style={{ display: 'none', position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="60" height="60" viewBox="0 0 120 120" opacity="0.6">
+              <circle cx="60" cy="60" r="55" fill="#1e1b4b" stroke="#6366f1" strokeWidth="1.5"/>
+              <circle cx="60" cy="60" r="40" fill="none" stroke="#4338ca" strokeWidth="0.8"/>
+              <circle cx="60" cy="60" r="25" fill="none" stroke="#4338ca" strokeWidth="0.8"/>
+              <circle cx="60" cy="60" r="14" fill="#0f0e2a" stroke="#6366f1" strokeWidth="1.5"/>
+              <circle cx="60" cy="60" r="5"  fill="#000" stroke="#818cf8" strokeWidth="1.5"/>
+            </svg>
           </div>
-          <div className="flex flex-col flex-grow p-4 border-t-2 border-indigo-500/30">
-            <div className="mb-3">
-              <h3 className="font-semibold text-lg text-indigo-100 line-clamp-1 group-hover:text-indigo-300 transition-colors">{item.title}</h3>
-              <p className="text-sm text-indigo-300/70 line-clamp-1">{item.artist}</p>
-              <p className="text-xs text-transparent select-none">-</p>
-            </div>
-            <div className="flex gap-2 flex-wrap items-center min-h-[28px] mb-3">
-              {item.genre && (
-                <span className="px-2 py-1 rounded-md text-xs font-medium bg-indigo-600/30 text-indigo-300 border border-indigo-500/50">{item.genre}</span>
-              )}
-            </div>
-            <div className="flex gap-1.5 flex-wrap min-h-[28px] mb-3">
-              {item.distribution?.release?.some(e => e.status?.toLowerCase() === 'live') && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-900/60 text-green-300 border border-green-700/50">Released</span>
-              )}
-              {item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed') && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-900/60 text-yellow-300 border border-yellow-700/50">Signed</span>
-              )}
-              {item.distribution?.submit?.length > 0 &&
-               !item.distribution.submit.some(e => e.status?.toLowerCase() === 'signed') &&
-               !item.distribution.release?.some(e => e.status?.toLowerCase() === 'live') && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-900/60 text-blue-300 border border-blue-700/50">Submitted</span>
-              )}
-              {item.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live') && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-pink-500/30 via-rose-500/30 to-orange-400/30 text-pink-200 border border-pink-400/60">Promoted</span>
-              )}
-            </div>
-            <div className="mt-auto pt-3 border-t border-indigo-500/20 flex items-center justify-between text-xs">
-              <span className="text-indigo-400 font-medium">View {item.collectionType}</span>
-              <span className="text-indigo-400/50">{item.releaseDate || ''}</span>
-            </div>
+          {/* Type badge overlaid on artwork */}
+          <div className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-xs font-bold border ${COLLECTION_BADGE_STYLES[item.collectionType] || COLLECTION_BADGE_STYLES['EP']}`}>
+            {item.collectionType}
           </div>
+        </div>
+
+        {/* Info */}
+        <div className="flex flex-col min-w-0 flex-grow px-3 py-2.5 gap-1">
+
+          {/* Title + artist + track count */}
+          <div>
+            <div className="flex items-baseline gap-2">
+              <h3 className="font-semibold text-sm text-indigo-100 truncate group-hover:text-indigo-300 transition-colors">{item.title}</h3>
+              <span className="text-xs text-indigo-400/50 flex-shrink-0">{item.tracks?.length || 0} {item.tracks?.length === 1 ? 'track' : 'tracks'}</span>
+            </div>
+            <p className="text-xs text-indigo-300/70 truncate">{item.artist}</p>
+          </div>
+
+          {/* Genre + status badges */}
+          <div className="flex flex-wrap items-center gap-1">
+            {item.genre && (
+              <span className="px-1.5 py-0.5 rounded text-xs bg-indigo-600/30 text-indigo-300 border border-indigo-500/40">{item.genre}</span>
+            )}
+            {item.distribution?.release?.some(e => e.status?.toLowerCase() === 'live') && (
+              <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-900/60 text-green-300 border border-green-700/50">Released</span>
+            )}
+            {item.distribution?.submit?.some(e => e.status?.toLowerCase() === 'signed') && (
+              <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-yellow-900/60 text-yellow-300 border border-yellow-700/50">Signed</span>
+            )}
+            {item.distribution?.submit?.length > 0 &&
+             !item.distribution.submit.some(e => e.status?.toLowerCase() === 'signed') &&
+             !item.distribution.release?.some(e => e.status?.toLowerCase() === 'live') && (
+              <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-900/60 text-blue-300 border border-blue-700/50">Submitted</span>
+            )}
+            {item.distribution?.promote?.some(e => e.status?.toLowerCase() === 'live') && (
+              <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-pink-500/30 via-rose-500/30 to-orange-400/30 text-pink-200 border border-pink-400/60">Promoted</span>
+            )}
+            {item.releaseDate && (
+              <span className="text-xs text-indigo-400/40 ml-auto">{formatDate(item.releaseDate)}</span>
+            )}
+          </div>
+
         </div>
       </div>
     </Link>
