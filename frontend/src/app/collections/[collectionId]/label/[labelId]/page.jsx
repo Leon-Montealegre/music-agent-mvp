@@ -6,6 +6,7 @@ import { fetchCollectionLabelEntry, apiFetch, API_BASE_URL } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
+import FileAttachments from '@/components/FileAttachments'
 
 export default function CollectionLabelEntryPage({ params }) {
   const unwrappedParams = use(params)
@@ -31,9 +32,6 @@ export default function CollectionLabelEntryPage({ params }) {
   const [contactToDelete, setContactToDelete] = useState(null)
   const [showDeleteContactModal, setShowDeleteContactModal] = useState(false)
 
-  const [uploading, setUploading] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
-
   const [pageNotes, setPageNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
 
@@ -46,7 +44,7 @@ export default function CollectionLabelEntryPage({ params }) {
     try {
       setLoading(true)
       const [colData, labelRes] = await Promise.all([
-        fetch(apiBase).then(r => r.json()),
+        apiFetch(apiBase).then(r => r.json()),
         fetchCollectionLabelEntry(collectionId, labelId)
       ])
       const collection = colData.collection || colData
@@ -117,70 +115,6 @@ export default function CollectionLabelEntryPage({ params }) {
     }
   }
 
-  const handleFileUpload = async (file) => {
-    if (!file) return
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await apiFetch(`${apiBase}/label/${labelId}/files`, {
-        method: 'POST',
-        body: formData
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to upload file')
-      setEntry(prev => prev ? { ...prev, documents: data.documents || [] } : prev)
-    } catch (err) {
-      console.error('Error uploading label document:', err)
-      alert(`Failed to upload: ${err.message}`)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleFileInputChange = (e) => {
-    const file = e.target.files[0]
-    if (file) handleFileUpload(file)
-  }
-
-  const handleDrag = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
-    }
-  }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleFileUpload(file)
-  }
-
-  const handleDeleteFile = async (filename) => {
-    try {
-      const res = await fetch(
-        `${apiBase}/label/${labelId}/files/${encodeURIComponent(filename)}`,
-        { method: 'DELETE' }
-      )
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to delete file')
-      setEntry(prev => prev ? { ...prev, documents: data.documents || [] } : prev)
-    } catch (err) {
-      console.error('Error deleting label document:', err)
-      alert(`Failed to delete: ${err.message}`)
-    }
-  }
-
-  const handleDownloadFile = (filename) => {
-    const url = `${apiBase}/label/${labelId}/files/${encodeURIComponent(filename)}`
-    window.open(url, '_blank')
-  }
-
   const handleSavePageNotes = async () => {
     setSavingNotes(true)
     try {
@@ -209,7 +143,7 @@ export default function CollectionLabelEntryPage({ params }) {
   const handleDeleteContact = async () => {
     if (!contactToDelete) return
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${apiBase}/label/${labelId}/contacts/${contactToDelete.id}`,
         { method: 'DELETE' }
       )
@@ -447,94 +381,13 @@ export default function CollectionLabelEntryPage({ params }) {
             </div>
 
             {/* Files */}
-            <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
-              <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-semibold text-gray-100">Files</h2>
-                <p className="text-sm text-gray-400 mt-1">
-                  Upload contracts, riders, and other deal files
-                </p>
-              </div>
-              <div className="p-6">
-                <div
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-all ${
-                    dragActive
-                      ? 'border-purple-500 bg-purple-500/10'
-                      : 'border-gray-600 hover:border-gray-500'
-                  }`}
-                >
-                  <input
-                    id="label-file-input"
-                    type="file"
-                    onChange={handleFileInputChange}
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.zip"
-                  />
-                  {uploading ? (
-                    <div>
-                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-2" />
-                      <p className="text-gray-400">Uploading...</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="text-4xl mb-2">📎</div>
-                      <p className="text-gray-300 mb-2">Drag and drop files here</p>
-                      <p className="text-gray-500 text-sm mb-4">or</p>
-                      <label
-                        htmlFor="label-file-input"
-                        className="inline-block bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg cursor-pointer transition-all"
-                      >
-                        Browse Files
-                      </label>
-                      <p className="text-xs text-gray-500 mt-3">
-                        Supports: PDF, DOC, DOCX, TXT, JPG, PNG, ZIP
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {(entry.documents || []).length > 0 && (
-                  <div className="mt-6 space-y-2">
-                    <h3 className="font-medium text-gray-300 mb-3">
-                      Uploaded Files ({entry.documents.length})
-                    </h3>
-                    {entry.documents.map(doc => (
-                      <div
-                        key={doc.filename}
-                        className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-gray-700"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-gray-200 font-medium truncate">{doc.filename}</p>
-                          <p className="text-xs text-gray-500">
-                            {(doc.size / 1024 / 1024).toFixed(2)} MB •{' '}
-                            {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : ''}
-                          </p>
-                        </div>
-                        <div className="flex gap-2 ml-4">
-                          <button
-                            onClick={() => handleDownloadFile(doc.filename)}
-                            className="text-purple-400 hover:text-purple-300 px-3 py-1 text-sm transition-colors"
-                            title="Download"
-                          >
-                            ⬇️
-                          </button>
-                          <button
-                            onClick={() => handleDeleteFile(doc.filename)}
-                            className="text-red-400 hover:text-red-300 px-3 py-1 text-sm transition-colors"
-                            title="Delete"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <FileAttachments
+              filesUrl={`${apiBase}/label/${labelId}/files`}
+              files={entry.documents || []}
+              onFilesChange={docs => setEntry(prev => prev ? { ...prev, documents: docs } : prev)}
+              title="Files"
+              description="Contracts, riders, and other deal documents"
+            />
           </div>
         </div>
 
