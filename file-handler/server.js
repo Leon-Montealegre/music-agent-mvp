@@ -243,23 +243,33 @@ app.post('/upload', authMiddleware, upload.any(), async (req, res) => {
 app.get('/files', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
-    const result = await db.query(
-      `SELECT
-         f.id, f.filename, f.size_bytes AS size, f.created_at AS "uploadedAt",
-         f.category, f.r2_key,
-         r.slug  AS release_slug,  r.title  AS release_title,
-         col.slug AS col_slug,     col.title AS col_title,
-         de.id   AS entry_id,      de.path_type
-       FROM files f
-       LEFT JOIN releases r          ON f.release_id    = r.id
-       LEFT JOIN collections col     ON f.collection_id = col.id
-       LEFT JOIN distribution_entries de ON f.entry_id  = de.id
-       WHERE f.user_id = $1
-       ORDER BY f.created_at DESC`,
-      [req.user.id]
-    )
 
-    const files = result.rows.map(f => {
+    // 1) Fetch document files (label, promo, track, notes) from the DB
+    const [dbResult, releasesResult] = await Promise.all([
+      db.query(
+        `SELECT
+           f.id, f.filename, f.size_bytes AS size, f.created_at AS "uploadedAt",
+           f.category, f.r2_key,
+           r.slug  AS release_slug,  r.title  AS release_title,
+           col.slug AS col_slug,     col.title AS col_title,
+           de.id   AS entry_id,      de.path_type
+         FROM files f
+         LEFT JOIN releases r          ON f.release_id    = r.id
+         LEFT JOIN collections col     ON f.collection_id = col.id
+         LEFT JOIN distribution_entries de ON f.entry_id  = de.id
+         WHERE f.user_id = $1
+         ORDER BY f.created_at DESC`,
+        [req.user.id]
+      ),
+      // 2) Fetch all releases so we can list their R2 audio/video files
+      db.query(
+        `SELECT id, slug, title FROM releases WHERE user_id = $1`,
+        [req.user.id]
+      )
+    ])
+
+    // Map DB document files
+    const docFiles = dbResult.rows.map(f => {
       let downloadUrl = null
       let sourceType  = f.release_slug ? 'release' : 'collection'
       let sourceSlug  = f.release_slug || f.col_slug || ''
@@ -270,13 +280,7 @@ app.get('/files', authMiddleware, async (req, res) => {
       let category    = f.category || 'General'
 
       const enc = encodeURIComponent(f.filename)
-      if (f.category === 'audio') {
-        downloadUrl = `/releases/${sourceSlug}/files/audio/${enc}`
-        category = 'Audio'
-      } else if (f.category === 'video') {
-        downloadUrl = `/releases/${sourceSlug}/files/video/${enc}`
-        category = 'Video'
-      } else if (f.category === 'label' && f.entry_id) {
+      if (f.category === 'label' && f.entry_id) {
         const base = f.release_slug
           ? `/releases/${sourceSlug}`
           : `/collections/${sourceSlug}`
@@ -314,7 +318,50 @@ app.get('/files', authMiddleware, async (req, res) => {
       }
     })
 
-    res.json({ success: true, files })
+    // 3) For each release, list audio + video files from R2 in parallel
+    const releases = releasesResult.rows
+    const r2Lists = await Promise.all(
+      releases.flatMap(rel => [
+        r2.listFiles(`releases/${rel.slug}/audio/primary/`).then(items =>
+          items.map(item => ({
+            id:          null,
+            filename:    item.Key.split('/').pop(),
+            size:        item.Size,
+            uploadedAt:  item.LastModified,
+            category:    'Audio',
+            downloadUrl: `/releases/${rel.slug}/files/audio/${encodeURIComponent(item.Key.split('/').pop())}`,
+            sourceType:  'release',
+            sourceSlug:  rel.slug,
+            sourceName:  rel.title || rel.slug,
+            sourceHref:  `/releases/${rel.slug}`
+          }))
+        ).catch(() => []),
+        r2.listFiles(`releases/${rel.slug}/video/`).then(items =>
+          items.map(item => ({
+            id:          null,
+            filename:    item.Key.split('/').pop(),
+            size:        item.Size,
+            uploadedAt:  item.LastModified,
+            category:    'Video',
+            downloadUrl: `/releases/${rel.slug}/files/video/${encodeURIComponent(item.Key.split('/').pop())}`,
+            sourceType:  'release',
+            sourceSlug:  rel.slug,
+            sourceName:  rel.title || rel.slug,
+            sourceHref:  `/releases/${rel.slug}`
+          }))
+        ).catch(() => [])
+      ])
+    )
+
+    const audioVideoFiles = r2Lists.flat()
+
+    // 4) Merge: audio/video first (sorted newest first by uploadedAt), then docs
+    const allFiles = [
+      ...audioVideoFiles.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt)),
+      ...docFiles
+    ]
+
+    res.json({ success: true, files: allFiles })
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
