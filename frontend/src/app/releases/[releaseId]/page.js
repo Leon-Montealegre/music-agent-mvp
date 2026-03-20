@@ -379,12 +379,31 @@ export default function TrackDetailPage({ params }) {
 
   // ── Loading / error states ────────────────────────────────────────────────
 
-  if (loading || !track) {
+  // Still fetching — show spinner
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4" />
           <p className="text-gray-300">Loading track...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Fetch finished but no track found (deleted, wrong ID, or API error)
+  if (!track) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="text-5xl mb-4">🎵</div>
+          <h2 className="text-xl font-semibold text-white mb-2">Track not found</h2>
+          <p className="text-gray-400 mb-6">
+            {error || 'This release may have been deleted or the link is incorrect.'}
+          </p>
+          <Link href="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors">
+            ← Back to Catalogue
+          </Link>
         </div>
       </div>
     )

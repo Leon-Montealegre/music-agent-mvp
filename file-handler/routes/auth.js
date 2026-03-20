@@ -153,8 +153,9 @@ router.patch('/me', authMiddleware, async (req, res) => {
       [updatedName, updatedEmail, userId]
     );
 
-    // Issue a fresh token so the new name/email are reflected immediately
-    const freshUser = { id: userId, email: updatedEmail, name: updatedName };
+    // Issue a fresh token so the new name/email are reflected immediately.
+    // Carry is_admin forward from the DB record so admins don't lose their flag.
+    const freshUser = { id: userId, email: updatedEmail, name: updatedName, is_admin: user.is_admin || false };
     const token = generateToken(freshUser);
 
     res.json({ token, user: freshUser });

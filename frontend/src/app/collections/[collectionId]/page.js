@@ -361,9 +361,14 @@ export default function CollectionDetailPage({ params }) {
 
   if (!collection) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-300 mb-4">Collection not found</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="text-5xl mb-4">📂</div>
+          <h2 className="text-xl font-semibold text-white mb-2">Collection not found</h2>
+          <p className="text-gray-400 mb-6">This collection may have been deleted or the link is incorrect.</p>
+          <Link href="/" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors">
+            ← Back to Catalogue
+          </Link>
         </div>
       </div>
     )
