@@ -58,7 +58,7 @@ export const authOptions = {
   // These two callbacks copy the backend JWT into the NextAuth session so
   // every page can read it with useSession().
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       // On first sign-in, "user" is the object returned by authorize() above.
       // We store the backend token inside NextAuth's own JWT.
       if (user) {
@@ -66,12 +66,23 @@ export const authOptions = {
         token.email       = user.email
         token.name        = user.name
       }
+
+      // When the settings page calls updateSession({ name, email, token }),
+      // NextAuth re-runs this callback with trigger === 'update' and the
+      // new values in `session`. We copy them into the JWT so they persist.
+      if (trigger === 'update' && session) {
+        if (session.name)  token.name        = session.name
+        if (session.email) token.email       = session.email
+        if (session.token) token.accessToken = session.token
+      }
+
       return token
     },
     async session({ session, token }) {
-      // Expose the backend token to the browser via session.token
-      session.token = token.accessToken
-      session.user.name = token.name
+      // Expose the backend token and up-to-date user info to the browser
+      session.token      = token.accessToken
+      session.user.name  = token.name
+      session.user.email = token.email
       return session
     },
   },

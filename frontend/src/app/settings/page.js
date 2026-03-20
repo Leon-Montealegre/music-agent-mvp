@@ -106,9 +106,15 @@ export default function SettingsPage() {
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || 'Update failed')
 
-    // If the server returned a new token, tell NextAuth to refresh the session
+    // If the server returned a new token, tell NextAuth to refresh the session.
+    // We pass flat values (name, email, token) because the jwt callback reads
+    // them directly from the `session` argument during a trigger === 'update'.
     if (data.token) {
-      await updateSession({ token: data.token, user: data.user })
+      await updateSession({
+        name:  data.user.name,
+        email: data.user.email,
+        token: data.token,
+      })
     }
     return data
   }
