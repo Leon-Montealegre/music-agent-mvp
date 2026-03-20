@@ -3,6 +3,7 @@ import Link from 'next/link'
 import ScrollToTop from '@/components/ScrollToTop'
 import FeedbackButton from '@/components/FeedbackButton'
 import UserPill from '@/components/UserPill'
+import AdminButton from '@/components/AdminButton'
 import HeaderNav from '@/components/HeaderNav'
 import Providers from '@/components/Providers'
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }) {
               
               <div className="flex items-center gap-3">
                 <FeedbackButton />
+                <AdminButton />
 
                 {/* ✅ NEW: Settings link */}
                 <Link
