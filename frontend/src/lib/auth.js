@@ -34,10 +34,11 @@ export const authOptions = {
         // Return an object — NextAuth stores this as the "user" in the session
         if (data.token) {
           return {
-            id:    data.user?.id || data.userId || '1',
-            email: data.user?.email || credentials.email,
-            name:  data.user?.name,
-            token: data.token,
+            id:      data.user?.id || data.userId || '1',
+            email:   data.user?.email || credentials.email,
+            name:    data.user?.name,
+            token:   data.token,
+            isAdmin: data.user?.is_admin || false,
           }
         }
 
@@ -65,6 +66,7 @@ export const authOptions = {
         token.accessToken = user.token
         token.email       = user.email
         token.name        = user.name
+        token.isAdmin     = user.isAdmin || false
       }
 
       // When the settings page calls updateSession({ name, email, token }),
@@ -80,9 +82,10 @@ export const authOptions = {
     },
     async session({ session, token }) {
       // Expose the backend token and up-to-date user info to the browser
-      session.token      = token.accessToken
-      session.user.name  = token.name
-      session.user.email = token.email
+      session.token         = token.accessToken
+      session.user.name     = token.name
+      session.user.email    = token.email
+      session.user.isAdmin  = token.isAdmin || false
       return session
     },
   },

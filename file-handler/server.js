@@ -8,7 +8,8 @@
 
 require('dotenv').config()
 
-const authRoutes = require('./routes/auth')
+const authRoutes  = require('./routes/auth')
+const adminRoutes = require('./routes/admin')
 const authMiddleware = require('./authMiddleware')
 const r2 = require('./r2')
 
@@ -189,6 +190,7 @@ app.get('/storage/status', async (req, res) => {
   })
 })
 app.use('/auth', authRoutes);
+app.use('/admin', adminRoutes);
 
 // =============================================================================
 // FILE UPLOAD

@@ -10,7 +10,7 @@ const TOKEN_EXPIRY = '7d';
 
 function generateToken(user) {
   return jwt.sign(
-    { userId: user.id, email: user.email, name: user.name },
+    { userId: user.id, email: user.email, name: user.name, isAdmin: user.is_admin || false },
     process.env.JWT_SECRET,
     { expiresIn: TOKEN_EXPIRY }
   );
@@ -74,7 +74,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = generateToken(user);
-    res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, is_admin: user.is_admin || false } });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
