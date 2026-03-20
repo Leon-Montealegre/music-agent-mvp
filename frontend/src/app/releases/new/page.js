@@ -2,9 +2,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { apiFetch, API_BASE_URL } from '@/lib/api'
 
 export default function CreateTrackPage() {
+  const { data: session } = useSession()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -40,6 +42,7 @@ export default function CreateTrackPage() {
   ]
 
   useEffect(() => {
+    if (!session?.token) return
     async function loadDefaults() {
       try {
         const res = await apiFetch('/settings')
@@ -54,7 +57,7 @@ export default function CreateTrackPage() {
       .then(r => r.json())
       .then(data => setCollections(data.collections || []))
       .catch(() => {})
-  }, [])
+  }, [session])
 
   const generateTrackId = (date, artistName, trackTitle) => {
     const cleanArtist = artistName.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')

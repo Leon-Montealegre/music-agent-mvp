@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { fetchAllFiles } from '@/lib/contacts'
 import { apiFetch } from '@/lib/api'
 
@@ -68,6 +69,7 @@ async function handleDownload(downloadUrl, filename) {
 }
 
 export default function FilesPage() {
+  const { data: session } = useSession()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -75,6 +77,7 @@ export default function FilesPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
 
   useEffect(() => {
+    if (!session?.token) return
     async function load() {
       try {
         setLoading(true)
@@ -90,7 +93,7 @@ export default function FilesPage() {
       }
     }
     load()
-  }, [])
+  }, [session])
 
   const filteredFiles = useMemo(() => {
     let list = files

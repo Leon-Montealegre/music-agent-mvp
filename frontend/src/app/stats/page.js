@@ -1,10 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { fetchReleases } from '@/lib/api'
 import Link from 'next/link'
 import BackButton from '@/components/BackButton'
 
 export default function StatsPage() {
+  const { data: session } = useSession()
   const [releases, setReleases] = useState([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
@@ -21,6 +23,7 @@ export default function StatsPage() {
   })
 
   useEffect(() => {
+    if (!session?.token) return
     async function loadData() {
       try {
         const data = await fetchReleases()
@@ -33,7 +36,7 @@ export default function StatsPage() {
       }
     }
     loadData()
-  }, [])
+  }, [session])
 
   function calculateStats(data) {
     if (data.length === 0) return

@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { fetchCollectionLabelEntry, apiFetch, API_BASE_URL } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
@@ -9,6 +10,7 @@ import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import FileAttachments from '@/components/FileAttachments'
 
 export default function CollectionLabelEntryPage({ params }) {
+  const { data: session } = useSession()
   const unwrappedParams = use(params)
   const collectionId = unwrappedParams.collectionId
   const labelId = unwrappedParams.labelId
@@ -68,8 +70,8 @@ export default function CollectionLabelEntryPage({ params }) {
   }
 
   useEffect(() => {
-    loadData()
-  }, [collectionId, labelId])
+    if (session?.token) loadData()
+  }, [collectionId, labelId, session])
 
   const handleSaveDetails = async () => {
     if (!detailsForm.label.trim()) {

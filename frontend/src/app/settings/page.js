@@ -1,13 +1,16 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { apiFetch } from '@/lib/api'
 
 export default function SettingsPage() {
+  const { data: session } = useSession()
   const [defaultArtist, setDefaultArtist] = useState('')
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
+    if (!session?.token) return
     apiFetch('/settings')
       .then(res => res.json())
       .then(data => {
@@ -15,7 +18,7 @@ export default function SettingsPage() {
           setDefaultArtist(data.settings.defaultArtistName)
         }
       })
-  }, [])
+  }, [session])
 
   async function handleSave() {
     await apiFetch('/settings', {

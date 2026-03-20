@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { fetchAllContacts } from '@/lib/contacts'
 import Modal from '@/components/Modal'
 
@@ -38,6 +39,7 @@ const BADGE_STYLES = {
 }
 
 export default function ContactsPage() {
+  const { data: session } = useSession()
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -46,6 +48,7 @@ export default function ContactsPage() {
   const [selectedContact, setSelectedContact] = useState(null)
 
   useEffect(() => {
+    if (!session?.token) return
     async function load() {
       try {
         setLoading(true)
@@ -61,7 +64,7 @@ export default function ContactsPage() {
       }
     }
     load()
-  }, [])
+  }, [session])
 
   const filteredContacts = useMemo(() => {
     let list = contacts

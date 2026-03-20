@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { fetchCollectionPromoEntry, apiFetch, API_BASE_URL } from '@/lib/api'
 import Modal from '@/components/Modal'
 import LabelContactForm from '@/components/LabelContactForm'
@@ -9,6 +10,7 @@ import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import FileAttachments from '@/components/FileAttachments'
 
 export default function CollectionPromoEntryPage({ params }) {
+  const { data: session } = useSession()
   const unwrappedParams = use(params)
   const collectionId = unwrappedParams.collectionId
   const promoId = unwrappedParams.promoId
@@ -74,8 +76,8 @@ export default function CollectionPromoEntryPage({ params }) {
   }
 
   useEffect(() => {
-    loadData()
-  }, [collectionId, promoId])
+    if (session?.token) loadData()
+  }, [collectionId, promoId, session])
 
   const handleSaveDetails = async () => {
     if (!detailsForm.promoName.trim()) {
