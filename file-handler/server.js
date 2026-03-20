@@ -69,17 +69,18 @@ async function validateAudioFile(bufferOrPath, mimetype) {
     const metadata = Buffer.isBuffer(bufferOrPath)
       ? await musicMetadata.parseBuffer(bufferOrPath, { mimeType: mimetype })
       : await musicMetadata.parseFile(bufferOrPath)
-    if (!metadata.format?.duration) return { valid: false, error: 'Could not read audio metadata' }
-    if (metadata.format.duration <= 0 || metadata.format.duration > 3600)
-      return { valid: false, error: `Invalid audio duration: ${metadata.format.duration}s` }
+    // Duration check is lenient: some valid files don't expose duration metadata
+    const dur = metadata.format?.duration
+    if (dur !== undefined && dur !== null && (dur <= 0 || dur > 3600))
+      return { valid: false, error: `Invalid audio duration: ${dur}s` }
     return {
       valid: true,
       metadata: {
-        duration:   Math.round(metadata.format.duration),
-        bitrate:    metadata.format.bitrate,
-        sampleRate: metadata.format.sampleRate,
-        channels:   metadata.format.numberOfChannels,
-        codec:      metadata.format.codec
+        duration:   dur ? Math.round(dur) : null,
+        bitrate:    metadata.format?.bitrate,
+        sampleRate: metadata.format?.sampleRate,
+        channels:   metadata.format?.numberOfChannels,
+        codec:      metadata.format?.codec
       }
     }
   } catch (error) {
@@ -232,6 +233,30 @@ app.post('/upload', authMiddleware, upload.any(), async (req, res) => {
   } catch (error) {
     res.status(error.statusCode || 500).json({ success: false, error: error.message })
   }
+})
+
+// =============================================================================
+// CONTACTS — GLOBAL ENDPOINT
+// =============================================================================
+
+// GET /contacts — return all contacts belonging to the authenticated user
+app.get('/contacts', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const result = await db.query(
+      `SELECT c.id, c.name, c.email, c.role,
+              COALESCE(c.phone, '')         AS phone,
+              COALESCE(c.location, '')      AS location,
+              COALESCE(c.label_name, '')    AS label,
+              COALESCE(c.contact_notes, '') AS notes,
+              c.created_at AS "createdAt"
+       FROM contacts c
+       WHERE c.user_id = $1
+       ORDER BY c.name ASC`,
+      [req.user.id]
+    )
+    res.json({ success: true, contacts: result.rows })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
 // =============================================================================
@@ -411,12 +436,17 @@ app.get('/releases/:releaseId/', authMiddleware, async (req, res) => {
     const r = result.rows[0]
     const releaseUUID = r.id
 
-    const [distResult, notesResult, songLinksResult, audioFiles, videoFiles] = await Promise.all([
+    const [distResult, notesResult, songLinksResult, audioFiles, videoFiles, trackDocsResult] = await Promise.all([
       db.query(`SELECT * FROM distribution_entries WHERE release_id = $1`, [releaseUUID]),
       db.query(`SELECT text FROM notes WHERE release_id = $1 LIMIT 1`, [releaseUUID]),
       db.query(`SELECT id, label, url FROM song_links WHERE release_id = $1`, [releaseUUID]),
       r2.listFiles(`releases/${releaseId}/audio/primary/`),
-      r2.listFiles(`releases/${releaseId}/video/`)
+      r2.listFiles(`releases/${releaseId}/video/`),
+      db.query(
+        `SELECT filename, size_bytes AS size, created_at AS "uploadedAt"
+         FROM files WHERE release_id = $1 AND category = 'track' ORDER BY created_at ASC`,
+        [releaseUUID]
+      )
     ])
 
     const distribution = { release: [], submit: [], promote: [] }
@@ -470,6 +500,7 @@ app.get('/releases/:releaseId/', authMiddleware, async (req, res) => {
         versions,
         distribution,
         notes:         { text: notesResult.rows[0]?.text || '', documents: [] },
+        documents:     trackDocsResult.rows,
         songLinks:     songLinksResult.rows
       }
     })
@@ -1407,6 +1438,88 @@ app.get('/releases/:releaseId/files/:fileType/:filename', async (req, res) => {
       return res.status(404).json({ error: 'File not found' })
     res.status(500).json({ error: error.message })
   }
+})
+
+// =============================================================================
+// RELEASES — TRACK DOCUMENTS
+// =============================================================================
+
+// POST /releases/:releaseId/docs — upload a document attached to a release
+app.post('/releases/:releaseId/docs', authMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    const db = require('./db')
+    const { releaseId } = req.params
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' })
+    const relRes = await db.query(
+      `SELECT id FROM releases WHERE slug = $1 AND user_id = $2`,
+      [releaseId, req.user.id]
+    )
+    if (!relRes.rows.length) return res.status(404).json({ success: false, error: 'Release not found' })
+    const releaseUUID = relRes.rows[0].id
+    const key = `releases/${releaseId}/docs/${req.file.originalname}`
+    await r2.uploadFile(key, req.file.buffer, req.file.mimetype)
+    await db.query(
+      `INSERT INTO files (id, user_id, release_id, category, filename, r2_key, size_bytes)
+       VALUES (gen_random_uuid(), $1, $2, 'track', $3, $4, $5)`,
+      [req.user.id, releaseUUID, req.file.originalname, key, req.file.size]
+    )
+    const docs = await db.query(
+      `SELECT filename, size_bytes AS size, created_at AS "uploadedAt"
+       FROM files WHERE release_id = $1 AND category = 'track' ORDER BY created_at ASC`,
+      [releaseUUID]
+    )
+    res.json({ success: true, documents: docs.rows })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+})
+
+// GET /releases/:releaseId/docs/:filename — download a track document
+app.get('/releases/:releaseId/docs/:filename', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const { releaseId, filename } = req.params
+    const relRes = await db.query(
+      `SELECT id FROM releases WHERE slug = $1 AND user_id = $2`,
+      [releaseId, req.user.id]
+    )
+    if (!relRes.rows.length) return res.status(404).json({ success: false, error: 'Release not found' })
+    const releaseUUID = relRes.rows[0].id
+    const fRes = await db.query(
+      `SELECT r2_key FROM files WHERE release_id = $1 AND category = 'track' AND filename = $2 LIMIT 1`,
+      [releaseUUID, filename]
+    )
+    if (!fRes.rows.length) return res.status(404).json({ success: false, error: 'File not found' })
+    const r2Obj = await r2.getFile(fRes.rows[0].r2_key)
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    if (r2Obj.ContentType) res.set('Content-Type', r2Obj.ContentType)
+    r2Obj.Body.pipe(res)
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+})
+
+// DELETE /releases/:releaseId/docs/:filename — delete a track document
+app.delete('/releases/:releaseId/docs/:filename', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const { releaseId, filename } = req.params
+    const relRes = await db.query(
+      `SELECT id FROM releases WHERE slug = $1 AND user_id = $2`,
+      [releaseId, req.user.id]
+    )
+    if (!relRes.rows.length) return res.status(404).json({ success: false, error: 'Release not found' })
+    const releaseUUID = relRes.rows[0].id
+    const fRes = await db.query(
+      `SELECT id, r2_key FROM files WHERE release_id = $1 AND category = 'track' AND filename = $2 LIMIT 1`,
+      [releaseUUID, filename]
+    )
+    if (!fRes.rows.length) return res.status(404).json({ success: false, error: 'File not found' })
+    await r2.deleteFile(fRes.rows[0].r2_key)
+    await db.query(`DELETE FROM files WHERE id = $1`, [fRes.rows[0].id])
+    const docs = await db.query(
+      `SELECT filename, size_bytes AS size, created_at AS "uploadedAt"
+       FROM files WHERE release_id = $1 AND category = 'track' ORDER BY created_at ASC`,
+      [releaseUUID]
+    )
+    res.json({ success: true, documents: docs.rows })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
 // =============================================================================

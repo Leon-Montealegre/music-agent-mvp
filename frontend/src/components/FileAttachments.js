@@ -22,7 +22,7 @@ export default function FileAttachments({
   files = [],
   onFilesChange,
   title = 'Files',
-  description = 'Contracts, confirmations, and other related documents',
+  description = 'Upload any related documents (contracts, stems, marketing material, etc.)',
 }) {
   const fileInputRef = useRef(null)
   const [uploading, setUploading]   = useState(false)

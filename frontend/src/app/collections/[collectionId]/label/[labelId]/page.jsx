@@ -134,10 +134,19 @@ export default function CollectionLabelEntryPage({ params }) {
     }
   }
 
-  const handleContactSuccess = () => {
+  const handleContactSuccess = (savedContact) => {
+    const wasEditing = editingContact
     setShowContactModal(false)
     setEditingContact(null)
-    loadData()
+    if (savedContact) {
+      if (wasEditing) {
+        setEntry(prev => prev ? { ...prev, contacts: (prev.contacts || []).map(c => c.id === savedContact.id ? savedContact : c) } : prev)
+      } else {
+        setEntry(prev => prev ? { ...prev, contacts: [...(prev.contacts || []), savedContact] } : prev)
+      }
+    } else {
+      loadData()
+    }
   }
 
   const handleDeleteContact = async () => {
@@ -195,7 +204,7 @@ export default function CollectionLabelEntryPage({ params }) {
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold text-gray-100 mb-6">
-          {(metadata.collectionType || '')} Label Details
+          {labelTitle} Label Details
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column: Label Details (read-only) */}

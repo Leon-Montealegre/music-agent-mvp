@@ -79,54 +79,17 @@ function extractContactsFromItem(item, sourceId, sourceType) {
 }
 
 /**
- * Fetches all contacts from releases and collections, deduplicated by name.
- * @returns {Promise<Array>} Deduplicated contacts sorted alphabetically by name
+ * Fetches all contacts from the dedicated /contacts endpoint.
+ * Returns contacts sorted alphabetically by name with empty sources array
+ * for compatibility with the contacts page UI.
+ * @returns {Promise<Array>} Contacts sorted alphabetically by name
  */
 export async function fetchAllContacts() {
-  const [releasesRes, collectionsRes] = await Promise.all([
-    apiFetch('/releases').then(r => r.json()),
-    apiFetch('/collections').then(r => r.json())
-  ])
-
-  const releases = releasesRes.releases || []
-  const collections = collectionsRes.collections || []
-
-  const allContacts = []
-
-  for (const r of releases) {
-    const releaseId = r.releaseId
-    const fullRes = await apiFetch(`/releases/${releaseId}`).then(x => x.json())
-    const release = fullRes.release || fullRes
-    const extracted = extractContactsFromItem(release, releaseId, 'release')
-    allContacts.push(...extracted)
-  }
-
-  for (const c of collections) {
-    const collectionId = c.releaseId || c.collectionId
-    const fullRes = await apiFetch(`/collections/${collectionId}`).then(x => x.json())
-    const collection = fullRes.collection || fullRes
-    const extracted = extractContactsFromItem(collection, collectionId, 'collection')
-    allContacts.push(...extracted)
-  }
-
-  // Deduplicate by name (case-insensitive trim)
-  const byName = new Map()
-  for (const contact of allContacts) {
-    const key = (contact.name || '').trim().toLowerCase()
-    if (!key) continue
-    if (!byName.has(key)) {
-      byName.set(key, {
-        ...contact,
-        sources: [{ sourceId: contact.sourceId, sourceName: contact.sourceName, sourceType: contact.sourceType, sourceHref: contact.sourceHref }]
-      })
-    } else {
-      const existing = byName.get(key)
-      existing.sources.push({ sourceId: contact.sourceId, sourceName: contact.sourceName, sourceType: contact.sourceType, sourceHref: contact.sourceHref })
-    }
-  }
-
-  const deduped = Array.from(byName.values())
-  return deduped.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }))
+  const res = await apiFetch('/contacts')
+  const data = await res.json()
+  const contacts = data.contacts || []
+  // Add empty sources array for UI compatibility
+  return contacts.map(c => ({ ...c, sources: [] }))
 }
 
 /**

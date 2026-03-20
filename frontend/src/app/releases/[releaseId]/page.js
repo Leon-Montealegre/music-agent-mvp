@@ -12,6 +12,7 @@ import DownloadModal from '@/components/DownloadModal'
 import DeleteTrackModal from '@/components/DeleteTrackModal'
 import TrackNotes from '@/components/TrackNotes'
 import EditMetadataModal from '@/components/EditMetadataModal'
+import FileAttachments from '@/components/FileAttachments'
 
 
 function CollectionThumb({ collectionId }) {
@@ -307,7 +308,7 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-  const handleMarkAsSigned = async (labelName, submissionTimestamp) => {
+  const handleMarkAsSigned = async (labelName, submissionId) => {
     try {
       const response = await apiFetch(`/releases/${trackId}/sign`, {
         method: 'PATCH',
@@ -317,14 +318,16 @@ export default function TrackDetailPage({ params }) {
       const data = await response.json()
       if (!response.ok) { alert(`Failed to mark as signed: ${data.error || 'Unknown error'}`); return }
 
-      // Also flip the matching distribution entry status to "Signed" so the badge
-      // is computed correctly from distribution entries (not from the releases table flag).
-      // Use apiFetch + encodeURIComponent so the ISO timestamp survives in the URL path.
-      if (submissionTimestamp) {
-        await apiFetch(
-          `/releases/${trackId}/distribution/submit/${encodeURIComponent(submissionTimestamp)}`,
-          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Signed' }) }
+      // Update the distribution entry status to "Signed" using the entry UUID (reliable).
+      if (submissionId) {
+        const entRes = await apiFetch(
+          `/releases/${trackId}/label/${submissionId}`,
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Signed', signedDate: signingDate }) }
         )
+        if (!entRes.ok) {
+          const d = await entRes.json().catch(() => ({}))
+          console.error('Failed to update entry status:', d.error)
+        }
       }
 
       setShowLabelSigningModal(false)
@@ -1122,6 +1125,14 @@ export default function TrackDetailPage({ params }) {
               </div>
             </div>
 
+            <FileAttachments
+              filesUrl={`${API_BASE_URL}/releases/${trackId}/docs`}
+              files={track.documents || []}
+              onFilesChange={docs => setTrack(prev => prev ? { ...prev, documents: docs } : prev)}
+              title="Documents"
+              description="Upload any related documents (contracts, stems, marketing material, etc.)"
+            />
+
             <TrackNotes
               releaseId={trackId}
               initialNotes={track.notes?.text || ''}
@@ -1188,7 +1199,7 @@ export default function TrackDetailPage({ params }) {
           {metadata.distribution?.submit?.length > 0 ? (
             <div className="space-y-2">
               {metadata.distribution.submit.map((submission, index) => (
-                <button key={index} onClick={() => handleMarkAsSigned(submission.label, submission.timestamp)} disabled={submitting}
+                <button key={index} onClick={() => handleMarkAsSigned(submission.label, submission.id)} disabled={submitting}
                   className="w-full text-left p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50">
                   <p className="font-medium text-gray-100">{submission.label}</p>
                   <p className="text-sm text-gray-400">Submitted via {submission.platform}</p>

@@ -140,10 +140,19 @@ export default function PromoEntryPage({ params }) {
     }
   }
 
-  const handleContactSuccess = () => {
+  const handleContactSuccess = (savedContact) => {
+    const wasEditing = editingContact
     setShowContactModal(false)
     setEditingContact(null)
-    loadData()
+    if (savedContact) {
+      if (wasEditing) {
+        setEntry(prev => prev ? { ...prev, contacts: (prev.contacts || []).map(c => c.id === savedContact.id ? savedContact : c) } : prev)
+      } else {
+        setEntry(prev => prev ? { ...prev, contacts: [...(prev.contacts || []), savedContact] } : prev)
+      }
+    } else {
+      loadData()
+    }
   }
 
   const handleDeleteContact = async () => {
