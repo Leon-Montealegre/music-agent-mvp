@@ -11,7 +11,7 @@ export default function AdminButton() {
     <Link
       href="/admin"
       style={{ height: '36px' }}
-      className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-purple-700 hover:bg-purple-600 text-white transition-colors font-medium shadow-md border border-purple-500/50"
+      className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 transition-all font-medium border border-amber-500/40 hover:border-amber-400/70 hover:shadow-md hover:shadow-amber-500/20"
     >
       <span className="text-base">🛡️</span>
       <span>Admin</span>
