@@ -2,8 +2,44 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto'); // built-in Node.js — no install needed
 const pool = require('../db');
 const authMiddleware = require('../authMiddleware');
+
+// ── Resend helper ─────────────────────────────────────────────────────────────
+// Calls the Resend HTTP API directly using built-in fetch (Node 18+).
+// No npm package needed.
+async function sendPasswordResetEmail(toEmail, resetUrl) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM_EMAIL || 'Music Agent <onboarding@resend.dev>',
+      to: [toEmail],
+      subject: 'Reset your Music Agent password',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1f2937;border-radius:12px;color:#e5e7eb;">
+          <h2 style="color:#fff;margin-top:0;">Reset your password</h2>
+          <p>We received a request to reset your Music Agent password. Click the button below — this link expires in <strong>1 hour</strong>.</p>
+          <a href="${resetUrl}"
+             style="display:inline-block;margin:16px 0;padding:12px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">
+            Reset password
+          </a>
+          <p style="color:#9ca3af;font-size:13px;">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+          <p style="color:#6b7280;font-size:12px;margin-bottom:0;">Or copy this link: ${resetUrl}</p>
+        </div>
+      `,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Resend API error ${res.status}: ${body}`);
+  }
+}
 
 const SALT_ROUNDS = 10;
 const TOKEN_EXPIRY = '7d';
@@ -164,5 +200,111 @@ router.patch('/me', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
+
+// POST /auth/forgot-password
+// Body: { email }
+// Generates a secure reset token, stores it in the DB, and emails a link.
+// ALWAYS returns 200 regardless of whether the email exists — this prevents
+// attackers from discovering which email addresses are registered.
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'email is required' });
+  }
+
+  try {
+    const result = await pool.query('SELECT id FROM users WHERE email = $1', [email.trim().toLowerCase()]);
+    const user = result.rows[0];
+
+    // Always respond the same way — don't reveal if the email is registered
+    if (!user) {
+      return res.json({ message: 'If that email is registered, a reset link has been sent.' });
+    }
+
+    // Generate a cryptographically secure random 64-char hex token
+    const token = crypto.randomBytes(32).toString('hex');
+
+    // Expire any previous unused tokens for this user (optional tidiness)
+    await pool.query(
+      'DELETE FROM password_reset_tokens WHERE user_id = $1 AND used_at IS NULL',
+      [user.id]
+    );
+
+    // Store the new token — expires in 1 hour
+    await pool.query(
+      `INSERT INTO password_reset_tokens (user_id, token, expires_at)
+       VALUES ($1, $2, NOW() + INTERVAL '1 hour')`,
+      [user.id, token]
+    );
+
+    // Build the reset URL the user will click in their email
+    const frontendUrl = process.env.FRONTEND_URL || 'https://music-agent-mvp.vercel.app';
+    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+
+    await sendPasswordResetEmail(email.trim().toLowerCase(), resetUrl);
+
+    res.json({ message: 'If that email is registered, a reset link has been sent.' });
+  } catch (err) {
+    console.error('POST /auth/forgot-password error:', err);
+    res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+
+// POST /auth/reset-password
+// Body: { token, newPassword }
+// Validates the reset token and updates the user's password.
+router.post('/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: 'token and newPassword are required' });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  try {
+    // Look up the token
+    const result = await pool.query(
+      'SELECT * FROM password_reset_tokens WHERE token = $1',
+      [token]
+    );
+    const row = result.rows[0];
+
+    // Token doesn't exist
+    if (!row) {
+      return res.status(400).json({ error: 'Invalid or expired reset link' });
+    }
+
+    // Token already used
+    if (row.used_at) {
+      return res.status(400).json({ error: 'This reset link has already been used' });
+    }
+
+    // Token expired
+    if (new Date() > new Date(row.expires_at)) {
+      return res.status(400).json({ error: 'This reset link has expired — please request a new one' });
+    }
+
+    // All good — update the password
+    const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, row.user_id]);
+
+    // Mark token as used so it can't be reused
+    await pool.query(
+      'UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1',
+      [row.id]
+    );
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('POST /auth/reset-password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
 
 module.exports = router;
