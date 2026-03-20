@@ -10,7 +10,8 @@ export default function TrackNotes({
   onUpdate,
   baseUrl, // optional override — if not provided, falls back to release endpoint
   notesPlaceholder,
-  fileCardTitle
+  fileCardTitle,
+  hideFiles = false  // set to true when a separate FileAttachments component replaces the files card
 }) {
   const [notes, setNotes]         = useState(initialNotes);
   const [documents, setDocuments] = useState(initialDocuments);
@@ -122,7 +123,7 @@ export default function TrackNotes({
         </div>
       </div>
 
-      <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
+      {!hideFiles && <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
         <div className="p-6 border-b border-gray-700">
           <h2 className="text-xl font-semibold text-gray-100">
             {fileCardTitle || 'Files'}
@@ -182,7 +183,7 @@ export default function TrackNotes({
             Upload any related documents (contracts, stems info, etc.)
           </p>
         </div>
-      </div>
+      </div>}
     </>
   );
 }

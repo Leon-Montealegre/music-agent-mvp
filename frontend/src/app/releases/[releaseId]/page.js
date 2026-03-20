@@ -1125,20 +1125,21 @@ export default function TrackDetailPage({ params }) {
               </div>
             </div>
 
-            <FileAttachments
-              filesUrl={`${API_BASE_URL}/releases/${trackId}/docs`}
-              files={track.documents || []}
-              onFilesChange={docs => setTrack(prev => prev ? { ...prev, documents: docs } : prev)}
-              title="Documents"
-              description="Upload any related documents (contracts, stems, marketing material, etc.)"
-            />
-
             <TrackNotes
               releaseId={trackId}
               initialNotes={track.notes?.text || ''}
               initialDocuments={track.notes?.documents || []}
               onUpdate={loadTrack}
               notesPlaceholder="Personal reminders, creative notes, mastering feedback, or anything you want to remember about this track."
+              hideFiles={true}
+            />
+
+            <FileAttachments
+              filesUrl={`${API_BASE_URL}/releases/${trackId}/docs`}
+              files={track.documents || []}
+              onFilesChange={docs => setTrack(prev => prev ? { ...prev, documents: docs } : prev)}
+              title="Files"
+              description="Upload any related documents (contracts, stems, marketing material, etc.)"
             />
 
             {/* Actions */}

@@ -239,6 +239,85 @@ app.post('/upload', authMiddleware, upload.any(), async (req, res) => {
 // CONTACTS — GLOBAL ENDPOINT
 // =============================================================================
 
+// GET /files — return all files belonging to the authenticated user with download URLs
+app.get('/files', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const result = await db.query(
+      `SELECT
+         f.id, f.filename, f.size_bytes AS size, f.created_at AS "uploadedAt",
+         f.category, f.r2_key,
+         r.slug  AS release_slug,  r.title  AS release_title,
+         col.slug AS col_slug,     col.title AS col_title,
+         de.id   AS entry_id,      de.path_type
+       FROM files f
+       LEFT JOIN releases r          ON f.release_id    = r.id
+       LEFT JOIN collections col     ON f.collection_id = col.id
+       LEFT JOIN distribution_entries de ON f.entry_id  = de.id
+       WHERE f.user_id = $1
+       ORDER BY f.created_at DESC`,
+      [req.user.id]
+    )
+
+    const files = result.rows.map(f => {
+      let downloadUrl = null
+      let sourceType  = f.release_slug ? 'release' : 'collection'
+      let sourceSlug  = f.release_slug || f.col_slug || ''
+      let sourceName  = f.release_title || f.col_title || sourceSlug
+      let sourceHref  = f.release_slug
+        ? `/releases/${f.release_slug}`
+        : `/collections/${f.col_slug}`
+      let category    = f.category || 'General'
+
+      const enc = encodeURIComponent(f.filename)
+      if (f.category === 'audio') {
+        downloadUrl = `/releases/${sourceSlug}/files/audio/${enc}`
+        category = 'Audio'
+      } else if (f.category === 'video') {
+        downloadUrl = `/releases/${sourceSlug}/files/video/${enc}`
+        category = 'Video'
+      } else if (f.category === 'label' && f.entry_id) {
+        const base = f.release_slug
+          ? `/releases/${sourceSlug}`
+          : `/collections/${sourceSlug}`
+        downloadUrl = `${base}/label/${f.entry_id}/files/${enc}`
+        category = 'Label'
+      } else if (f.category === 'promo' && f.entry_id) {
+        const base = f.release_slug
+          ? `/releases/${sourceSlug}`
+          : `/collections/${sourceSlug}`
+        downloadUrl = `${base}/promo/${f.entry_id}/files/${enc}`
+        category = 'Promo'
+      } else if (f.category === 'track') {
+        downloadUrl = `/releases/${sourceSlug}/docs/${enc}`
+        category = 'General'
+      } else {
+        // notes files or anything else
+        const base = f.release_slug
+          ? `/releases/${sourceSlug}`
+          : `/collections/${sourceSlug}`
+        downloadUrl = `${base}/notes/files/${enc}`
+        category = 'General'
+      }
+
+      return {
+        id:          f.id,
+        filename:    f.filename,
+        size:        f.size,
+        uploadedAt:  f.uploadedAt,
+        category,
+        downloadUrl,
+        sourceType,
+        sourceSlug,
+        sourceName,
+        sourceHref
+      }
+    })
+
+    res.json({ success: true, files })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+})
+
 // GET /contacts — return all contacts belonging to the authenticated user
 app.get('/contacts', authMiddleware, async (req, res) => {
   try {

@@ -204,39 +204,12 @@ function extractFilesFromItem(item, sourceId, sourceType) {
 }
 
 /**
- * Fetches all files from releases and collections.
- * @returns {Promise<Array>} All files sorted by uploadedAt descending
+ * Fetches all files from the dedicated /files endpoint.
+ * Returns files sorted by uploadedAt descending (newest first).
+ * @returns {Promise<Array>} All files
  */
 export async function fetchAllFiles() {
-  const [releasesRes, collectionsRes] = await Promise.all([
-    apiFetch('/releases').then(r => r.json()),
-    apiFetch('/collections').then(r => r.json())
-  ])
-
-  const releases = releasesRes.releases || []
-  const collections = collectionsRes.collections || []
-
-  const allFiles = []
-
-  for (const r of releases) {
-    const releaseId = r.releaseId
-    const fullRes = await apiFetch(`/releases/${releaseId}`).then(x => x.json())
-    const release = fullRes.release || fullRes
-    const extracted = extractFilesFromItem(release, releaseId, 'release')
-    allFiles.push(...extracted)
-  }
-
-  for (const c of collections) {
-    const collectionId = c.releaseId || c.collectionId
-    const fullRes = await apiFetch(`/collections/${collectionId}`).then(x => x.json())
-    const collection = fullRes.collection || fullRes
-    const extracted = extractFilesFromItem(collection, collectionId, 'collection')
-    allFiles.push(...extracted)
-  }
-
-  return allFiles.sort((a, b) => {
-    const dateA = new Date(a.uploadedAt || 0)
-    const dateB = new Date(b.uploadedAt || 0)
-    return dateB - dateA
-  })
+  const res = await apiFetch('/files')
+  const data = await res.json()
+  return data.files || []
 }

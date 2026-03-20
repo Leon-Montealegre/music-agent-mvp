@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useEffect, useRef, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Modal from '@/components/Modal'
@@ -39,6 +40,7 @@ function TrackThumb({ releaseId }) {
 export default function CollectionDetailPage({ params }) {
   const { collectionId } = use(params)
   const router = useRouter()
+  const { data: session } = useSession()
 
   const [collection, setCollection] = useState(null)
   const [tracks, setTracks]         = useState([])
@@ -122,7 +124,7 @@ export default function CollectionDetailPage({ params }) {
     }
   }
 
-  useEffect(() => { loadCollection() }, [collectionId])
+  useEffect(() => { if (session?.token) loadCollection() }, [collectionId, session])
 
   // Check artwork exists
   useEffect(() => {
@@ -201,7 +203,7 @@ export default function CollectionDetailPage({ params }) {
     }
   }
 
-  const handleMarkAsSigned = async (labelName) => {
+  const handleMarkAsSigned = async (labelName, submissionId) => {
     try {
       const response = await apiFetch(`/collections/${collectionId}/sign`, {
         method: 'PATCH',
@@ -210,6 +212,19 @@ export default function CollectionDetailPage({ params }) {
       })
       const data = await response.json()
       if (!response.ok) { alert(`Failed to mark as signed: ${data.error || 'Unknown error'}`); return }
+
+      // Also update the distribution entry status to "Signed" using the entry UUID.
+      if (submissionId) {
+        const entRes = await apiFetch(
+          `/collections/${collectionId}/label/${submissionId}`,
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Signed', signedDate: signingDate }) }
+        )
+        if (!entRes.ok) {
+          const d = await entRes.json().catch(() => ({}))
+          console.error('Failed to update entry status:', d.error)
+        }
+      }
+
       await loadCollection()
       setShowLabelSigningModal(false)
     } catch (err) {
@@ -1099,7 +1114,7 @@ export default function CollectionDetailPage({ params }) {
           </div>
           <div className="space-y-2">
             {dist.submit?.map((submission, index) => (
-              <button key={index} onClick={() => handleMarkAsSigned(submission.label)}
+              <button key={index} onClick={() => handleMarkAsSigned(submission.label, submission.id)}
                 className="w-full text-left p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
                 <p className="font-medium text-gray-100">{submission.label}</p>
                 <p className="text-sm text-gray-400">Submitted via {submission.platform}</p>
