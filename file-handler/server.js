@@ -110,7 +110,7 @@ function getVersionInfo(req) {
 // =============================================================================
 
 // One instance covers every upload route — no disk writes at all.
-const upload              = multer({ storage: multer.memoryStorage() })
+const upload              = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1 * 1024 * 1024 * 1024 } }) // 1GB max
 const trackArtworkUpload  = upload
 const releaseNotesUpload  = upload
 
@@ -120,7 +120,7 @@ const collectionUpload    = upload
 const collectionNotesUpload   = upload
 
 const collectionPromoEntryUpload  = upload
-const collectionLabelEntryUpload  = multer({ storage: multer.memoryStorage() /* placeholder — same instance */ })
+const collectionLabelEntryUpload  = upload // same instance with 1GB limit
 
 // All aliases point to the same memoryStorage instance — no disk writes anywhere.
 
@@ -2778,6 +2778,9 @@ app.patch('/collections/:collectionId/label/:labelId/notes', authMiddleware, asy
 // =============================================================================
 
 app.use((err, req, res, next) => {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ success: false, message: 'File too large. Maximum upload size is 1GB.' })
+  }
   res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Server error' })
 })
 
