@@ -11,6 +11,15 @@ function formatDate(iso) {
   })
 }
 
+// Format bytes into human-readable storage size, e.g. "2.4 GB"
+function formatStorage(bytes) {
+  if (!bytes || bytes === 0) return '—'
+  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
+  if (bytes >= 1024 * 1024)        return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  if (bytes >= 1024)               return (bytes / 1024).toFixed(1) + ' KB'
+  return bytes + ' B'
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession()
   const [users,   setUsers]   = useState([])
@@ -103,8 +112,9 @@ export default function AdminPage() {
 
           {/* Table header */}
           <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-gray-700 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            <div className="col-span-4">Name</div>
-            <div className="col-span-4">Email</div>
+            <div className="col-span-3">Name</div>
+            <div className="col-span-3">Email</div>
+            <div className="col-span-2">Storage</div>
             <div className="col-span-2">Joined</div>
             <div className="col-span-1">Role</div>
             <div className="col-span-1"></div>
@@ -128,7 +138,7 @@ export default function AdminPage() {
                   }`}
                 >
                   {/* Name */}
-                  <div className="col-span-4 flex items-center gap-2">
+                  <div className="col-span-3 flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-300 flex-shrink-0">
                       {user.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
@@ -139,7 +149,15 @@ export default function AdminPage() {
                   </div>
 
                   {/* Email */}
-                  <div className="col-span-4 text-gray-300 text-sm truncate">{user.email}</div>
+                  <div className="col-span-3 text-gray-300 text-sm truncate">{user.email}</div>
+
+                  {/* Storage */}
+                  <div className="col-span-2">
+                    <span className="text-gray-200 text-sm">{formatStorage(user.storage_bytes)}</span>
+                    {user.file_count > 0 && (
+                      <span className="ml-1 text-xs text-gray-500">({user.file_count} {user.file_count === 1 ? 'file' : 'files'})</span>
+                    )}
+                  </div>
 
                   {/* Joined */}
                   <div className="col-span-2 text-gray-400 text-sm">{formatDate(user.created_at)}</div>
@@ -190,11 +208,14 @@ export default function AdminPage() {
           )}
         </div>
 
-        {/* User count */}
+        {/* Summary footer */}
         {!loading && (
-          <p className="mt-4 text-right text-xs text-gray-600">
-            {users.length} {users.length === 1 ? 'user' : 'users'} total
-          </p>
+          <div className="mt-4 flex justify-between items-center text-xs text-gray-600">
+            <span>
+              Total storage: <span className="text-gray-400">{formatStorage(users.reduce((sum, u) => sum + Number(u.storage_bytes || 0), 0))}</span>
+            </span>
+            <span>{users.length} {users.length === 1 ? 'user' : 'users'} total</span>
+          </div>
         )}
 
       </div>

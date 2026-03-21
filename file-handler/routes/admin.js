@@ -17,13 +17,18 @@ function adminMiddleware(req, res, next) {
 router.use(authMiddleware, adminMiddleware);
 
 // ─── GET /admin/users ─────────────────────────────────────────────────────────
-// Returns all users: id, name, email, created_at, is_admin
+// Returns all users: id, name, email, created_at, is_admin, storage_bytes, file_count
 router.get('/users', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, name, email, created_at, is_admin
-       FROM users
-       ORDER BY created_at DESC`
+      `SELECT
+         u.id, u.name, u.email, u.created_at, u.is_admin,
+         COALESCE(SUM(f.size_bytes), 0)::BIGINT AS storage_bytes,
+         COUNT(f.id)::INTEGER                   AS file_count
+       FROM users u
+       LEFT JOIN files f ON f.user_id = u.id
+       GROUP BY u.id, u.name, u.email, u.created_at, u.is_admin
+       ORDER BY u.created_at DESC`
     );
     res.json({ users: result.rows });
   } catch (err) {
