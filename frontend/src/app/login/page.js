@@ -120,6 +120,12 @@ export default function LoginPage() {
           </p>
         </div>
 
+        <p className="text-center text-gray-600 text-xs mt-6">
+          <Link href="/terms" className="hover:text-gray-400">Terms of Service</Link>
+          {' · '}
+          <Link href="/privacy" className="hover:text-gray-400">Privacy Policy</Link>
+        </p>
+
       </div>
     </div>
   )

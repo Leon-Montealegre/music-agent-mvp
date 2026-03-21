@@ -6,6 +6,64 @@ const crypto = require('crypto'); // built-in Node.js — no install needed
 const pool = require('../db');
 const authMiddleware = require('../authMiddleware');
 
+// ── In-memory rate limiter ────────────────────────────────────────────────────
+// No external package needed. Tracks request counts per IP within a time window.
+// Resets on server restart — fine for this app's scale.
+//
+// Usage: apply as middleware before a route handler, e.g.
+//   router.post('/login', loginLimiter, async (req, res) => { ... })
+//
+function createRateLimiter({ windowMs, max, message }) {
+  const store = new Map()
+
+  // Purge stale entries once per window so the Map doesn't grow forever
+  setInterval(() => {
+    const now = Date.now()
+    for (const [key, entry] of store.entries()) {
+      if (now - entry.start > windowMs) store.delete(key)
+    }
+  }, windowMs)
+
+  return function rateLimiter(req, res, next) {
+    const ip  = req.ip || req.socket?.remoteAddress || 'unknown'
+    const now = Date.now()
+    const entry = store.get(ip)
+
+    if (!entry || now - entry.start > windowMs) {
+      store.set(ip, { start: now, count: 1 })
+      return next()
+    }
+
+    if (entry.count >= max) {
+      return res.status(429).json({ error: message })
+    }
+
+    entry.count++
+    return next()
+  }
+}
+
+// 10 login attempts per 15 minutes per IP
+const loginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many login attempts. Please try again in 15 minutes.',
+})
+
+// 5 registrations per hour per IP
+const registerLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Too many accounts created from this IP. Please try again later.',
+})
+
+// 5 password reset requests per hour per IP — prevents email spam
+const forgotPasswordLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Too many password reset requests. Please try again in an hour.',
+})
+
 // ── Resend helper ─────────────────────────────────────────────────────────────
 // Calls the Resend HTTP API directly using built-in fetch (Node 18+).
 // No npm package needed.
@@ -54,7 +112,7 @@ function generateToken(user) {
 
 // POST /auth/register
 // Body: { email, password, name }
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   const { email, password, name } = req.body;
 
   if (!email || !password || !name) {
@@ -89,7 +147,7 @@ router.post('/register', async (req, res) => {
 
 // POST /auth/login
 // Body: { email, password }
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -206,7 +264,7 @@ router.patch('/me', authMiddleware, async (req, res) => {
 // Generates a secure reset token, stores it in the DB, and emails a link.
 // ALWAYS returns 200 regardless of whether the email exists — this prevents
 // attackers from discovering which email addresses are registered.
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
   const { email } = req.body;
 
   if (!email) {

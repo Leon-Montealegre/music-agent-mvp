@@ -7,7 +7,26 @@ import Providers from '@/components/Providers'
 
 export const metadata = {
   title: 'Music Agent',
-  description: 'Manage your music catalogue',
+  description: 'Track your music releases, manage distribution submissions, and monitor your catalogue — all in one place.',
+  metadataBase: new URL('https://musicagentchigui.com'),
+  openGraph: {
+    title: 'Music Agent',
+    description: 'Track your music releases, manage distribution submissions, and monitor your catalogue — all in one place.',
+    url: 'https://musicagentchigui.com',
+    siteName: 'Music Agent',
+    images: [{ url: '/logo.png', alt: 'Music Agent' }],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Music Agent',
+    description: 'Track your music releases, manage distribution submissions, and monitor your catalogue — all in one place.',
+    images: ['/logo.png'],
+  },
+  icons: {
+    icon: '/logo.png',
+  },
 }
 
 
