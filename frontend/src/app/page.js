@@ -404,7 +404,7 @@ export default function HomePage() {
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700 mb-4">
         <div className="max-w-7xl mx-auto px-4 py-4">
 
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-100 mb-1">Catalogue Dashboard</h1>
               <div className="flex items-center gap-3 flex-wrap text-sm">
@@ -418,7 +418,7 @@ export default function HomePage() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
               {/* View mode toggle */}
               <div style={{ height: '36px', display: 'flex', alignItems: 'center', border: '1px solid #374151', borderRadius: '8px', overflow: 'hidden' }}>
                 <button
@@ -462,16 +462,16 @@ export default function HomePage() {
                 </button>
               </div>
 
-              <Link href="/contacts" className="px-5 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border border-gray-600/50" style={{ height: '36px', minWidth: '110px' }}>
+              <Link href="/contacts" className="px-4 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border border-gray-600/50" style={{ height: '36px' }}>
                 👤 Contacts
               </Link>
-              <Link href="/files" className="px-5 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border border-gray-600/50" style={{ height: '36px', minWidth: '110px' }}>
+              <Link href="/files" className="px-4 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border border-gray-600/50" style={{ height: '36px' }}>
                 📁 Files
               </Link>
-              <Link href="/stats" className="px-5 py-2 text-sm font-medium rounded-lg flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border border-gray-600/50" style={{ height: '36px', minWidth: '110px' }}>
-                📊 Statistics
+              <Link href="/stats" className="px-4 py-2 text-sm font-medium rounded-lg flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border border-gray-600/50" style={{ height: '36px' }}>
+                📊 Stats
               </Link>
-              <Link href="/releases/new" className="px-5 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white" style={{ height: '36px', minWidth: '110px' }}>
+              <Link href="/releases/new" className="px-4 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white" style={{ height: '36px' }}>
                 ✚ Add Track
               </Link>
             </div>

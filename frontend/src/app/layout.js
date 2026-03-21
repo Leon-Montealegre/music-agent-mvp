@@ -1,10 +1,7 @@
 import './globals.css'
 import Link from 'next/link'
 import ScrollToTop from '@/components/ScrollToTop'
-import FeedbackButton from '@/components/FeedbackButton'
-import UserPill from '@/components/UserPill'
-import AdminButton from '@/components/AdminButton'
-import HeaderNav from '@/components/HeaderNav'
+import MobileMenu from '@/components/MobileMenu'
 import Providers from '@/components/Providers'
 
 
@@ -21,45 +18,18 @@ export default function RootLayout({ children }) {
         <Providers>
         <ScrollToTop />
 
-        <header className="bg-gray-900/95 backdrop-blur-lg border-b border-gray-700/50 sticky top-0 z-50 shadow-xl">
+        <header className="bg-gray-900/95 backdrop-blur-lg border-b border-gray-700/50 sticky top-0 z-50 shadow-xl relative">
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <Link href="/">
-                <img 
-                  src="/logo.png" 
-                  alt="Music Agent Logo" 
+                <img
+                  src="/logo.png"
+                  alt="Music Agent Logo"
                   className="h-26 w-auto cursor-pointer hover:opacity-80 transition-opacity"
                 />
               </Link>
-              
-              <div className="flex items-center gap-3">
-                <FeedbackButton />
-                <AdminButton />
 
-                {/* ✅ NEW: Settings link */}
-                <Link
-                  href="/settings"
-                  style={{ height: '36px' }}
-                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-colors font-medium shadow-md border border-gray-600/50"
-                >
-                  <span className="text-base">⚙️</span>
-                  <span>Settings</span>
-                </Link>
-
-                <UserPill />
-
-                <a
-                  href="https://www.buymeacoffee.com/musicagent"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ height: '36px' }}
-                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-orange-600 hover:bg-orange-700 text-white transition-colors font-medium shadow-md hover:shadow-lg border border-orange-500/20"
-                >
-                  <span className="text-base">☕</span>
-                  <span>Buy me a coffee</span>
-                </a>
-                <HeaderNav />
-              </div>
+              <MobileMenu />
             </div>
           </div>
         </header>
