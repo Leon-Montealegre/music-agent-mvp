@@ -114,7 +114,7 @@ function LandingPage() {
         </svg>
       ),
       verb: 'Track',
-      detail: 'every release — Singles, EPs, and Albums — from pre-release to live',
+      detail: 'Singles, EPs and Albums, from pre-release to live',
     },
     {
       icon: (
@@ -125,7 +125,7 @@ function LandingPage() {
         </svg>
       ),
       verb: 'Manage',
-      detail: 'label submissions, distribution, and promotions across platforms',
+      detail: 'Label submissions, distribution and promotions, across platforms',
     },
     {
       icon: (
@@ -135,7 +135,7 @@ function LandingPage() {
         </svg>
       ),
       verb: 'Store',
-      detail: 'contacts, stems, artwork, video files, and contract documents',
+      detail: 'Contacts, stems, artwork, video files and contract documents',
     },
   ]
 
