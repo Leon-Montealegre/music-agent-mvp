@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { fetchReleases, apiFetch, API_BASE_URL } from '@/lib/api'
 import ReleaseCard from '@/components/ReleaseCard'
@@ -11,6 +11,236 @@ const COLLECTION_BADGE_STYLES = {
 }
 
 const KEY_ORDER = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B']
+
+// ─────────────────────────────────────────────────────────────
+//  LANDING PAGE — shown to visitors who are not signed in
+// ─────────────────────────────────────────────────────────────
+function LandingPage() {
+  const canvasRef = useRef(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+
+    const resize = () => {
+      canvas.width  = window.innerWidth
+      canvas.height = window.innerHeight
+    }
+    resize()
+    window.addEventListener('resize', resize)
+
+    let animId
+    let t = 0
+
+    // Multiple sine waves — each is a different "frequency channel"
+    const waves = [
+      { freq: 0.008,  amp: 90,  speed: 0.35, color: 'rgba(139, 92, 246, 0.55)', lineWidth: 1.8, yFrac: 0.38 },
+      { freq: 0.013,  amp: 55,  speed: 0.22, color: 'rgba(99, 102, 241, 0.45)', lineWidth: 1.2, yFrac: 0.50 },
+      { freq: 0.006,  amp: 110, speed: 0.55, color: 'rgba(168, 85, 247, 0.35)', lineWidth: 2.2, yFrac: 0.60 },
+      { freq: 0.019,  amp: 38,  speed: 0.18, color: 'rgba(59, 130, 246, 0.40)', lineWidth: 1.0, yFrac: 0.44 },
+      { freq: 0.005,  amp: 130, speed: 0.70, color: 'rgba(236, 72, 153, 0.22)', lineWidth: 1.5, yFrac: 0.54 },
+    ]
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+      // Subtle DAW-style grid
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)'
+      ctx.lineWidth = 1
+      const g = 70
+      for (let x = 0; x <= canvas.width; x += g) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke()
+      }
+      for (let y = 0; y <= canvas.height; y += g) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
+      }
+
+      // Drifting glow orb — purple, top-left
+      const orb1 = ctx.createRadialGradient(
+        canvas.width * 0.18 + Math.sin(t * 0.09) * 90, canvas.height * 0.28 + Math.cos(t * 0.07) * 60, 0,
+        canvas.width * 0.18 + Math.sin(t * 0.09) * 90, canvas.height * 0.28 + Math.cos(t * 0.07) * 60, 380
+      )
+      orb1.addColorStop(0, 'rgba(109, 40, 217, 0.28)')
+      orb1.addColorStop(1, 'rgba(109, 40, 217, 0)')
+      ctx.fillStyle = orb1
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      // Drifting glow orb — indigo/blue, bottom-right
+      const orb2 = ctx.createRadialGradient(
+        canvas.width * 0.82 + Math.cos(t * 0.07) * 70, canvas.height * 0.65 + Math.sin(t * 0.06) * 50, 0,
+        canvas.width * 0.82 + Math.cos(t * 0.07) * 70, canvas.height * 0.65 + Math.sin(t * 0.06) * 50, 300
+      )
+      orb2.addColorStop(0, 'rgba(29, 78, 216, 0.22)')
+      orb2.addColorStop(1, 'rgba(29, 78, 216, 0)')
+      ctx.fillStyle = orb2
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      // Oscilloscope waves
+      waves.forEach(wave => {
+        ctx.beginPath()
+        ctx.strokeStyle = wave.color
+        ctx.lineWidth = wave.lineWidth
+        ctx.shadowBlur = 10
+        ctx.shadowColor = wave.color
+        for (let x = 0; x <= canvas.width; x += 2) {
+          const y =
+            canvas.height * wave.yFrac +
+            Math.sin(x * wave.freq + t * wave.speed) * wave.amp +
+            Math.sin(x * wave.freq * 2.3 + t * wave.speed * 1.4) * wave.amp * 0.25
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+        }
+        ctx.stroke()
+      })
+      ctx.shadowBlur = 0
+
+      t += 0.025
+      animId = requestAnimationFrame(draw)
+    }
+
+    draw()
+    return () => {
+      window.removeEventListener('resize', resize)
+      cancelAnimationFrame(animId)
+    }
+  }, [])
+
+  const features = [
+    {
+      icon: '🎵',
+      title: 'Release Tracking',
+      desc: 'Singles, EPs & Albums — from pre-release to live',
+    },
+    {
+      icon: '📋',
+      title: 'Label Management',
+      desc: 'Submissions, distribution & promotions across platforms',
+    },
+    {
+      icon: '📁',
+      title: 'File & Asset Storage',
+      desc: 'Contacts, stems, artwork, video & contract documents',
+    },
+  ]
+
+  return (
+    <div className="relative min-h-screen overflow-hidden" style={{ background: '#07070f' }}>
+
+      {/* Animated canvas */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+
+      {/* Bottom fade */}
+      <div
+        className="absolute inset-x-0 bottom-0 pointer-events-none"
+        style={{ height: '35%', background: 'linear-gradient(to top, #07070f, transparent)' }}
+      />
+
+      {/* All content */}
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 py-20 text-center">
+
+        {/* Logo — large with glow */}
+        <div
+          className="mb-8"
+          style={{ filter: 'drop-shadow(0 0 48px rgba(139, 92, 246, 0.5)) drop-shadow(0 0 96px rgba(99, 102, 241, 0.25))' }}
+        >
+          <img src="/logo.png" alt="Music Agent" style={{ height: '140px', width: 'auto' }} />
+        </div>
+
+        {/* Main headline */}
+        <h1
+          className="font-black tracking-tight mb-4 text-center"
+          style={{
+            fontSize: 'clamp(2.8rem, 8vw, 5.5rem)',
+            lineHeight: 1.05,
+            background: 'linear-gradient(135deg, #ffffff 0%, #d8b4fe 45%, #818cf8 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          Music Agent
+        </h1>
+
+        {/* Tagline */}
+        <p
+          className="text-center mb-16"
+          style={{
+            fontSize: 'clamp(1rem, 2.5vw, 1.25rem)',
+            color: 'rgba(156, 163, 175, 0.9)',
+            letterSpacing: '0.04em',
+            fontWeight: 300,
+          }}
+        >
+          Manage your Music Catalogue
+        </p>
+
+        {/* Feature cards — glassmorphism */}
+        <div
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mb-14"
+          style={{ maxWidth: '780px' }}
+        >
+          {features.map(({ icon, title, desc }) => (
+            <div
+              key={title}
+              style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                borderRadius: '18px',
+                padding: '26px 22px',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ fontSize: '1.6rem', marginBottom: '12px' }}>{icon}</div>
+              <div style={{ color: '#f3f4f6', fontWeight: 600, fontSize: '14px', marginBottom: '6px' }}>{title}</div>
+              <div style={{ color: 'rgba(156, 163, 175, 0.8)', fontSize: '12.5px', lineHeight: 1.6 }}>{desc}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA buttons */}
+        <div className="flex gap-3 justify-center flex-wrap">
+          <Link
+            href="/login"
+            style={{
+              padding: '13px 32px',
+              border: '1px solid rgba(255,255,255,0.14)',
+              background: 'rgba(255,255,255,0.07)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              borderRadius: '12px',
+              color: '#e5e7eb',
+              fontWeight: 500,
+              fontSize: '15px',
+              textDecoration: 'none',
+              letterSpacing: '0.02em',
+            }}
+          >
+            Log in
+          </Link>
+          <Link
+            href="/register"
+            style={{
+              padding: '13px 32px',
+              background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+              borderRadius: '12px',
+              color: 'white',
+              fontWeight: 600,
+              fontSize: '15px',
+              textDecoration: 'none',
+              letterSpacing: '0.02em',
+              boxShadow: '0 0 35px rgba(124, 58, 237, 0.55), 0 4px 16px rgba(0,0,0,0.4)',
+            }}
+          >
+            Register →
+          </Link>
+        </div>
+
+      </div>
+    </div>
+  )
+}
 
 export default function HomePage() {
   const { status } = useSession()   // 'loading' | 'authenticated' | 'unauthenticated'
@@ -166,41 +396,7 @@ export default function HomePage() {
   const useSections  = typeFilter === 'all'
 
   // ── Landing page for visitors who are not signed in ──
-  if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center px-4">
-        <div className="max-w-lg w-full text-center">
-
-          <img src="/logo.png" alt="Music Agent" className="h-20 w-auto mx-auto mb-8" />
-
-          <h1 className="text-3xl font-bold text-gray-100 mb-2">Music Agent</h1>
-          <p className="text-lg text-gray-400 mb-10">Manage your Music Catalogue</p>
-
-          <ul className="text-left space-y-3 mb-10 text-gray-300 text-sm leading-relaxed">
-            <li>— Track every release — Singles, EPs, and Albums — from pre-release to live</li>
-            <li>— Manage label submissions, distribution, and promotions across platforms</li>
-            <li>— Store contacts, stems, artwork, video files, and contract documents</li>
-          </ul>
-
-          <div className="flex gap-4 justify-center">
-            <Link
-              href="/login"
-              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors border border-gray-600"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/register"
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-            >
-              Register →
-            </Link>
-          </div>
-
-        </div>
-      </div>
-    )
-  }
+  if (status === 'unauthenticated') return <LandingPage />
 
   if (error) {
     return (
