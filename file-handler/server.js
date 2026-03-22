@@ -367,23 +367,153 @@ app.get('/files', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
+// =============================================================================
+// CONTACTS — CRM (Phase 3)
+// =============================================================================
+
+// Helper: format a contact row from the DB into the shape the frontend expects
+function fmtContact(c) {
+  return {
+    id:        c.id,
+    name:      c.name          || '',
+    email:     c.email         || '',
+    role:      c.role          || '',
+    phone:     c.phone         || '',
+    location:  c.location      || '',
+    label:     c.label_name    || '',
+    notes:     c.contact_notes || '',
+    createdAt: c.created_at,
+  }
+}
+
+// Helper: given a contact id, return the list of entries it is linked to,
+// formatted as { entryId, pathType, sourceType, sourceName, sourceHref }
+async function fetchContactSources(db, contactId) {
+  const res = await db.query(
+    `SELECT de.id        AS "entryId",
+            de.path_type AS "pathType",
+            de.entry_label AS "entryLabel",
+            COALESCE(r.slug,  col.slug)  AS slug,
+            COALESCE(r.title, col.title) AS "sourceTitle",
+            CASE
+              WHEN de.release_id    IS NOT NULL THEN 'release'
+              WHEN de.collection_id IS NOT NULL THEN 'collection'
+            END AS "sourceType"
+     FROM entry_contacts ec
+     JOIN distribution_entries de ON de.id = ec.entry_id
+     LEFT JOIN releases    r   ON r.id = de.release_id
+     LEFT JOIN collections col ON col.id = de.collection_id
+     WHERE ec.contact_id = $1`,
+    [contactId]
+  )
+  return res.rows.map(row => {
+    const base = row.sourceType === 'release' ? 'releases' : 'collections'
+    const path = row.pathType === 'submit' ? 'label' : 'promo'
+    return {
+      entryId:    row.entryId,
+      pathType:   row.pathType,
+      sourceType: row.sourceType,
+      sourceName: row.entryLabel || row.sourceTitle || 'Untitled',
+      sourceHref: `/${base}/${row.slug}/${path}/${row.entryId}`,
+    }
+  })
+}
+
 // GET /contacts — return all contacts belonging to the authenticated user
+// Each contact now includes a `sources` array of linked entries
 app.get('/contacts', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
     const result = await db.query(
       `SELECT c.id, c.name, c.email, c.role,
-              COALESCE(c.phone, '')         AS phone,
-              COALESCE(c.location, '')      AS location,
-              COALESCE(c.label_name, '')    AS label,
-              COALESCE(c.contact_notes, '') AS notes,
-              c.created_at AS "createdAt"
+              c.phone, c.location, c.label_name, c.contact_notes,
+              c.created_at
        FROM contacts c
        WHERE c.user_id = $1
        ORDER BY c.name ASC`,
       [req.user.id]
     )
-    res.json({ success: true, contacts: result.rows })
+    // Fetch linked entries for every contact in parallel
+    const contacts = await Promise.all(
+      result.rows.map(async (c) => ({
+        ...fmtContact(c),
+        sources: await fetchContactSources(db, c.id),
+      }))
+    )
+    res.json({ success: true, contacts })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+})
+
+// GET /contacts/:contactId — single contact with its linked entries
+app.get('/contacts/:contactId', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const { contactId } = req.params
+    const result = await db.query(
+      `SELECT * FROM contacts WHERE id = $1 AND user_id = $2`,
+      [contactId, req.user.id]
+    )
+    if (!result.rows.length) return res.status(404).json({ success: false, error: 'Contact not found' })
+    const c = result.rows[0]
+    const sources = await fetchContactSources(db, c.id)
+    res.json({ success: true, contact: { ...fmtContact(c), sources } })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+})
+
+// POST /contacts — create a standalone contact (not tied to any entry yet)
+app.post('/contacts', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const { name, email, role, phone, location, label, notes } = req.body
+    if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Name is required' })
+    const result = await db.query(
+      `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [req.user.id, name.trim(), email || '', role || '', phone || '', location || '', label || '', notes || '']
+    )
+    const c = result.rows[0]
+    res.json({ success: true, contact: { ...fmtContact(c), sources: [] } })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+})
+
+// PATCH /contacts/:contactId — update a contact's details
+// Because contacts are shared, this change propagates everywhere the contact is linked
+app.patch('/contacts/:contactId', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const { contactId } = req.params
+    const { name, email, role, phone, location, label, notes } = req.body
+    if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Name is required' })
+    // Confirm the contact belongs to this user
+    const own = await db.query(
+      `SELECT 1 FROM contacts WHERE id = $1 AND user_id = $2`,
+      [contactId, req.user.id]
+    )
+    if (!own.rows.length) return res.status(404).json({ success: false, error: 'Contact not found' })
+    const result = await db.query(
+      `UPDATE contacts
+       SET name=$2, email=$3, role=$4, phone=$5, location=$6, label_name=$7, contact_notes=$8
+       WHERE id=$1 RETURNING *`,
+      [contactId, name.trim(), email || '', role || '', phone || '', location || '', label || '', notes || '']
+    )
+    const c = result.rows[0]
+    const sources = await fetchContactSources(db, c.id)
+    res.json({ success: true, contact: { ...fmtContact(c), sources } })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+})
+
+// DELETE /contacts/:contactId — permanently delete a contact
+// The ON DELETE CASCADE on entry_contacts means all links are removed automatically
+app.delete('/contacts/:contactId', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const { contactId } = req.params
+    const result = await db.query(
+      `DELETE FROM contacts WHERE id = $1 AND user_id = $2 RETURNING id`,
+      [contactId, req.user.id]
+    )
+    if (!result.rows.length) return res.status(404).json({ success: false, error: 'Contact not found' })
+    res.json({ success: true })
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
@@ -1170,30 +1300,35 @@ app.delete('/releases/:releaseId/promo/:promoId', authMiddleware, async (req, re
 })
 
 // -- Promo entry: POST contact ------------------------------------------------
+// Accepts { contactId } to link an existing contact, or full fields to create new.
 app.post('/releases/:releaseId/promo/:promoId/contacts', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
     const { releaseId, promoId } = req.params
-    const { name, label, email, phone, location, role, notes } = req.body
-    if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+    const { contactId, name, label, email, phone, location, role, notes } = req.body
     const ent = await getReleaseEntry(db, releaseId, promoId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Promo entry not found' })
-    const cRes = await db.query(
-      `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
-    )
-    const contact = cRes.rows[0]
+    let contact
+    if (contactId) {
+      const existing = await db.query(
+        `SELECT * FROM contacts WHERE id = $1 AND user_id = $2`, [contactId, req.user.id]
+      )
+      if (!existing.rows.length) return res.status(404).json({ success: false, error: 'Contact not found' })
+      contact = existing.rows[0]
+    } else {
+      if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+      const cRes = await db.query(
+        `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
+      )
+      contact = cRes.rows[0]
+    }
     await db.query(
-      `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2)`,
+      `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [contact.id, ent.id]
     )
-    res.json({ success: true, contact: {
-      id: contact.id, name: contact.name, email: contact.email, role: contact.role,
-      phone: contact.phone || '', location: contact.location || '',
-      label: contact.label_name || '', notes: contact.contact_notes || '',
-      createdAt: contact.created_at
-    }})
+    res.json({ success: true, contact: fmtContact(contact) })
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
@@ -1386,30 +1521,39 @@ app.delete('/releases/:releaseId/label/:labelId', authMiddleware, async (req, re
 })
 
 // -- Label entry: POST contact ------------------------------------------------
+// Accepts either { contactId } to link an existing contact, or full contact
+// fields to create a new contact and link it in one step.
 app.post('/releases/:releaseId/label/:labelId/contacts', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
     const { releaseId, labelId } = req.params
-    const { name, label, email, phone, location, role, notes } = req.body
-    if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+    const { contactId, name, label, email, phone, location, role, notes } = req.body
     const ent = await getReleaseEntry(db, releaseId, labelId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Label submission not found' })
-    const cRes = await db.query(
-      `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
-    )
-    const contact = cRes.rows[0]
+    let contact
+    if (contactId) {
+      // Link an existing contact — verify it belongs to this user first
+      const existing = await db.query(
+        `SELECT * FROM contacts WHERE id = $1 AND user_id = $2`, [contactId, req.user.id]
+      )
+      if (!existing.rows.length) return res.status(404).json({ success: false, error: 'Contact not found' })
+      contact = existing.rows[0]
+    } else {
+      // Create a brand-new contact
+      if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+      const cRes = await db.query(
+        `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
+      )
+      contact = cRes.rows[0]
+    }
+    // Create the link (ignore if already linked — ON CONFLICT DO NOTHING)
     await db.query(
-      `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2)`,
+      `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [contact.id, ent.id]
     )
-    res.json({ success: true, contact: {
-      id: contact.id, name: contact.name, email: contact.email, role: contact.role,
-      phone: contact.phone || '', location: contact.location || '',
-      label: contact.label_name || '', notes: contact.contact_notes || '',
-      createdAt: contact.created_at
-    }})
+    res.json({ success: true, contact: fmtContact(contact) })
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
@@ -2404,30 +2548,35 @@ app.delete('/collections/:collectionId/promo/:promoId', authMiddleware, async (r
 })
 
 // -- Collection promo entry: POST contact -------------------------------------
+// Accepts { contactId } to link existing contact, or full fields to create new.
 app.post('/collections/:collectionId/promo/:promoId/contacts', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
     const { collectionId, promoId } = req.params
-    const { name, label, email, phone, location, role, notes } = req.body
-    if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+    const { contactId, name, label, email, phone, location, role, notes } = req.body
     const ent = await getCollectionEntry(db, collectionId, promoId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Promo entry not found' })
-    const cRes = await db.query(
-      `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
-    )
-    const contact = cRes.rows[0]
+    let contact
+    if (contactId) {
+      const existing = await db.query(
+        `SELECT * FROM contacts WHERE id = $1 AND user_id = $2`, [contactId, req.user.id]
+      )
+      if (!existing.rows.length) return res.status(404).json({ success: false, error: 'Contact not found' })
+      contact = existing.rows[0]
+    } else {
+      if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+      const cRes = await db.query(
+        `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
+      )
+      contact = cRes.rows[0]
+    }
     await db.query(
-      `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2)`,
+      `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [contact.id, ent.id]
     )
-    res.json({ success: true, contact: {
-      id: contact.id, name: contact.name, email: contact.email, role: contact.role,
-      phone: contact.phone || '', location: contact.location || '',
-      label: contact.label_name || '', notes: contact.contact_notes || '',
-      createdAt: contact.created_at
-    }})
+    res.json({ success: true, contact: fmtContact(contact) })
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
@@ -2618,30 +2767,35 @@ app.delete('/collections/:collectionId/label/:labelId', authMiddleware, async (r
 })
 
 // -- Collection label entry: POST contact -------------------------------------
+// Accepts { contactId } to link existing contact, or full fields to create new.
 app.post('/collections/:collectionId/label/:labelId/contacts', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
     const { collectionId, labelId } = req.params
-    const { name, label, email, phone, location, role, notes } = req.body
-    if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+    const { contactId, name, label, email, phone, location, role, notes } = req.body
     const ent = await getCollectionEntry(db, collectionId, labelId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Label submission not found' })
-    const cRes = await db.query(
-      `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
-    )
-    const contact = cRes.rows[0]
+    let contact
+    if (contactId) {
+      const existing = await db.query(
+        `SELECT * FROM contacts WHERE id = $1 AND user_id = $2`, [contactId, req.user.id]
+      )
+      if (!existing.rows.length) return res.status(404).json({ success: false, error: 'Contact not found' })
+      contact = existing.rows[0]
+    } else {
+      if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
+      const cRes = await db.query(
+        `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
+      )
+      contact = cRes.rows[0]
+    }
     await db.query(
-      `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2)`,
+      `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [contact.id, ent.id]
     )
-    res.json({ success: true, contact: {
-      id: contact.id, name: contact.name, email: contact.email, role: contact.role,
-      phone: contact.phone || '', location: contact.location || '',
-      label: contact.label_name || '', notes: contact.contact_notes || '',
-      createdAt: contact.created_at
-    }})
+    res.json({ success: true, contact: fmtContact(contact) })
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 

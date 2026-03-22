@@ -80,16 +80,68 @@ function extractContactsFromItem(item, sourceId, sourceType) {
 
 /**
  * Fetches all contacts from the dedicated /contacts endpoint.
- * Returns contacts sorted alphabetically by name with empty sources array
- * for compatibility with the contacts page UI.
+ * Each contact includes a `sources` array of linked entries (from the backend).
  * @returns {Promise<Array>} Contacts sorted alphabetically by name
  */
 export async function fetchAllContacts() {
   const res = await apiFetch('/contacts')
   const data = await res.json()
-  const contacts = data.contacts || []
-  // Add empty sources array for UI compatibility
-  return contacts.map(c => ({ ...c, sources: [] }))
+  return data.contacts || []
+}
+
+/**
+ * Fetch a single contact by ID, including its linked entries.
+ * @param {string} contactId
+ */
+export async function fetchContact(contactId) {
+  const res = await apiFetch(`/contacts/${contactId}`)
+  if (!res.ok) throw new Error('Contact not found')
+  const data = await res.json()
+  return data.contact
+}
+
+/**
+ * Create a standalone contact (not yet linked to any entry).
+ * @param {{ name, email, role, phone, location, label, notes }} fields
+ * @returns {Promise<Object>} The created contact
+ */
+export async function createContact(fields) {
+  const res = await apiFetch('/contacts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to create contact')
+  return data.contact
+}
+
+/**
+ * Update an existing contact's details.
+ * Because contacts are shared, this update propagates to every linked entry.
+ * @param {string} contactId
+ * @param {{ name, email, role, phone, location, label, notes }} fields
+ * @returns {Promise<Object>} The updated contact
+ */
+export async function updateContact(contactId, fields) {
+  const res = await apiFetch(`/contacts/${contactId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to update contact')
+  return data.contact
+}
+
+/**
+ * Permanently delete a contact. All links to entries are removed automatically.
+ * @param {string} contactId
+ */
+export async function deleteContact(contactId) {
+  const res = await apiFetch(`/contacts/${contactId}`, { method: 'DELETE' })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to delete contact')
 }
 
 /**
