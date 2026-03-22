@@ -113,7 +113,8 @@ function LandingPage() {
           <path d="M2 12h2.5l2-7 3 14 3-10 2 5 1.5-5 1.5 3H22" />
         </svg>
       ),
-      text: 'Track every release — Singles, EPs, and Albums — from pre-release to live',
+      verb: 'Track',
+      detail: 'every release — Singles, EPs, and Albums — from pre-release to live',
     },
     {
       icon: (
@@ -123,7 +124,8 @@ function LandingPage() {
           <path d="M22 2L15 22 11 13 2 9l20-7z" />
         </svg>
       ),
-      text: 'Manage label submissions, distribution, and promotions across platforms',
+      verb: 'Manage',
+      detail: 'label submissions, distribution, and promotions across platforms',
     },
     {
       icon: (
@@ -132,7 +134,8 @@ function LandingPage() {
           <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
         </svg>
       ),
-      text: 'Store contacts, stems, artwork, video files, and contract documents',
+      verb: 'Store',
+      detail: 'contacts, stems, artwork, video files, and contract documents',
     },
   ]
 
@@ -192,9 +195,9 @@ function LandingPage() {
           className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mb-14"
           style={{ maxWidth: '820px' }}
         >
-          {features.map(({ icon, text }) => (
+          {features.map(({ icon, verb, detail }) => (
             <div
-              key={text}
+              key={verb}
               style={{
                 background: 'rgba(255, 255, 255, 0.04)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -205,12 +208,18 @@ function LandingPage() {
                 textAlign: 'left',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '14px',
+                gap: '10px',
               }}
             >
-              <div style={{ color: '#a78bfa' }}>{icon}</div>
-              <p style={{ color: 'rgba(209, 213, 219, 0.85)', fontSize: '13.5px', lineHeight: 1.7, margin: 0 }}>
-                {text}
+              {/* Icon */}
+              <div style={{ color: '#a78bfa', marginBottom: '4px' }}>{icon}</div>
+              {/* Action verb — large, bold, white */}
+              <div style={{ color: '#f9fafb', fontWeight: 700, fontSize: '18px', letterSpacing: '-0.01em' }}>
+                {verb}
+              </div>
+              {/* Detail — smaller, muted */}
+              <p style={{ color: 'rgba(156, 163, 175, 0.85)', fontSize: '13px', lineHeight: 1.7, margin: 0 }}>
+                {detail}
               </p>
             </div>
           ))}
