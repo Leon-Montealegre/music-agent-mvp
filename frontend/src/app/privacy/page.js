@@ -9,12 +9,6 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black py-12 px-4">
       <div className="max-w-2xl mx-auto">
 
-        <div className="mb-8">
-          <Link href="/login" className="text-sm text-purple-400 hover:text-purple-300">
-            ← Back
-          </Link>
-        </div>
-
         <h1 className="text-3xl font-bold text-gray-100 mb-2">Privacy Policy</h1>
         <p className="text-gray-500 text-sm mb-10">Last updated: March 2026</p>
 

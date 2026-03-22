@@ -44,7 +44,7 @@ export default function RootLayout({ children }) {
                 <img
                   src="/logo.png"
                   alt="Music Agent Logo"
-                  className="h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+                  className="h-16 w-auto cursor-pointer hover:opacity-80 transition-opacity"
                 />
               </Link>
 
