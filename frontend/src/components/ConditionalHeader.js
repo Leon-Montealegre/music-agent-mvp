@@ -1,16 +1,19 @@
 'use client'
-// ConditionalHeader — renders the sticky nav on every page EXCEPT the landing page (/).
-// The landing page is full-bleed with its own design and doesn't need the app header.
+// ConditionalHeader — renders the sticky nav on every page EXCEPT the unauthenticated landing page.
+// When a logged-in user is on /, they see the catalogue and still need the header.
+// When a logged-out visitor is on /, they see the full-bleed landing page — no header.
 
 import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import MobileMenu from './MobileMenu'
 
 export default function ConditionalHeader() {
   const pathname = usePathname()
+  const { status } = useSession()
 
-  // Hide the global header on the landing page — it has its own layout
-  if (pathname === '/') return null
+  // Hide header only when on the landing page AND not authenticated
+  if (pathname === '/' && status !== 'authenticated') return null
 
   return (
     <header className="bg-gray-900/95 backdrop-blur-lg border-b border-gray-700/50 sticky top-0 z-50 shadow-xl relative">

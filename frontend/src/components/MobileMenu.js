@@ -66,7 +66,7 @@ export default function MobileMenu() {
             <span className="text-gray-500">|</span>
             <button
               type="button"
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => signOut({ callbackUrl: '/' })}
               className="text-xs text-gray-400 hover:text-white transition-colors"
             >
               Log out
@@ -128,7 +128,7 @@ export default function MobileMenu() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => signOut({ callbackUrl: '/login' })}
+                  onClick={() => signOut({ callbackUrl: '/' })}
                   className="text-sm text-gray-400 hover:text-red-400 transition-colors"
                 >
                   Log out
