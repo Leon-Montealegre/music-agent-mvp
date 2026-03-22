@@ -274,6 +274,22 @@ export default function SettingsPage() {
           <SaveButton onClick={saveArtist} saving={artistSaving} status={artistStatus} />
         </Card>
 
+        {/* ── Legal ────────────────────────────────────────────────────── */}
+        <Card title="Legal">
+          <p className="text-xs text-gray-500 mb-4">
+            Review the terms and privacy policy you agreed to when creating your account.
+          </p>
+          <div className="flex gap-4 text-sm">
+            <a href="/terms" className="text-purple-400 hover:text-purple-300 transition-colors">
+              Terms of Service
+            </a>
+            <span className="text-gray-700">·</span>
+            <a href="/privacy" className="text-purple-400 hover:text-purple-300 transition-colors">
+              Privacy Policy
+            </a>
+          </div>
+        </Card>
+
       </div>
     </div>
   )
