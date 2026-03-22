@@ -39,6 +39,7 @@ export default function HomePage() {
     // Wait until NextAuth has finished loading the session.
     // Without this, the fetch fires before the token is set → 401 → empty page.
     if (status !== 'authenticated') return
+    // Note: unauthenticated users see the landing page (rendered below), not this data fetch.
 
     async function loadData() {
       try {
@@ -163,6 +164,43 @@ export default function HomePage() {
 
   const totalVisible = filteredReleases.length + filteredCollections.length
   const useSections  = typeFilter === 'all'
+
+  // ── Landing page for visitors who are not signed in ──
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center px-4">
+        <div className="max-w-lg w-full text-center">
+
+          <img src="/logo.png" alt="Music Agent" className="h-20 w-auto mx-auto mb-8" />
+
+          <h1 className="text-3xl font-bold text-gray-100 mb-2">Music Agent</h1>
+          <p className="text-lg text-gray-400 mb-10">Manage your Music Catalogue</p>
+
+          <ul className="text-left space-y-3 mb-10 text-gray-300 text-sm leading-relaxed">
+            <li>— Track every release — Singles, EPs, and Albums — from pre-release to live</li>
+            <li>— Manage label submissions, distribution, and promotions across platforms</li>
+            <li>— Store contacts, stems, artwork, video files, and contract documents</li>
+          </ul>
+
+          <div className="flex gap-4 justify-center">
+            <Link
+              href="/login"
+              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors border border-gray-600"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/register"
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+            >
+              Register →
+            </Link>
+          </div>
+
+        </div>
+      </div>
+    )
+  }
 
   if (error) {
     return (
