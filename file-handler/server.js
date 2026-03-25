@@ -452,10 +452,11 @@ app.get('/follow-ups', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
-// GET /cron/follow-up-emails — sends reminder emails for all due follow-ups
-// Protected by CRON_SECRET env var. Set up a Railway cron job to call this daily:
-//   curl -H "x-cron-secret: $CRON_SECRET" https://music-agent-mvp-production.up.railway.app/cron/follow-up-emails
-app.get('/cron/follow-up-emails', async (req, res) => {
+// GET /api/send-reminders — sends reminder emails for all due follow-ups
+// (also accessible as /cron/follow-up-emails for backwards compat)
+// Protected by CRON_SECRET env var. Call daily:
+//   curl -H "x-cron-secret: $CRON_SECRET" https://music-agent-mvp-production.up.railway.app/api/send-reminders
+async function handleSendReminders(req, res) {
   const secret = process.env.CRON_SECRET
   if (secret && req.headers['x-cron-secret'] !== secret) {
     return res.status(401).json({ error: 'Unauthorized' })
@@ -500,7 +501,9 @@ app.get('/cron/follow-up-emails', async (req, res) => {
     }
     res.json({ success: true, sent, total: result.rows.length })
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
-})
+}
+app.get('/api/send-reminders', handleSendReminders)
+app.get('/cron/follow-up-emails', handleSendReminders)
 
 // =============================================================================
 // CONTACTS — CRM (Phase 3)
