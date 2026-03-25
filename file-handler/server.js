@@ -368,6 +368,56 @@ app.get('/files', authMiddleware, async (req, res) => {
 })
 
 // =============================================================================
+// FOLLOW-UPS — CRM (Phase 3)
+// Returns all overdue follow-up entries for the current user.
+// "Overdue" = follow_up_date is set and is before today.
+// =============================================================================
+
+app.get('/follow-ups', authMiddleware, async (req, res) => {
+  try {
+    const db = require('./db')
+    const today = new Date().toISOString().split('T')[0] // 'YYYY-MM-DD'
+    const result = await db.query(
+      `SELECT
+         de.id,
+         de.path_type,
+         de.follow_up_date,
+         de.label,
+         de.promo_name,
+         de.response_status,
+         COALESCE(r.slug, col.slug)   AS slug,
+         COALESCE(r.title, col.title) AS source_title,
+         CASE
+           WHEN de.release_id    IS NOT NULL THEN 'release'
+           WHEN de.collection_id IS NOT NULL THEN 'collection'
+         END AS source_type
+       FROM distribution_entries de
+       LEFT JOIN releases    r   ON r.id = de.release_id
+       LEFT JOIN collections col ON col.id = de.collection_id
+       WHERE de.user_id = $1
+         AND de.follow_up_date IS NOT NULL
+         AND de.follow_up_date < $2
+       ORDER BY de.follow_up_date ASC`,
+      [req.user.id, today]
+    )
+    const followUps = result.rows.map(row => {
+      const base = row.source_type === 'release' ? 'releases' : 'collections'
+      const path = row.path_type === 'submit' ? 'label' : 'promo'
+      const entryName = row.label || row.promo_name || row.source_title || 'Untitled'
+      return {
+        id:           row.id,
+        entryName,
+        sourceTitle:  row.source_title || '',
+        followUpDate: row.follow_up_date,
+        responseStatus: row.response_status || 'No Reply',
+        href: `/${base}/${row.slug}/${path}/${row.id}`,
+      }
+    })
+    res.json({ success: true, followUps, count: followUps.length })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+})
+
+// =============================================================================
 // CONTACTS — CRM (Phase 3)
 // =============================================================================
 
@@ -1214,14 +1264,16 @@ async function fetchEntryContactsAndDocs(db, entryId) {
 // for a label/submit entry.
 function fmtLabel(ent, contacts, documents) {
   return {
-    id:         ent.id,
-    label:      ent.label       || '',
-    platform:   ent.platform    || '',
-    status:     ent.status      || '',
-    signedDate: ent.signed_date || null,
-    notes:      ent.entry_notes || '',
-    pageNotes:  ent.page_notes  || '',
-    timestamp:  ent.timestamp,
+    id:             ent.id,
+    label:          ent.label           || '',
+    platform:       ent.platform        || '',
+    status:         ent.status          || '',
+    signedDate:     ent.signed_date     || null,
+    notes:          ent.entry_notes     || '',
+    pageNotes:      ent.page_notes      || '',
+    responseStatus: ent.response_status || 'No Reply',
+    followUpDate:   ent.follow_up_date  || null,
+    timestamp:      ent.timestamp,
     contacts,
     documents
   }
@@ -1230,14 +1282,16 @@ function fmtLabel(ent, contacts, documents) {
 // Same for a promo/promote entry.
 function fmtPromo(ent, contacts, documents) {
   return {
-    id:        ent.id,
-    promoName: ent.promo_name  || '',
-    platform:  ent.platform    || '',
-    status:    ent.status      || '',
-    liveDate:  ent.live_date   || null,
-    notes:     ent.entry_notes || '',
-    pageNotes: ent.page_notes  || '',
-    timestamp: ent.timestamp,
+    id:             ent.id,
+    promoName:      ent.promo_name      || '',
+    platform:       ent.platform        || '',
+    status:         ent.status          || '',
+    liveDate:       ent.live_date       || null,
+    notes:          ent.entry_notes     || '',
+    pageNotes:      ent.page_notes      || '',
+    responseStatus: ent.response_status || 'No Reply',
+    followUpDate:   ent.follow_up_date  || null,
+    timestamp:      ent.timestamp,
     contacts,
     documents
   }
@@ -1262,17 +1316,20 @@ app.patch('/releases/:releaseId/promo/:promoId', authMiddleware, async (req, res
     const { releaseId, promoId } = req.params
     const ent = await getReleaseEntry(db, releaseId, promoId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Promo entry not found' })
-    const { promoName, status, liveDate, platform, notes } = req.body
+    const { promoName, status, liveDate, platform, notes, responseStatus, followUpDate } = req.body
     await db.query(
       `UPDATE distribution_entries SET
-         promo_name  = COALESCE($2, promo_name),
-         status      = COALESCE($3, status),
-         live_date   = COALESCE($4, live_date),
-         platform    = COALESCE($5, platform),
-         entry_notes = COALESCE($6, entry_notes)
+         promo_name      = COALESCE($2, promo_name),
+         status          = COALESCE($3, status),
+         live_date       = COALESCE($4, live_date),
+         platform        = COALESCE($5, platform),
+         entry_notes     = COALESCE($6, entry_notes),
+         response_status = COALESCE($7, response_status),
+         follow_up_date  = $8
        WHERE id = $1`,
       [ent.id, promoName || null, status || null,
-       liveDate || null, platform || null, notes !== undefined ? notes : null]
+       liveDate || null, platform || null, notes !== undefined ? notes : null,
+       responseStatus || null, followUpDate || null]
     )
     const updated = await db.query(
       `SELECT * FROM distribution_entries WHERE id = $1`, [ent.id]
@@ -1484,17 +1541,20 @@ app.patch('/releases/:releaseId/label/:labelId', authMiddleware, async (req, res
     const { releaseId, labelId } = req.params
     const ent = await getReleaseEntry(db, releaseId, labelId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Label submission not found' })
-    const { label, status, signedDate, platform, notes } = req.body
+    const { label, status, signedDate, platform, notes, responseStatus, followUpDate } = req.body
     await db.query(
       `UPDATE distribution_entries SET
-         label       = COALESCE($2, label),
-         status      = COALESCE($3, status),
-         signed_date = COALESCE($4, signed_date),
-         platform    = COALESCE($5, platform),
-         entry_notes = COALESCE($6, entry_notes)
+         label           = COALESCE($2, label),
+         status          = COALESCE($3, status),
+         signed_date     = COALESCE($4, signed_date),
+         platform        = COALESCE($5, platform),
+         entry_notes     = COALESCE($6, entry_notes),
+         response_status = COALESCE($7, response_status),
+         follow_up_date  = $8
        WHERE id = $1`,
       [ent.id, label || null, status || null,
-       signedDate || null, platform || null, notes !== undefined ? notes : null]
+       signedDate || null, platform || null, notes !== undefined ? notes : null,
+       responseStatus || null, followUpDate || null]
     )
     const updated = await db.query(
       `SELECT * FROM distribution_entries WHERE id = $1`, [ent.id]
@@ -2511,17 +2571,20 @@ app.patch('/collections/:collectionId/promo/:promoId', authMiddleware, async (re
     const { collectionId, promoId } = req.params
     const ent = await getCollectionEntry(db, collectionId, promoId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Promo entry not found' })
-    const { promoName, status, liveDate, platform, notes } = req.body
+    const { promoName, status, liveDate, platform, notes, responseStatus, followUpDate } = req.body
     await db.query(
       `UPDATE distribution_entries SET
-         promo_name  = COALESCE($2, promo_name),
-         status      = COALESCE($3, status),
-         live_date   = COALESCE($4, live_date),
-         platform    = COALESCE($5, platform),
-         entry_notes = COALESCE($6, entry_notes)
+         promo_name      = COALESCE($2, promo_name),
+         status          = COALESCE($3, status),
+         live_date       = COALESCE($4, live_date),
+         platform        = COALESCE($5, platform),
+         entry_notes     = COALESCE($6, entry_notes),
+         response_status = COALESCE($7, response_status),
+         follow_up_date  = $8
        WHERE id = $1`,
       [ent.id, promoName || null, status || null,
-       liveDate || null, platform || null, notes !== undefined ? notes : null]
+       liveDate || null, platform || null, notes !== undefined ? notes : null,
+       responseStatus || null, followUpDate || null]
     )
     const updated = await db.query(
       `SELECT * FROM distribution_entries WHERE id = $1`, [ent.id]
@@ -2730,17 +2793,20 @@ app.patch('/collections/:collectionId/label/:labelId', authMiddleware, async (re
     const { collectionId, labelId } = req.params
     const ent = await getCollectionEntry(db, collectionId, labelId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Label submission not found' })
-    const { label, status, signedDate, platform, notes } = req.body
+    const { label, status, signedDate, platform, notes, responseStatus, followUpDate } = req.body
     await db.query(
       `UPDATE distribution_entries SET
-         label       = COALESCE($2, label),
-         status      = COALESCE($3, status),
-         signed_date = COALESCE($4, signed_date),
-         platform    = COALESCE($5, platform),
-         entry_notes = COALESCE($6, entry_notes)
+         label           = COALESCE($2, label),
+         status          = COALESCE($3, status),
+         signed_date     = COALESCE($4, signed_date),
+         platform        = COALESCE($5, platform),
+         entry_notes     = COALESCE($6, entry_notes),
+         response_status = COALESCE($7, response_status),
+         follow_up_date  = $8
        WHERE id = $1`,
       [ent.id, label || null, status || null,
-       signedDate || null, platform || null, notes !== undefined ? notes : null]
+       signedDate || null, platform || null, notes !== undefined ? notes : null,
+       responseStatus || null, followUpDate || null]
     )
     const updated = await db.query(
       `SELECT * FROM distribution_entries WHERE id = $1`, [ent.id]

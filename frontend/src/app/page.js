@@ -274,6 +274,8 @@ export default function HomePage() {
   const [collections, setCollections] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [overdueFollowUps, setOverdueFollowUps] = useState([])
+  const [showFollowUpBanner, setShowFollowUpBanner] = useState(true)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -299,12 +301,14 @@ export default function HomePage() {
 
     async function loadData() {
       try {
-        const [releasesData, collectionsRes] = await Promise.all([
+        const [releasesData, collectionsRes, followUpsRes] = await Promise.all([
           fetchReleases(),
-          apiFetch('/collections').then(r => r.json())
+          apiFetch('/collections').then(r => r.json()),
+          apiFetch('/follow-ups').then(r => r.json()).catch(() => ({ followUps: [] })),
         ])
         setReleases(releasesData)
         setCollections(collectionsRes.collections || [])
+        setOverdueFollowUps(followUpsRes.followUps || [])
       } catch (err) {
         // Only show the error screen for actual network failures (TypeError = fetch failed).
         // HTTP errors like 401 throw differently and should not block the UI.
@@ -828,6 +832,41 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* Overdue follow-up banner */}
+      {overdueFollowUps.length > 0 && showFollowUpBanner && (
+        <div className="max-w-7xl mx-auto px-4 mb-4">
+          <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-4 flex items-start gap-3">
+            <span className="text-amber-400 text-xl flex-shrink-0">⏰</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-amber-300 font-semibold text-sm">
+                {overdueFollowUps.length} overdue follow-up{overdueFollowUps.length > 1 ? 's' : ''}
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {overdueFollowUps.slice(0, 3).map(fu => (
+                  <li key={fu.id} className="text-xs text-amber-400/80">
+                    <a href={fu.href} className="hover:text-amber-300 underline underline-offset-2">
+                      {fu.entryName}
+                    </a>
+                    {' '}— due {new Date(fu.followUpDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {fu.responseStatus !== 'No Reply' && <span className="ml-1 text-amber-500/70">({fu.responseStatus})</span>}
+                  </li>
+                ))}
+                {overdueFollowUps.length > 3 && (
+                  <li className="text-xs text-amber-500/60">+ {overdueFollowUps.length - 3} more</li>
+                )}
+              </ul>
+            </div>
+            <button
+              onClick={() => setShowFollowUpBanner(false)}
+              className="flex-shrink-0 text-amber-500/60 hover:text-amber-400 text-lg leading-none"
+              title="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Grid */}
       <div className="max-w-7xl mx-auto px-4 pb-12">

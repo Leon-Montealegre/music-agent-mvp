@@ -4,10 +4,13 @@ import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { fetchCollectionLabelEntry, apiFetch, API_BASE_URL } from '@/lib/api'
+import { fetchAllContacts } from '@/lib/contacts'
 import Modal from '@/components/Modal'
-import LabelContactForm from '@/components/LabelContactForm'
+import ContactPicker from '@/components/ContactPicker'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import FileAttachments from '@/components/FileAttachments'
+
+const RESPONSE_STATUS_OPTIONS = ['No Reply', 'Interested', 'Passed', 'Signed']
 
 export default function CollectionLabelEntryPage({ params }) {
   const { data: session } = useSession()
@@ -19,18 +22,23 @@ export default function CollectionLabelEntryPage({ params }) {
   const [track, setTrack] = useState(null)
   const [entry, setEntry] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [allContacts, setAllContacts] = useState([])
 
   const [detailsForm, setDetailsForm] = useState({
     label: '',
     platform: '',
     status: 'Submitted',
     signedDate: '',
-    notes: ''
+    notes: '',
+    responseStatus: 'No Reply',
+    followUpDate: '',
   })
   const [savingDetails, setSavingDetails] = useState(false)
 
-  const [showContactModal, setShowContactModal] = useState(false)
+  const [showContactPicker, setShowContactPicker] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
+  const [editContactForm, setEditContactForm] = useState({})
+  const [savingContact, setSavingContact] = useState(false)
   const [contactToDelete, setContactToDelete] = useState(null)
   const [showDeleteContactModal, setShowDeleteContactModal] = useState(false)
 
@@ -45,21 +53,25 @@ export default function CollectionLabelEntryPage({ params }) {
   async function loadData() {
     try {
       setLoading(true)
-      const [colData, labelRes] = await Promise.all([
+      const [colData, labelRes, contactsData] = await Promise.all([
         apiFetch(apiBase).then(r => r.json()),
-        fetchCollectionLabelEntry(collectionId, labelId)
+        fetchCollectionLabelEntry(collectionId, labelId),
+        fetchAllContacts(),
       ])
       const collection = colData.collection || colData
       const fetchedEntry = labelRes.entry
 
       setTrack(collection)
       setEntry(fetchedEntry)
+      setAllContacts(Array.isArray(contactsData) ? contactsData : [])
       setDetailsForm({
         label: fetchedEntry.label || fetchedEntry.labelName || '',
         platform: fetchedEntry.platform || '',
         status: fetchedEntry.status || 'Submitted',
-        signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : (fetchedEntry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
-        notes: fetchedEntry.notes || ''
+        signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : '',
+        notes: fetchedEntry.notes || '',
+        responseStatus: fetchedEntry.responseStatus || 'No Reply',
+        followUpDate: fetchedEntry.followUpDate ? fetchedEntry.followUpDate.slice(0, 10) : '',
       })
       setPageNotes(fetchedEntry.pageNotes || '')
     } catch (err) {
@@ -84,7 +96,9 @@ export default function CollectionLabelEntryPage({ params }) {
         label: detailsForm.label.trim(),
         platform: detailsForm.platform,
         status: detailsForm.status,
-        notes: detailsForm.notes
+        notes: detailsForm.notes,
+        responseStatus: detailsForm.responseStatus,
+        followUpDate: detailsForm.followUpDate || null,
       }
       if (detailsForm.status === 'Signed' && detailsForm.signedDate) {
         payload.signedDate = detailsForm.signedDate
@@ -105,8 +119,10 @@ export default function CollectionLabelEntryPage({ params }) {
         label: data.entry.label || data.entry.labelName || '',
         platform: data.entry.platform || '',
         status: data.entry.status || 'Submitted',
-        signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : (data.entry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
-        notes: data.entry.notes || ''
+        signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : '',
+        notes: data.entry.notes || '',
+        responseStatus: data.entry.responseStatus || 'No Reply',
+        followUpDate: data.entry.followUpDate ? data.entry.followUpDate.slice(0, 10) : '',
       })
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
@@ -136,18 +152,41 @@ export default function CollectionLabelEntryPage({ params }) {
     }
   }
 
-  const handleContactSuccess = (savedContact) => {
-    const wasEditing = editingContact
-    setShowContactModal(false)
-    setEditingContact(null)
-    if (savedContact) {
-      if (wasEditing) {
-        setEntry(prev => prev ? { ...prev, contacts: (prev.contacts || []).map(c => c.id === savedContact.id ? savedContact : c) } : prev)
-      } else {
-        setEntry(prev => prev ? { ...prev, contacts: [...(prev.contacts || []), savedContact] } : prev)
-      }
-    } else {
-      loadData()
+  const handlePickContact = async (selection) => {
+    try {
+      const res = await apiFetch(`${apiBase}/label/${labelId}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(selection),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to add contact')
+      await loadData()
+      setShowContactPicker(false)
+    } catch (err) {
+      console.error('Error adding contact:', err)
+      alert(`Failed to add contact: ${err.message}`)
+    }
+  }
+
+  const handleSaveEditContact = async () => {
+    if (!editContactForm.name?.trim()) return
+    setSavingContact(true)
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/contacts/${editingContact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editContactForm),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update contact')
+      await loadData()
+      setEditingContact(null)
+    } catch (err) {
+      console.error('Error updating contact:', err)
+      alert(`Failed to update contact: ${err.message}`)
+    } finally {
+      setSavingContact(false)
     }
   }
 
@@ -192,41 +231,60 @@ export default function CollectionLabelEntryPage({ params }) {
     )
   }
 
-  const metadata = track.metadata || track
   const status = (entry.status || 'Submitted').toLowerCase()
   let statusClasses = 'bg-gray-700/60 border border-gray-500/60 text-gray-200'
   if (status === 'signed') statusClasses = 'bg-green-500/20 border border-green-400/60 text-green-200'
   else if (status === 'completed') statusClasses = 'bg-gray-600/40 border border-gray-400/60 text-gray-100'
   else if (status === 'pending' || status === 'submitted') statusClasses = 'bg-yellow-500/20 border border-yellow-400/60 text-yellow-200'
 
+  const responseStatus = entry.responseStatus || 'No Reply'
+  const responseStatusClasses = {
+    'No Reply':  'bg-gray-700/60 border border-gray-500/60 text-gray-300',
+    'Interested':'bg-blue-500/20 border border-blue-400/60 text-blue-200',
+    'Passed':    'bg-red-500/20 border border-red-400/60 text-red-200',
+    'Signed':    'bg-green-500/20 border border-green-400/60 text-green-200',
+  }[responseStatus] || 'bg-gray-700/60 border border-gray-500/60 text-gray-300'
+
+  const isOverdue = entry.followUpDate && new Date(entry.followUpDate) < new Date()
   const labelTitle = entry.label || entry.labelName || 'Label Deal'
 
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold text-gray-100 mb-6">
           {labelTitle} Label Details
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left column: Label Details (read-only) */}
-          <div className="lg:col-span-1">
+          {/* Left column: Label Details */}
+          <div className="lg:col-span-1 space-y-6">
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6">
               <h2 className="text-lg font-semibold text-gray-100 mb-4">Label Details</h2>
-
               <div className="space-y-4">
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Label Name</p>
                   <p className="text-sm font-medium text-gray-200">{entry.label || entry.labelName || '—'}</p>
                 </div>
-
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Deal Status</p>
                   <span className={`inline-block px-3 py-1 rounded-md text-sm font-semibold ${statusClasses}`}>
                     {entry.status || 'Submitted'}
                   </span>
                 </div>
-
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Their Response</p>
+                  <span className={`inline-block px-3 py-1 rounded-md text-sm font-semibold border ${responseStatusClasses}`}>
+                    {responseStatus}
+                  </span>
+                </div>
+                {entry.followUpDate && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Follow-up Date</p>
+                    <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
+                      {isOverdue ? '⚠️ ' : ''}
+                      {new Date(entry.followUpDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                )}
                 {entry.signedDate && (
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signature Date</p>
@@ -235,14 +293,12 @@ export default function CollectionLabelEntryPage({ params }) {
                     </p>
                   </div>
                 )}
-
                 {entry.platform && (
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Submitted via</p>
                     <p className="text-sm font-medium text-gray-200">{entry.platform}</p>
                   </div>
                 )}
-
                 {entry.timestamp && (
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Logged</p>
@@ -255,27 +311,32 @@ export default function CollectionLabelEntryPage({ params }) {
             </div>
           </div>
 
-          {/* Right column: Contacts, Files, Notes */}
+          {/* Right column: Contacts, Notes, Files */}
           <div className="lg:col-span-2 space-y-8">
             {/* Contacts */}
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl">
               <div className="p-6 border-b border-gray-700 flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-gray-100">Label Contacts</h2>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Key people involved in this label discussion
-                  </p>
+                  <p className="text-sm text-gray-400 mt-1">Key people involved in this label discussion</p>
                 </div>
                 <button
-                  onClick={() => {
-                    setEditingContact(null)
-                    setShowContactModal(true)
-                  }}
+                  onClick={() => setShowContactPicker(true)}
                   className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium text-sm"
                 >
                   + Add Contact
                 </button>
               </div>
+              {showContactPicker && (
+                <div className="border-b border-gray-700 bg-gray-900/40">
+                  <ContactPicker
+                    contacts={allContacts}
+                    onSelect={handlePickContact}
+                    onCancel={() => setShowContactPicker(false)}
+                    labelName={detailsForm.label}
+                  />
+                </div>
+              )}
               <div className="p-6">
                 {(entry.contacts || []).length > 0 ? (
                   <div className="space-y-4">
@@ -295,10 +356,7 @@ export default function CollectionLabelEntryPage({ params }) {
                           {contact.email && (
                             <div>
                               <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Email</p>
-                              <a
-                                href={`mailto:${contact.email}`}
-                                className="text-purple-400 hover:text-purple-300 text-sm"
-                              >
+                              <a href={`mailto:${contact.email}`} className="text-purple-400 hover:text-purple-300 text-sm">
                                 {contact.email}
                               </a>
                             </div>
@@ -326,17 +384,19 @@ export default function CollectionLabelEntryPage({ params }) {
                           <button
                             onClick={() => {
                               setEditingContact(contact)
-                              setShowContactModal(true)
+                              setEditContactForm({
+                                name: contact.name || '', email: contact.email || '',
+                                role: contact.role || '', label: contact.label || '',
+                                phone: contact.phone || '', location: contact.location || '',
+                                notes: contact.notes || '',
+                              })
                             }}
                             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-all font-medium text-sm"
                           >
                             ✏️ Edit
                           </button>
                           <button
-                            onClick={() => {
-                              setContactToDelete(contact)
-                              setShowDeleteContactModal(true)
-                            }}
+                            onClick={() => { setContactToDelete(contact); setShowDeleteContactModal(true) }}
                             className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-300 rounded-lg transition-all font-medium text-sm"
                           >
                             🗑️
@@ -345,20 +405,17 @@ export default function CollectionLabelEntryPage({ params }) {
                       </div>
                     ))}
                   </div>
-                ) : (
+                ) : !showContactPicker ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500 mb-4">No contacts added yet</p>
                     <button
-                      onClick={() => {
-                        setEditingContact(null)
-                        setShowContactModal(true)
-                      }}
+                      onClick={() => setShowContactPicker(true)}
                       className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg transition-all font-medium"
                     >
                       + Add First Contact
                     </button>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -367,7 +424,7 @@ export default function CollectionLabelEntryPage({ params }) {
               <div className="p-6 border-b border-gray-700">
                 <h2 className="text-xl font-semibold text-gray-100">Notes</h2>
                 <p className="text-sm text-gray-400 mt-1">
-                  Track any important context here — what was discussed, timeline expectations, key contacts reached out to, next steps.
+                  Track any important context here — what was discussed, timeline expectations, next steps.
                 </p>
               </div>
               <div className="p-6 space-y-4">
@@ -376,7 +433,7 @@ export default function CollectionLabelEntryPage({ params }) {
                   onChange={e => setPageNotes(e.target.value)}
                   rows={5}
                   className="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Track any important context here — what was discussed, timeline expectations, key contacts reached out to, next steps."
+                  placeholder="Track any important context here…"
                 />
                 <div className="flex justify-end">
                   <button
@@ -421,35 +478,76 @@ export default function CollectionLabelEntryPage({ params }) {
         </div>
       </div>
 
-      {/* Contact modal */}
-      <Modal
-        isOpen={showContactModal}
-        onClose={() => {
-          setShowContactModal(false)
-          setEditingContact(null)
-        }}
-        title={editingContact ? 'Edit Contact' : 'Add Contact'}
-      >
-        <LabelContactForm
-          labelName={detailsForm.label}
-          existingContact={editingContact}
-          onSuccess={handleContactSuccess}
-          onCancel={() => {
-            setShowContactModal(false)
-            setEditingContact(null)
-          }}
-          baseUrl={apiBase}
-          contactPath={`label/${labelId}/contacts`}
-        />
-      </Modal>
+      {/* Edit contact modal */}
+      {editingContact && (
+        <Modal isOpen={!!editingContact} onClose={() => setEditingContact(null)} title="Edit Contact">
+          <div className="p-4 space-y-3">
+            <p className="text-xs text-gray-400">Editing this contact updates it everywhere it appears.</p>
+            {[
+              { key: 'name', label: 'Name', required: true, placeholder: 'Sophie Joe' },
+              { key: 'email', label: 'Email', placeholder: 'sophie@label.com', type: 'email' },
+              { key: 'label', label: 'Label / Company', placeholder: 'e.g. Sojoe Studios' },
+              { key: 'phone', label: 'Phone', placeholder: '+44 7700 900000' },
+              { key: 'location', label: 'Location', placeholder: 'Amsterdam' },
+            ].map(({ key, label, required, placeholder, type }) => (
+              <div key={key}>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+                </label>
+                <input
+                  type={type || 'text'}
+                  value={editContactForm[key] || ''}
+                  onChange={e => setEditContactForm(f => ({ ...f, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            ))}
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Role</label>
+              <select
+                value={editContactForm.role || ''}
+                onChange={e => setEditContactForm(f => ({ ...f, role: e.target.value }))}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">— pick —</option>
+                {['A&R','Label Owner','Label Manager','Marketing','Label','Blog Owner','Playlist Curator','Channel Owner','PR Manager','Promo','Artist','Booking Agent','Other'].map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Notes</label>
+              <textarea
+                value={editContactForm.notes || ''}
+                onChange={e => setEditContactForm(f => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                placeholder="Met at ADE 2025…"
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleSaveEditContact}
+                disabled={!editContactForm.name?.trim() || savingContact}
+                className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                {savingContact ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => setEditingContact(null)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
-      {/* Delete contact confirmation */}
       <ConfirmDeleteModal
         isOpen={showDeleteContactModal}
-        onClose={() => {
-          setShowDeleteContactModal(false)
-          setContactToDelete(null)
-        }}
+        onClose={() => { setShowDeleteContactModal(false); setContactToDelete(null) }}
         onConfirm={handleDeleteContact}
         title="Delete Contact"
         message="Are you sure you want to delete this contact? This action cannot be undone."
@@ -457,16 +555,10 @@ export default function CollectionLabelEntryPage({ params }) {
       />
 
       {/* Edit Entry modal */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        title="Edit Label Entry"
-      >
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Label Entry">
         <div className="p-4 space-y-4">
           <div>
-            <label className="block text-sm text-gray-300 mb-1">
-              Label Name <span className="text-red-400">*</span>
-            </label>
+            <label className="block text-sm text-gray-300 mb-1">Label Name <span className="text-red-400">*</span></label>
             <input
               type="text"
               value={detailsForm.label}
@@ -490,7 +582,7 @@ export default function CollectionLabelEntryPage({ params }) {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Status</label>
+            <label className="block text-sm text-gray-300 mb-1">Deal Status</label>
             <select
               value={detailsForm.status}
               onChange={e => setDetailsForm({ ...detailsForm, status: e.target.value })}
@@ -513,6 +605,30 @@ export default function CollectionLabelEntryPage({ params }) {
             </div>
           )}
           <div>
+            <label className="block text-sm text-gray-300 mb-1">Their Response</label>
+            <select
+              value={detailsForm.responseStatus}
+              onChange={e => setDetailsForm({ ...detailsForm, responseStatus: e.target.value })}
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+            >
+              {RESPONSE_STATUS_OPTIONS.map(opt => <option key={opt}>{opt}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Follow-up Date <span className="text-gray-500">(optional)</span></label>
+            <input
+              type="date"
+              value={detailsForm.followUpDate}
+              onChange={e => setDetailsForm({ ...detailsForm, followUpDate: e.target.value })}
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+            {detailsForm.followUpDate && (
+              <button type="button" onClick={() => setDetailsForm({ ...detailsForm, followUpDate: '' })} className="mt-1 text-xs text-gray-500 hover:text-gray-300">
+                Clear date
+              </button>
+            )}
+          </div>
+          <div>
             <label className="block text-sm text-gray-300 mb-1">Notes</label>
             <textarea
               value={detailsForm.notes}
@@ -524,10 +640,7 @@ export default function CollectionLabelEntryPage({ params }) {
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={async () => {
-                await handleSaveDetails()
-                setShowEditModal(false)
-              }}
+              onClick={async () => { await handleSaveDetails(); setShowEditModal(false) }}
               disabled={savingDetails}
               className="flex-1 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium disabled:bg-gray-600 disabled:cursor-not-allowed"
             >
@@ -544,7 +657,6 @@ export default function CollectionLabelEntryPage({ params }) {
         </div>
       </Modal>
 
-      {/* Delete entry confirmation */}
       <ConfirmDeleteModal
         isOpen={showDeleteEntryModal}
         onClose={() => setShowDeleteEntryModal(false)}

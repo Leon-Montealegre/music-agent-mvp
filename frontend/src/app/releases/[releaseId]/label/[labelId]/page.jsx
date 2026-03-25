@@ -4,10 +4,13 @@ import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { fetchLabelEntry, fetchRelease, apiFetch, API_BASE_URL } from '@/lib/api'
+import { fetchAllContacts } from '@/lib/contacts'
 import Modal from '@/components/Modal'
-import LabelContactForm from '@/components/LabelContactForm'
+import ContactPicker from '@/components/ContactPicker'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import FileAttachments from '@/components/FileAttachments'
+
+const RESPONSE_STATUS_OPTIONS = ['No Reply', 'Interested', 'Passed', 'Signed']
 
 export default function LabelEntryPage({ params }) {
   const { data: session } = useSession()
@@ -19,18 +22,23 @@ export default function LabelEntryPage({ params }) {
   const [track, setTrack] = useState(null)
   const [entry, setEntry] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [allContacts, setAllContacts] = useState([])
 
   const [detailsForm, setDetailsForm] = useState({
     label: '',
     platform: '',
     status: 'Submitted',
     signedDate: '',
-    notes: ''
+    notes: '',
+    responseStatus: 'No Reply',
+    followUpDate: '',
   })
   const [savingDetails, setSavingDetails] = useState(false)
 
-  const [showContactModal, setShowContactModal] = useState(false)
+  const [showContactPicker, setShowContactPicker] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
+  const [editContactForm, setEditContactForm] = useState({})
+  const [savingContact, setSavingContact] = useState(false)
   const [contactToDelete, setContactToDelete] = useState(null)
   const [showDeleteContactModal, setShowDeleteContactModal] = useState(false)
 
@@ -45,21 +53,25 @@ export default function LabelEntryPage({ params }) {
   async function loadData() {
     try {
       setLoading(true)
-      const [releaseRes, labelRes] = await Promise.all([
+      const [releaseRes, labelRes, contactsData] = await Promise.all([
         fetchRelease(releaseId),
-        fetchLabelEntry(releaseId, labelId)
+        fetchLabelEntry(releaseId, labelId),
+        fetchAllContacts(),
       ])
       const release = releaseRes.release || releaseRes
       const fetchedEntry = labelRes.entry
 
       setTrack(release)
       setEntry(fetchedEntry)
+      setAllContacts(Array.isArray(contactsData) ? contactsData : [])
       setDetailsForm({
         label: fetchedEntry.label || fetchedEntry.labelName || '',
         platform: fetchedEntry.platform || '',
         status: fetchedEntry.status || 'Submitted',
-        signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : (fetchedEntry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
-        notes: fetchedEntry.notes || ''
+        signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : '',
+        notes: fetchedEntry.notes || '',
+        responseStatus: fetchedEntry.responseStatus || 'No Reply',
+        followUpDate: fetchedEntry.followUpDate ? fetchedEntry.followUpDate.slice(0, 10) : '',
       })
       setPageNotes(fetchedEntry.pageNotes || '')
     } catch (err) {
@@ -84,7 +96,9 @@ export default function LabelEntryPage({ params }) {
         label: detailsForm.label.trim(),
         platform: detailsForm.platform,
         status: detailsForm.status,
-        notes: detailsForm.notes
+        notes: detailsForm.notes,
+        responseStatus: detailsForm.responseStatus,
+        followUpDate: detailsForm.followUpDate || null,
       }
       if (detailsForm.status === 'Signed' && detailsForm.signedDate) {
         payload.signedDate = detailsForm.signedDate
@@ -105,8 +119,10 @@ export default function LabelEntryPage({ params }) {
         label: data.entry.label || data.entry.labelName || '',
         platform: data.entry.platform || '',
         status: data.entry.status || 'Submitted',
-        signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : (data.entry.status === 'Signed' ? new Date().toISOString().split('T')[0] : ''),
-        notes: data.entry.notes || ''
+        signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : '',
+        notes: data.entry.notes || '',
+        responseStatus: data.entry.responseStatus || 'No Reply',
+        followUpDate: data.entry.followUpDate ? data.entry.followUpDate.slice(0, 10) : '',
       })
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
@@ -136,18 +152,46 @@ export default function LabelEntryPage({ params }) {
     }
   }
 
-  const handleContactSuccess = (savedContact) => {
-    const wasEditing = editingContact
-    setShowContactModal(false)
-    setEditingContact(null)
-    if (savedContact) {
-      if (wasEditing) {
-        setEntry(prev => prev ? { ...prev, contacts: (prev.contacts || []).map(c => c.id === savedContact.id ? savedContact : c) } : prev)
-      } else {
-        setEntry(prev => prev ? { ...prev, contacts: [...(prev.contacts || []), savedContact] } : prev)
-      }
-    } else {
-      loadData()
+  // ContactPicker calls this when the user picks or creates a contact.
+  // It receives either { contactId } or { name, email, role, ... }
+  const handlePickContact = async (selection) => {
+    try {
+      const res = await apiFetch(`${apiBase}/label/${labelId}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(selection),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to add contact')
+      // Refresh entry contacts and the global contact list
+      await loadData()
+      setShowContactPicker(false)
+    } catch (err) {
+      console.error('Error adding contact:', err)
+      alert(`Failed to add contact: ${err.message}`)
+    }
+  }
+
+  // Edit an existing linked contact (updates the shared contact row everywhere)
+  const handleSaveEditContact = async () => {
+    if (!editContactForm.name?.trim()) return
+    setSavingContact(true)
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/contacts/${editingContact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editContactForm),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update contact')
+      // Refresh to pick up the updated contact data
+      await loadData()
+      setEditingContact(null)
+    } catch (err) {
+      console.error('Error updating contact:', err)
+      alert(`Failed to update contact: ${err.message}`)
+    } finally {
+      setSavingContact(false)
     }
   }
 
@@ -199,6 +243,15 @@ export default function LabelEntryPage({ params }) {
   else if (status === 'completed') statusClasses = 'bg-gray-600/40 border border-gray-400/60 text-gray-100'
   else if (status === 'pending' || status === 'submitted') statusClasses = 'bg-yellow-500/20 border border-yellow-400/60 text-yellow-200'
 
+  const responseStatus = entry.responseStatus || 'No Reply'
+  const responseStatusClasses = {
+    'No Reply':  'bg-gray-700/60 border border-gray-500/60 text-gray-300',
+    'Interested':'bg-blue-500/20 border border-blue-400/60 text-blue-200',
+    'Passed':    'bg-red-500/20 border border-red-400/60 text-red-200',
+    'Signed':    'bg-green-500/20 border border-green-400/60 text-green-200',
+  }[responseStatus] || 'bg-gray-700/60 border border-gray-500/60 text-gray-300'
+
+  const isOverdue = entry.followUpDate && new Date(entry.followUpDate) < new Date()
   const labelTitle = entry.label || entry.labelName || 'Label Deal'
 
   return (
@@ -210,7 +263,7 @@ export default function LabelEntryPage({ params }) {
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column: Label Details (read-only) */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-6">
             <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg shadow-2xl p-6">
               <h2 className="text-lg font-semibold text-gray-100 mb-4">Label Details</h2>
 
@@ -221,11 +274,28 @@ export default function LabelEntryPage({ params }) {
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Status</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Deal Status</p>
                   <span className={`inline-block px-3 py-1 rounded-md text-sm font-semibold ${statusClasses}`}>
                     {entry.status || 'Submitted'}
                   </span>
                 </div>
+
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Their Response</p>
+                  <span className={`inline-block px-3 py-1 rounded-md text-sm font-semibold border ${responseStatusClasses}`}>
+                    {responseStatus}
+                  </span>
+                </div>
+
+                {entry.followUpDate && (
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Follow-up Date</p>
+                    <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
+                      {isOverdue ? '⚠️ ' : ''}
+                      {new Date(entry.followUpDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                )}
 
                 {entry.signedDate && (
                   <div>
@@ -267,15 +337,25 @@ export default function LabelEntryPage({ params }) {
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    setEditingContact(null)
-                    setShowContactModal(true)
-                  }}
+                  onClick={() => setShowContactPicker(true)}
                   className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-all font-medium text-sm"
                 >
                   + Add Contact
                 </button>
               </div>
+
+              {/* Inline ContactPicker — visible when Add Contact is clicked */}
+              {showContactPicker && (
+                <div className="border-b border-gray-700 bg-gray-900/40">
+                  <ContactPicker
+                    contacts={allContacts}
+                    onSelect={handlePickContact}
+                    onCancel={() => setShowContactPicker(false)}
+                    labelName={detailsForm.label}
+                  />
+                </div>
+              )}
+
               <div className="p-6">
                 {(entry.contacts || []).length > 0 ? (
                   <div className="space-y-4">
@@ -326,7 +406,15 @@ export default function LabelEntryPage({ params }) {
                           <button
                             onClick={() => {
                               setEditingContact(contact)
-                              setShowContactModal(true)
+                              setEditContactForm({
+                                name: contact.name || '',
+                                email: contact.email || '',
+                                role: contact.role || '',
+                                label: contact.label || '',
+                                phone: contact.phone || '',
+                                location: contact.location || '',
+                                notes: contact.notes || '',
+                              })
                             }}
                             className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-all font-medium text-sm"
                           >
@@ -345,20 +433,17 @@ export default function LabelEntryPage({ params }) {
                       </div>
                     ))}
                   </div>
-                ) : (
+                ) : !showContactPicker ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500 mb-4">No contacts added yet</p>
                     <button
-                      onClick={() => {
-                        setEditingContact(null)
-                        setShowContactModal(true)
-                      }}
+                      onClick={() => setShowContactPicker(true)}
                       className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg transition-all font-medium"
                     >
                       + Add First Contact
                     </button>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -421,27 +506,78 @@ export default function LabelEntryPage({ params }) {
         </div>
       </div>
 
-      {/* Contact modal */}
-      <Modal
-        isOpen={showContactModal}
-        onClose={() => {
-          setShowContactModal(false)
-          setEditingContact(null)
-        }}
-        title={editingContact ? 'Edit Contact' : 'Add Contact'}
-      >
-        <LabelContactForm
-          releaseId={releaseId}
-          labelName={detailsForm.label}
-          existingContact={editingContact}
-          onSuccess={handleContactSuccess}
-          onCancel={() => {
-            setShowContactModal(false)
-            setEditingContact(null)
-          }}
-          contactPath={`label/${labelId}/contacts`}
-        />
-      </Modal>
+      {/* Edit contact modal */}
+      {editingContact && (
+        <Modal
+          isOpen={!!editingContact}
+          onClose={() => setEditingContact(null)}
+          title="Edit Contact"
+        >
+          <div className="p-4 space-y-3">
+            <p className="text-xs text-gray-400">
+              Editing this contact updates it everywhere it appears in your submissions.
+            </p>
+            {[
+              { key: 'name', label: 'Name', required: true, placeholder: 'Sophie Joe' },
+              { key: 'email', label: 'Email', placeholder: 'sophie@label.com', type: 'email' },
+              { key: 'label', label: 'Label / Company', placeholder: 'e.g. Sojoe Studios' },
+              { key: 'phone', label: 'Phone', placeholder: '+44 7700 900000' },
+              { key: 'location', label: 'Location', placeholder: 'Amsterdam' },
+            ].map(({ key, label, required, placeholder, type }) => (
+              <div key={key}>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+                </label>
+                <input
+                  type={type || 'text'}
+                  value={editContactForm[key] || ''}
+                  onChange={e => setEditContactForm(f => ({ ...f, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            ))}
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Role</label>
+              <select
+                value={editContactForm.role || ''}
+                onChange={e => setEditContactForm(f => ({ ...f, role: e.target.value }))}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">— pick —</option>
+                {['A&R','Label Owner','Label Manager','Marketing','Label','Blog Owner','Playlist Curator','Channel Owner','PR Manager','Promo','Artist','Booking Agent','Other'].map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Notes</label>
+              <textarea
+                value={editContactForm.notes || ''}
+                onChange={e => setEditContactForm(f => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                placeholder="Met at ADE 2025…"
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleSaveEditContact}
+                disabled={!editContactForm.name?.trim() || savingContact}
+                className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                {savingContact ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => setEditingContact(null)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Delete contact confirmation */}
       <ConfirmDeleteModal
@@ -490,7 +626,7 @@ export default function LabelEntryPage({ params }) {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Status</label>
+            <label className="block text-sm text-gray-300 mb-1">Deal Status</label>
             <select
               value={detailsForm.status}
               onChange={e => setDetailsForm({ ...detailsForm, status: e.target.value })}
@@ -512,6 +648,39 @@ export default function LabelEntryPage({ params }) {
               />
             </div>
           )}
+
+          {/* CRM: Their Response */}
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Their Response</label>
+            <select
+              value={detailsForm.responseStatus}
+              onChange={e => setDetailsForm({ ...detailsForm, responseStatus: e.target.value })}
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+            >
+              {RESPONSE_STATUS_OPTIONS.map(opt => <option key={opt}>{opt}</option>)}
+            </select>
+          </div>
+
+          {/* CRM: Follow-up Date */}
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Follow-up Date <span className="text-gray-500">(optional)</span></label>
+            <input
+              type="date"
+              value={detailsForm.followUpDate}
+              onChange={e => setDetailsForm({ ...detailsForm, followUpDate: e.target.value })}
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+            />
+            {detailsForm.followUpDate && (
+              <button
+                type="button"
+                onClick={() => setDetailsForm({ ...detailsForm, followUpDate: '' })}
+                className="mt-1 text-xs text-gray-500 hover:text-gray-300"
+              >
+                Clear date
+              </button>
+            )}
+          </div>
+
           <div>
             <label className="block text-sm text-gray-300 mb-1">Notes</label>
             <textarea
@@ -556,4 +725,3 @@ export default function LabelEntryPage({ params }) {
     </div>
   )
 }
-
