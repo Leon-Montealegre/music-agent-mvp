@@ -457,15 +457,17 @@ app.get('/follow-ups', authMiddleware, async (req, res) => {
 // Protected by CRON_SECRET env var. Call daily:
 //   curl -H "x-cron-secret: $CRON_SECRET" https://music-agent-mvp-production.up.railway.app/api/send-reminders
 async function handleSendReminders(req, res) {
-  const secret = process.env.CRON_SECRET
-  if (secret && req.headers['x-cron-secret'] !== secret) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
+  console.log('[CRON] Handler reached')
   try {
+    const secret = process.env.CRON_SECRET
+    console.log('[CRON] CRON_SECRET set:', !!secret)
+    if (secret && req.headers['x-cron-secret'] !== secret) {
+      console.log('[CRON] Unauthorized — header mismatch')
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
     const db = require('./db')
+    console.log('[CRON] DB loaded, running query...')
     const today = new Date().toISOString().split('T')[0]
-    // Find all label submissions with a follow_up_date of today or earlier
-    // that have not yet been reminded today (we track last_reminded_at)
     const result = await db.query(
       `SELECT de.id, de.follow_up_date, de.label AS entry_name,
               COALESCE(r.title, col.title) AS source_title,
@@ -499,8 +501,12 @@ async function handleSendReminders(req, res) {
         console.error(`Failed to send follow-up email for entry ${row.id}:`, e.message)
       }
     }
+    console.log(`[CRON] Done — sent ${sent} of ${result.rows.length}`)
     res.json({ success: true, sent, total: result.rows.length })
-  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+  } catch (err) {
+    console.error('[CRON] Error:', err.message)
+    res.status(500).json({ success: false, error: err.message })
+  }
 }
 app.get('/api/send-reminders', handleSendReminders)
 app.get('/cron/follow-up-emails', handleSendReminders)
