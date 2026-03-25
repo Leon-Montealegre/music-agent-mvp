@@ -470,14 +470,15 @@ async function handleSendReminders(req, res) {
     const today = new Date().toISOString().split('T')[0]
     const result = await db.query(
       `SELECT de.id, de.follow_up_date, de.label AS entry_name,
-              COALESCE(r.title, col.title) AS source_title,
-              COALESCE(r.slug,  col.slug)  AS slug,
+              COALESCE(r.title, col.title)  AS source_title,
+              COALESCE(r.slug,  col.slug)   AS slug,
               CASE WHEN de.release_id IS NOT NULL THEN 'release' ELSE 'collection' END AS source_type,
-              u.email AS user_email
+              COALESCE(ur.email, uc.email)  AS user_email
        FROM distribution_entries de
-       JOIN users u ON u.id = de.user_id
-       LEFT JOIN releases    r   ON r.id = de.release_id
+       LEFT JOIN releases    r   ON r.id   = de.release_id
        LEFT JOIN collections col ON col.id = de.collection_id
+       LEFT JOIN users       ur  ON ur.id  = r.user_id
+       LEFT JOIN users       uc  ON uc.id  = col.user_id
        WHERE de.path_type = 'submit'
          AND de.follow_up_date IS NOT NULL
          AND de.follow_up_date <= $1
