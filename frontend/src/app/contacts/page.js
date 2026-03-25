@@ -115,7 +115,7 @@ function ContactFormModal({ isOpen, onClose, onSaved, editingContact }) {
             type="text"
             {...field('name')}
             required
-            placeholder="Sophie Müller"
+            placeholder="Sophie Joe"
             className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
@@ -125,7 +125,7 @@ function ContactFormModal({ isOpen, onClose, onSaved, editingContact }) {
           <input
             type="text"
             {...field('label')}
-            placeholder="Anjunadeep"
+            placeholder="e.g. Sojoe Studios"
             className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>

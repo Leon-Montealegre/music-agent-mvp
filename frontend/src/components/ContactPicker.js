@@ -192,7 +192,7 @@ export default function ContactPicker({ contacts = [], onSelect, onCancel, label
           type="text"
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-          placeholder="Sophie Müller"
+          placeholder="Sophie Joe"
           required
           className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
@@ -205,7 +205,7 @@ export default function ContactPicker({ contacts = [], onSelect, onCancel, label
           type="text"
           value={form.label}
           onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
-          placeholder="Anjunadeep"
+          placeholder="e.g. Sojoe Studios"
           className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>

@@ -209,7 +209,7 @@ export default function SettingsPage() {
             label="Your name"
             value={name}
             onChange={setName}
-            placeholder="e.g. DJ Example"
+            placeholder="e.g. Sophie Joe"
             autoComplete="name"
           />
           {nameError && <p className="text-red-400 text-sm mb-3">{nameError}</p>}
