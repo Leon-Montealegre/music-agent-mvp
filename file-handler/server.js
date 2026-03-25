@@ -442,7 +442,7 @@ async function fetchContactSources(db, contactId) {
   const res = await db.query(
     `SELECT de.id        AS "entryId",
             de.path_type AS "pathType",
-            de.entry_label AS "entryLabel",
+            COALESCE(de.label, de.promo_name) AS "entryLabel",
             COALESCE(r.slug,  col.slug)  AS slug,
             COALESCE(r.title, col.title) AS "sourceTitle",
             CASE
