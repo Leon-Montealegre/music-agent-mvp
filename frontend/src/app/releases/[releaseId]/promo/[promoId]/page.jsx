@@ -349,6 +349,7 @@ export default function PromoEntryPage({ params }) {
                     onSelect={handlePickContact}
                     onCancel={() => setShowContactPicker(false)}
                     labelName={detailsForm.promoName}
+                    entryType="promo"
                   />
                 </div>
               )}

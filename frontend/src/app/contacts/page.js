@@ -8,18 +8,21 @@ import Modal from '@/components/Modal'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const LABEL_ROLES = ['A&R', 'Label Owner', 'Label Manager', 'Marketing', 'Label']
-const PROMO_ROLES = ['Blog Owner', 'Playlist Curator', 'Channel Owner', 'PR Manager', 'Promo']
+const LABEL_ROLES = ['A&R', 'Label Manager', 'Marketing', 'Label']
+const PROMO_ROLES = ['Playlist Curator', 'Blog / Channel', 'PR / Promo']
+const ARTIST_ROLES = ['Artist']
 const ROLE_OPTIONS = [
   ...LABEL_ROLES,
   ...PROMO_ROLES,
-  'Artist', 'Booking Agent', 'Other',
+  ...ARTIST_ROLES,
+  'Booking Agent', 'Other',
 ]
 
 function getContactRoleType(contact) {
   const role = (contact.role || '').trim()
   if (LABEL_ROLES.some(r => role.toLowerCase() === r.toLowerCase())) return 'label'
   if (PROMO_ROLES.some(r => role.toLowerCase() === r.toLowerCase())) return 'promo'
+  if (ARTIST_ROLES.some(r => role.toLowerCase() === r.toLowerCase())) return 'artist'
   return 'other'
 }
 
@@ -31,15 +34,17 @@ function getInitials(name) {
 }
 
 const AVATAR_STYLES = {
-  label: 'bg-purple-600/80 text-white',
-  promo: 'bg-pink-600/80 text-white',
-  other: 'bg-gray-600/80 text-gray-200',
+  label:  'bg-purple-600/80 text-white',
+  promo:  'bg-pink-600/80 text-white',
+  artist: 'bg-blue-600/80 text-white',
+  other:  'bg-gray-600/80 text-gray-200',
 }
 
 const BADGE_STYLES = {
-  label: 'bg-purple-600/40 text-purple-300 border-purple-500/50',
-  promo: 'bg-pink-600/40 text-pink-300 border-pink-500/50',
-  other: 'bg-gray-600/40 text-gray-400 border-gray-500/50',
+  label:  'bg-purple-600/40 text-purple-300 border-purple-500/50',
+  promo:  'bg-pink-600/40 text-pink-300 border-pink-500/50',
+  artist: 'bg-blue-600/40 text-blue-300 border-blue-500/50',
+  other:  'bg-gray-600/40 text-gray-400 border-gray-500/50',
 }
 
 // ── Empty form helper ─────────────────────────────────────────────────────────
@@ -451,10 +456,11 @@ export default function ContactsPage() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-gray-500 text-sm font-medium">Filter:</span>
               {[
-                { value: 'all',   label: 'All' },
-                { value: 'label', label: 'Label' },
-                { value: 'promo', label: 'Promo' },
-                { value: 'other', label: 'Other' },
+                { value: 'all',    label: 'All' },
+                { value: 'label',  label: 'Label' },
+                { value: 'promo',  label: 'Promo' },
+                { value: 'artist', label: 'Artist' },
+                { value: 'other',  label: 'Other' },
               ].map(({ value, label }) => (
                 <button
                   key={value}

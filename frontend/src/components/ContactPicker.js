@@ -18,15 +18,22 @@
  *   onSelect   {Function} Called with { contactId } OR { name, email, ... }
  *   onCancel   {Function} Called when the user clicks "Cancel"
  *   labelName  {string}   Optional — pre-fills the label/company field
+ *   entryType  {string}   'label' | 'promo' — pre-selects a sensible default role
  */
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 
 const ROLE_OPTIONS = [
-  'A&R', 'Label Owner', 'Label Manager', 'Marketing', 'Label',
-  'Blog Owner', 'Playlist Curator', 'Channel Owner', 'PR Manager', 'Promo',
+  'A&R', 'Label Manager', 'Marketing', 'Label',
+  'Playlist Curator', 'Blog / Channel', 'PR / Promo',
   'Artist', 'Booking Agent', 'Other',
 ]
+
+// Default role pre-selected in the create form based on the entry type
+const DEFAULT_ROLE_FOR_ENTRY_TYPE = {
+  label: 'Label',
+  promo: 'PR / Promo',
+}
 
 function getInitials(name) {
   if (!name?.trim()) return '??'
@@ -35,12 +42,13 @@ function getInitials(name) {
   return name.trim().slice(0, 2).toUpperCase()
 }
 
-export default function ContactPicker({ contacts = [], onSelect, onCancel, labelName = '' }) {
+export default function ContactPicker({ contacts = [], onSelect, onCancel, labelName = '', entryType = '' }) {
   const [mode, setMode] = useState('search') // 'search' | 'create'
   const [query, setQuery] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const defaultRole = DEFAULT_ROLE_FOR_ENTRY_TYPE[entryType] || ''
   const [form, setForm] = useState({
-    name: '', email: '', role: '', label: labelName, phone: '', location: '', notes: '',
+    name: '', email: '', role: defaultRole, label: labelName, phone: '', location: '', notes: '',
   })
   const searchRef = useRef(null)
 

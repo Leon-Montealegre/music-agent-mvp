@@ -339,6 +339,7 @@ export default function CollectionLabelEntryPage({ params }) {
                     onSelect={handlePickContact}
                     onCancel={() => setShowContactPicker(false)}
                     labelName={detailsForm.label}
+                    entryType="label"
                   />
                 </div>
               )}

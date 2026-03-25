@@ -336,6 +336,7 @@ export default function CollectionPromoEntryPage({ params }) {
                     onSelect={handlePickContact}
                     onCancel={() => setShowContactPicker(false)}
                     labelName={detailsForm.promoName}
+                    entryType="promo"
                   />
                 </div>
               )}
