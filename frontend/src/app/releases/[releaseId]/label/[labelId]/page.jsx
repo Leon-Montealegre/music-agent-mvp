@@ -67,14 +67,19 @@ export default function LabelEntryPage({ params }) {
       const fetchedEntry = labelRes.entry
 
       setTrack(release)
-      setEntry(fetchedEntry)
+      const normalizedEntry = {
+        ...fetchedEntry,
+        followUpDate: fetchedEntry.followUpDate ? fetchedEntry.followUpDate.slice(0, 10) : null,
+        signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : null,
+      }
+      setEntry(normalizedEntry)
       setDetailsForm({
-        label: fetchedEntry.label || fetchedEntry.labelName || '',
-        platform: fetchedEntry.platform || '',
-        status: fetchedEntry.status || 'Submitted',
-        signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : '',
-        notes: fetchedEntry.notes || '',
-        followUpDate: fetchedEntry.followUpDate ? fetchedEntry.followUpDate.slice(0, 10) : '',
+        label: normalizedEntry.label || normalizedEntry.labelName || '',
+        platform: normalizedEntry.platform || '',
+        status: normalizedEntry.status || 'Submitted',
+        signedDate: normalizedEntry.signedDate || '',
+        notes: normalizedEntry.notes || '',
+        followUpDate: normalizedEntry.followUpDate || '',
       })
       setPageNotes(fetchedEntry.pageNotes || '')
     } catch (err) {
@@ -701,25 +706,27 @@ export default function LabelEntryPage({ params }) {
             </div>
           )}
 
-          {/* Follow-up Date */}
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Follow-up Date <span className="text-gray-500">(optional)</span></label>
-            <input
-              type="date"
-              value={detailsForm.followUpDate}
-              onChange={e => setDetailsForm({ ...detailsForm, followUpDate: e.target.value })}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
-            />
-            {detailsForm.followUpDate && (
-              <button
-                type="button"
-                onClick={() => setDetailsForm({ ...detailsForm, followUpDate: '' })}
-                className="mt-1 text-xs text-gray-500 hover:text-gray-300"
-              >
-                Clear date
-              </button>
-            )}
-          </div>
+          {/* Follow-up Date — only relevant when Submitted */}
+          {detailsForm.status === 'Submitted' && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">Follow-up Date <span className="text-gray-500">(optional)</span></label>
+              <input
+                type="date"
+                value={detailsForm.followUpDate}
+                onChange={e => setDetailsForm({ ...detailsForm, followUpDate: e.target.value })}
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
+              />
+              {detailsForm.followUpDate && (
+                <button
+                  type="button"
+                  onClick={() => setDetailsForm({ ...detailsForm, followUpDate: '' })}
+                  className="mt-1 text-xs text-gray-500 hover:text-gray-300"
+                >
+                  Clear date
+                </button>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm text-gray-300 mb-1">Notes</label>

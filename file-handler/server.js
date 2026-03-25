@@ -1110,19 +1110,20 @@ app.patch('/releases/:releaseId/distribution', authMiddleware, async (req, res) 
 
     await db.query(
       `INSERT INTO distribution_entries
-         (id, release_id, path_type, platform, label, promo_name, status, url, live_date, page_notes, timestamp)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+         (id, release_id, path_type, platform, label, promo_name, status, url, live_date, page_notes, timestamp, follow_up_date)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         releaseUUID,
         distPath,
-        entry.platform   || null,
-        entry.label      || null,
-        entry.promoName  || null,
-        entry.status     || 'Pending',
-        entry.url        || null,
-        entry.liveDate   || null,
-        entry.pageNotes  !== undefined ? entry.pageNotes : '',
-        timestamp
+        entry.platform    || null,
+        entry.label       || null,
+        entry.promoName   || null,
+        entry.status      || 'Pending',
+        entry.url         || null,
+        entry.liveDate    || null,
+        entry.pageNotes   !== undefined ? entry.pageNotes : '',
+        timestamp,
+        entry.followUpDate || null,
       ]
     )
 
