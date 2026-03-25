@@ -276,6 +276,34 @@ export default function HomePage() {
   const [error, setError] = useState(null)
   const [overdueFollowUps, setOverdueFollowUps] = useState([])
   const [showFollowUpBanner, setShowFollowUpBanner] = useState(true)
+  const [snoozingId, setSnoozingId] = useState(null)
+
+  const handleSnoozeFollowUp = async (fu) => {
+    setSnoozingId(fu.id)
+    try {
+      const newDate = new Date()
+      newDate.setDate(newDate.getDate() + 10)
+      const newDateStr = newDate.toISOString().split('T')[0]
+      // fu.href is like /releases/:slug/label/:id or /collections/:slug/label/:id
+      // We need to PATCH the entry. Build the API path from the href.
+      const parts = fu.href.split('/')
+      // e.g. ['', 'releases', 'some-slug', 'label', '123']
+      const sourceType = parts[1] // 'releases' or 'collections'
+      const slug = parts[2]
+      const entryId = parts[4]
+      const apiPath = `/${sourceType}/${slug}/label/${entryId}`
+      await apiFetch(apiPath, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followUpDate: newDateStr }),
+      })
+      setOverdueFollowUps(prev => prev.filter(f => f.id !== fu.id))
+    } catch (err) {
+      console.error('Snooze failed:', err)
+    } finally {
+      setSnoozingId(null)
+    }
+  }
 
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -842,14 +870,20 @@ export default function HomePage() {
               <p className="text-amber-300 font-semibold text-sm">
                 {overdueFollowUps.length} overdue follow-up{overdueFollowUps.length > 1 ? 's' : ''}
               </p>
-              <ul className="mt-1 space-y-0.5">
+              <ul className="mt-1 space-y-1">
                 {overdueFollowUps.slice(0, 3).map(fu => (
-                  <li key={fu.id} className="text-xs text-amber-400/80">
+                  <li key={fu.id} className="text-xs text-amber-400/80 flex items-center gap-2 flex-wrap">
                     <a href={fu.href} className="hover:text-amber-300 underline underline-offset-2">
                       {fu.entryName}
                     </a>
-                    {' '}— due {new Date(fu.followUpDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    {fu.responseStatus !== 'No Reply' && <span className="ml-1 text-amber-500/70">({fu.responseStatus})</span>}
+                    <span>— due {new Date(fu.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    <button
+                      onClick={() => handleSnoozeFollowUp(fu)}
+                      disabled={snoozingId === fu.id}
+                      className="text-amber-500/70 hover:text-amber-300 border border-amber-500/40 rounded px-1.5 py-0.5 text-[10px] leading-tight disabled:opacity-40"
+                    >
+                      {snoozingId === fu.id ? '…' : '💤 Snooze 10d'}
+                    </button>
                   </li>
                 ))}
                 {overdueFollowUps.length > 3 && (

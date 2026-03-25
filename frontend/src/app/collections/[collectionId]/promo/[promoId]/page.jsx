@@ -10,7 +10,6 @@ import ContactPicker from '@/components/ContactPicker'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import FileAttachments from '@/components/FileAttachments'
 
-const RESPONSE_STATUS_OPTIONS = ['No Reply', 'Interested', 'Passed', 'Signed']
 
 export default function CollectionPromoEntryPage({ params }) {
   const { data: session } = useSession()
@@ -30,8 +29,6 @@ export default function CollectionPromoEntryPage({ params }) {
     liveDate: '',
     platform: '',
     notes: '',
-    responseStatus: 'No Reply',
-    followUpDate: '',
   })
   const [savingDetails, setSavingDetails] = useState(false)
 
@@ -68,8 +65,6 @@ export default function CollectionPromoEntryPage({ params }) {
         liveDate: fetchedEntry.liveDate ? fetchedEntry.liveDate.slice(0, 10) : '',
         platform: fetchedEntry.platform || '',
         notes: fetchedEntry.notes || '',
-        responseStatus: fetchedEntry.responseStatus || 'No Reply',
-        followUpDate: fetchedEntry.followUpDate ? fetchedEntry.followUpDate.slice(0, 10) : '',
       })
       setPageNotes(fetchedEntry.pageNotes || '')
     } catch (err) {
@@ -102,8 +97,6 @@ export default function CollectionPromoEntryPage({ params }) {
         status: detailsForm.status,
         platform: detailsForm.platform,
         notes: detailsForm.notes,
-        responseStatus: detailsForm.responseStatus,
-        followUpDate: detailsForm.followUpDate || null,
       }
       if (detailsForm.status === 'Live' && detailsForm.liveDate) {
         payload.liveDate = detailsForm.liveDate
@@ -124,8 +117,6 @@ export default function CollectionPromoEntryPage({ params }) {
         liveDate: data.entry.liveDate ? data.entry.liveDate.slice(0, 10) : '',
         platform: data.entry.platform || '',
         notes: data.entry.notes || '',
-        responseStatus: data.entry.responseStatus || 'No Reply',
-        followUpDate: data.entry.followUpDate ? data.entry.followUpDate.slice(0, 10) : '',
       })
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
@@ -240,15 +231,6 @@ export default function CollectionPromoEntryPage({ params }) {
   else if (status === 'completed') statusClasses = 'bg-gray-600/40 border border-gray-400/60 text-gray-100'
   else if (status === 'pending' || status === 'scheduled') statusClasses = 'bg-yellow-500/20 border border-yellow-400/60 text-yellow-200'
 
-  const responseStatus = entry.responseStatus || 'No Reply'
-  const responseStatusClasses = {
-    'No Reply':  'bg-gray-700/60 border border-gray-500/60 text-gray-300',
-    'Interested':'bg-blue-500/20 border border-blue-400/60 text-blue-200',
-    'Passed':    'bg-red-500/20 border border-red-400/60 text-red-200',
-    'Signed':    'bg-green-500/20 border border-green-400/60 text-green-200',
-  }[responseStatus] || 'bg-gray-700/60 border border-gray-500/60 text-gray-300'
-
-  const isOverdue = entry.followUpDate && new Date(entry.followUpDate) < new Date()
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -272,21 +254,6 @@ export default function CollectionPromoEntryPage({ params }) {
                     {entry.status || 'Pending'}
                   </span>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Their Response</p>
-                  <span className={`inline-block px-3 py-1 rounded-md text-sm font-semibold border ${responseStatusClasses}`}>
-                    {responseStatus}
-                  </span>
-                </div>
-                {entry.followUpDate && (
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Follow-up Date</p>
-                    <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
-                      {isOverdue ? '⚠️ ' : ''}
-                      {new Date(entry.followUpDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
-                  </div>
-                )}
                 {entry.liveDate && (
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Live Date</p>
@@ -564,19 +531,6 @@ export default function CollectionPromoEntryPage({ params }) {
           <div>
             <label className="block text-sm text-gray-300 mb-1">Platform / Type</label>
             <input type="text" value={detailsForm.platform} onChange={e => setDetailsForm({ ...detailsForm, platform: e.target.value })} className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500" />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Their Response</label>
-            <select value={detailsForm.responseStatus} onChange={e => setDetailsForm({ ...detailsForm, responseStatus: e.target.value })} className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500">
-              {RESPONSE_STATUS_OPTIONS.map(opt => <option key={opt}>{opt}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Follow-up Date <span className="text-gray-500">(optional)</span></label>
-            <input type="date" value={detailsForm.followUpDate} onChange={e => setDetailsForm({ ...detailsForm, followUpDate: e.target.value })} className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-pink-500" />
-            {detailsForm.followUpDate && (
-              <button type="button" onClick={() => setDetailsForm({ ...detailsForm, followUpDate: '' })} className="mt-1 text-xs text-gray-500 hover:text-gray-300">Clear date</button>
-            )}
           </div>
           <div>
             <label className="block text-sm text-gray-300 mb-1">Notes</label>

@@ -10,7 +10,10 @@ import ContactPicker from '@/components/ContactPicker'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import FileAttachments from '@/components/FileAttachments'
 
-const RESPONSE_STATUS_OPTIONS = ['No Reply', 'Interested', 'Passed', 'Signed']
+function todayStr() { return new Date().toISOString().split('T')[0] }
+function daysFromNow(n) {
+  const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]
+}
 
 export default function CollectionLabelEntryPage({ params }) {
   const { data: session } = useSession()
@@ -30,10 +33,11 @@ export default function CollectionLabelEntryPage({ params }) {
     status: 'Submitted',
     signedDate: '',
     notes: '',
-    responseStatus: 'No Reply',
     followUpDate: '',
   })
   const [savingDetails, setSavingDetails] = useState(false)
+  const [followUpPromptDismissed, setFollowUpPromptDismissed] = useState(false)
+  const [snoozing, setSnoozing] = useState(false)
 
   const [showContactPicker, setShowContactPicker] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
@@ -68,7 +72,6 @@ export default function CollectionLabelEntryPage({ params }) {
         status: fetchedEntry.status || 'Submitted',
         signedDate: fetchedEntry.signedDate ? fetchedEntry.signedDate.slice(0, 10) : '',
         notes: fetchedEntry.notes || '',
-        responseStatus: fetchedEntry.responseStatus || 'No Reply',
         followUpDate: fetchedEntry.followUpDate ? fetchedEntry.followUpDate.slice(0, 10) : '',
       })
       setPageNotes(fetchedEntry.pageNotes || '')
@@ -102,7 +105,6 @@ export default function CollectionLabelEntryPage({ params }) {
         platform: detailsForm.platform,
         status: detailsForm.status,
         notes: detailsForm.notes,
-        responseStatus: detailsForm.responseStatus,
         followUpDate: detailsForm.followUpDate || null,
       }
       if (detailsForm.status === 'Signed' && detailsForm.signedDate) {
@@ -126,7 +128,6 @@ export default function CollectionLabelEntryPage({ params }) {
         status: data.entry.status || 'Submitted',
         signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : '',
         notes: data.entry.notes || '',
-        responseStatus: data.entry.responseStatus || 'No Reply',
         followUpDate: data.entry.followUpDate ? data.entry.followUpDate.slice(0, 10) : '',
       })
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -135,6 +136,28 @@ export default function CollectionLabelEntryPage({ params }) {
       alert(`Failed to save label details: ${err.message}`)
     } finally {
       setSavingDetails(false)
+    }
+  }
+
+  const handleSetFollowUp = async (days = 10) => {
+    setSnoozing(true)
+    try {
+      const newDate = daysFromNow(days)
+      const res = await apiFetch(`${apiBase}/label/${labelId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followUpDate: newDate }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to set follow-up')
+      setEntry(prev => ({ ...prev, followUpDate: newDate }))
+      setDetailsForm(prev => ({ ...prev, followUpDate: newDate }))
+      setFollowUpPromptDismissed(false)
+    } catch (err) {
+      console.error(err)
+      alert(`Could not set follow-up: ${err.message}`)
+    } finally {
+      setSnoozing(false)
     }
   }
 
@@ -242,15 +265,10 @@ export default function CollectionLabelEntryPage({ params }) {
   else if (status === 'completed') statusClasses = 'bg-gray-600/40 border border-gray-400/60 text-gray-100'
   else if (status === 'pending' || status === 'submitted') statusClasses = 'bg-yellow-500/20 border border-yellow-400/60 text-yellow-200'
 
-  const responseStatus = entry.responseStatus || 'No Reply'
-  const responseStatusClasses = {
-    'No Reply':  'bg-gray-700/60 border border-gray-500/60 text-gray-300',
-    'Interested':'bg-blue-500/20 border border-blue-400/60 text-blue-200',
-    'Passed':    'bg-red-500/20 border border-red-400/60 text-red-200',
-    'Signed':    'bg-green-500/20 border border-green-400/60 text-green-200',
-  }[responseStatus] || 'bg-gray-700/60 border border-gray-500/60 text-gray-300'
-
-  const isOverdue = entry.followUpDate && new Date(entry.followUpDate) < new Date()
+  const isOverdue = entry.followUpDate && new Date(entry.followUpDate + 'T23:59:59') < new Date()
+  const showFollowUpPrompt = (entry.status || '').toLowerCase() === 'submitted'
+    && !entry.followUpDate
+    && !followUpPromptDismissed
   const labelTitle = entry.label || entry.labelName || 'Label Deal'
 
   return (
@@ -275,19 +293,31 @@ export default function CollectionLabelEntryPage({ params }) {
                     {entry.status || 'Submitted'}
                   </span>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Their Response</p>
-                  <span className={`inline-block px-3 py-1 rounded-md text-sm font-semibold border ${responseStatusClasses}`}>
-                    {responseStatus}
-                  </span>
-                </div>
+                {showFollowUpPrompt && (
+                  <div className="bg-purple-900/30 border border-purple-500/40 rounded-lg p-3">
+                    <p className="text-xs text-purple-300 font-medium mb-2">📅 Follow up in 10 days?</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleSetFollowUp(10)} disabled={snoozing} className="flex-1 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md transition-colors">
+                        {snoozing ? 'Setting…' : 'Yes'}
+                      </button>
+                      <button onClick={() => setFollowUpPromptDismissed(true)} className="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded-md transition-colors">
+                        No thanks
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {entry.followUpDate && (
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Follow-up Date</p>
                     <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
-                      {isOverdue ? '⚠️ ' : ''}
-                      {new Date(entry.followUpDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      {isOverdue ? '⚠️ Overdue · ' : ''}
+                      {new Date(entry.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                     </p>
+                    {isOverdue && (
+                      <button onClick={() => handleSetFollowUp(10)} disabled={snoozing} className="mt-1.5 px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 text-xs rounded-md transition-colors">
+                        {snoozing ? 'Snoozing…' : '💤 Snooze 10 days'}
+                      </button>
+                    )}
                   </div>
                 )}
                 {entry.signedDate && (
@@ -610,16 +640,6 @@ export default function CollectionLabelEntryPage({ params }) {
               />
             </div>
           )}
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">Their Response</label>
-            <select
-              value={detailsForm.responseStatus}
-              onChange={e => setDetailsForm({ ...detailsForm, responseStatus: e.target.value })}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
-            >
-              {RESPONSE_STATUS_OPTIONS.map(opt => <option key={opt}>{opt}</option>)}
-            </select>
-          </div>
           <div>
             <label className="block text-sm text-gray-300 mb-1">Follow-up Date <span className="text-gray-500">(optional)</span></label>
             <input

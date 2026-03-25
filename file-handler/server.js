@@ -8,6 +8,40 @@
 
 require('dotenv').config()
 
+// ── Email (Resend) ─────────────────────────────────────────────────────────────
+// Set RESEND_API_KEY in Railway env vars to enable email reminders.
+// If the key is missing, email calls are skipped silently.
+let resend = null
+try {
+  const { Resend } = require('resend')
+  if (process.env.RESEND_API_KEY) {
+    resend = new Resend(process.env.RESEND_API_KEY)
+  }
+} catch (e) { /* resend not installed yet — run: npm install resend */ }
+
+async function sendFollowUpEmail({ to, entryName, sourceTitle, followUpDate, href }) {
+  if (!resend) return
+  const dateStr = new Date(followUpDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  await resend.emails.send({
+    from: 'Music Agent <reminders@musicagentchigui.com>',
+    to,
+    subject: `⏰ Follow-up reminder: ${entryName}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px">
+        <h2 style="color:#7c3aed">Follow-up reminder</h2>
+        <p>It's time to follow up on your label submission:</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="color:#6b7280;padding:4px 8px">Submission</td><td style="padding:4px 8px;font-weight:600">${entryName}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 8px">Release / Collection</td><td style="padding:4px 8px">${sourceTitle}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 8px">Follow-up date</td><td style="padding:4px 8px">${dateStr}</td></tr>
+        </table>
+        <a href="https://musicagentchigui.com${href}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Open entry →</a>
+        <p style="color:#9ca3af;font-size:12px;margin-top:24px">You're receiving this because you set a follow-up reminder in Music Agent. Open the entry and click "Snooze 10 days" if you need more time.</p>
+      </div>
+    `,
+  })
+}
+
 const authRoutes  = require('./routes/auth')
 const adminRoutes = require('./routes/admin')
 const authMiddleware = require('./authMiddleware')
@@ -396,7 +430,8 @@ app.get('/follow-ups', authMiddleware, async (req, res) => {
        LEFT JOIN collections col ON col.id = de.collection_id
        WHERE de.user_id = $1
          AND de.follow_up_date IS NOT NULL
-         AND de.follow_up_date < $2
+         AND de.follow_up_date <= $2
+         AND de.path_type = 'submit'
        ORDER BY de.follow_up_date ASC`,
       [req.user.id, today]
     )
@@ -414,6 +449,56 @@ app.get('/follow-ups', authMiddleware, async (req, res) => {
       }
     })
     res.json({ success: true, followUps, count: followUps.length })
+  } catch (err) { res.status(500).json({ success: false, error: err.message }) }
+})
+
+// GET /cron/follow-up-emails — sends reminder emails for all due follow-ups
+// Protected by CRON_SECRET env var. Set up a Railway cron job to call this daily:
+//   curl -H "x-cron-secret: $CRON_SECRET" https://music-agent-mvp-production.up.railway.app/cron/follow-up-emails
+app.get('/cron/follow-up-emails', async (req, res) => {
+  const secret = process.env.CRON_SECRET
+  if (secret && req.headers['x-cron-secret'] !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  try {
+    const db = require('./db')
+    const today = new Date().toISOString().split('T')[0]
+    // Find all label submissions with a follow_up_date of today or earlier
+    // that have not yet been reminded today (we track last_reminded_at)
+    const result = await db.query(
+      `SELECT de.id, de.follow_up_date, de.label AS entry_name,
+              COALESCE(r.title, col.title) AS source_title,
+              COALESCE(r.slug,  col.slug)  AS slug,
+              CASE WHEN de.release_id IS NOT NULL THEN 'release' ELSE 'collection' END AS source_type,
+              u.email AS user_email
+       FROM distribution_entries de
+       JOIN users u ON u.id = de.user_id
+       LEFT JOIN releases    r   ON r.id = de.release_id
+       LEFT JOIN collections col ON col.id = de.collection_id
+       WHERE de.path_type = 'submit'
+         AND de.follow_up_date IS NOT NULL
+         AND de.follow_up_date <= $1
+         AND (de.last_reminded_at IS NULL OR de.last_reminded_at::date < $1::date)`,
+      [today]
+    )
+    let sent = 0
+    for (const row of result.rows) {
+      const href = `/${row.source_type === 'release' ? 'releases' : 'collections'}/${row.slug}/label/${row.id}`
+      try {
+        await sendFollowUpEmail({
+          to:          row.user_email,
+          entryName:   row.entry_name || 'Label submission',
+          sourceTitle: row.source_title || '',
+          followUpDate: row.follow_up_date,
+          href,
+        })
+        await db.query(`UPDATE distribution_entries SET last_reminded_at = NOW() WHERE id = $1`, [row.id])
+        sent++
+      } catch (e) {
+        console.error(`Failed to send follow-up email for entry ${row.id}:`, e.message)
+      }
+    }
+    res.json({ success: true, sent, total: result.rows.length })
   } catch (err) { res.status(500).json({ success: false, error: err.message }) }
 })
 
