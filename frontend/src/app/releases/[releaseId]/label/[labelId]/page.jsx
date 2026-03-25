@@ -40,6 +40,8 @@ export default function LabelEntryPage({ params }) {
   const [followUpPromptDismissed, setFollowUpPromptDismissed] = useState(false)
   const [snoozing, setSnoozing] = useState(false)
   const [savingDetails, setSavingDetails] = useState(false)
+  // Edit-modal follow-up helpers
+  const [editFollowUpDays, setEditFollowUpDays] = useState(10)
 
   const [showContactPicker, setShowContactPicker] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
@@ -311,47 +313,51 @@ export default function LabelEntryPage({ params }) {
                   </span>
                 </div>
 
-                {/* Follow-up prompt — shown when status=Submitted and no date set */}
-                {showFollowUpPrompt && (
-                  <div className="bg-purple-900/30 border border-purple-500/40 rounded-lg p-3">
-                    <p className="text-xs text-purple-300 font-medium mb-2">📅 Follow up in 10 days?</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleSetFollowUp(10)}
-                        disabled={snoozing}
-                        className="flex-1 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md transition-colors"
-                      >
-                        {snoozing ? 'Setting…' : 'Yes'}
-                      </button>
-                      <button
-                        onClick={() => setFollowUpPromptDismissed(true)}
-                        className="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded-md transition-colors"
-                      >
-                        No thanks
-                      </button>
+                {/* Follow-up — only shown when Submitted */}
+                {entry.status?.toLowerCase() === 'submitted' && (<>
+                  {/* Prompt — when no date is set yet */}
+                  {showFollowUpPrompt && (
+                    <div className="bg-purple-900/30 border border-purple-500/40 rounded-lg p-3">
+                      <p className="text-xs text-purple-300 font-medium mb-1">📅 Set a follow-up reminder?</p>
+                      <p className="text-xs text-gray-400 mb-2">Follow up in 10 days ({new Date(daysFromNow(10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSetFollowUp(10)}
+                          disabled={snoozing}
+                          className="flex-1 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md transition-colors"
+                        >
+                          {snoozing ? 'Setting…' : 'Yes, set reminder'}
+                        </button>
+                        <button
+                          onClick={() => setFollowUpPromptDismissed(true)}
+                          className="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded-md transition-colors"
+                        >
+                          No thanks
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Follow-up date + snooze */}
-                {entry.followUpDate && (
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Follow-up Date</p>
-                    <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
-                      {isOverdue ? '⚠️ Overdue · ' : ''}
-                      {new Date(entry.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
-                    {isOverdue && (
-                      <button
-                        onClick={() => handleSetFollowUp(10)}
-                        disabled={snoozing}
-                        className="mt-1.5 px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 text-xs rounded-md transition-colors"
-                      >
-                        {snoozing ? 'Snoozing…' : '💤 Snooze 10 days'}
-                      </button>
-                    )}
-                  </div>
-                )}
+                  {/* Date display — when date is already set */}
+                  {entry.followUpDate && (
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Follow-up Date</p>
+                      <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
+                        {isOverdue ? '⚠️ Overdue · ' : ''}
+                        {new Date(entry.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                      {isOverdue && (
+                        <button
+                          onClick={() => handleSetFollowUp(10)}
+                          disabled={snoozing}
+                          className="mt-1.5 px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 text-xs rounded-md transition-colors"
+                        >
+                          {snoozing ? 'Snoozing…' : '💤 Snooze 10 days'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>)}
 
                 {entry.signedDate && (
                   <div>
@@ -708,22 +714,63 @@ export default function LabelEntryPage({ params }) {
 
           {/* Follow-up Date — only relevant when Submitted */}
           {detailsForm.status === 'Submitted' && (
-            <div>
-              <label className="block text-sm text-gray-300 mb-1">Follow-up Date <span className="text-gray-500">(optional)</span></label>
-              <input
-                type="date"
-                value={detailsForm.followUpDate}
-                onChange={e => setDetailsForm({ ...detailsForm, followUpDate: e.target.value })}
-                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 text-gray-100 rounded-lg focus:ring-2 focus:ring-purple-500"
-              />
+            <div className="rounded-lg border border-purple-500/30 bg-purple-900/20 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-purple-300 font-medium">📅 Follow-up reminder</span>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={!!detailsForm.followUpDate}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        const d = daysFromNow(editFollowUpDays)
+                        setDetailsForm(prev => ({ ...prev, followUpDate: d }))
+                      } else {
+                        setDetailsForm(prev => ({ ...prev, followUpDate: '' }))
+                      }
+                    }}
+                    className="accent-purple-500 w-4 h-4"
+                  />
+                  <span className="text-xs text-gray-400">Set reminder</span>
+                </label>
+              </div>
               {detailsForm.followUpDate && (
-                <button
-                  type="button"
-                  onClick={() => setDetailsForm({ ...detailsForm, followUpDate: '' })}
-                  className="mt-1 text-xs text-gray-500 hover:text-gray-300"
-                >
-                  Clear date
-                </button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-300 whitespace-nowrap">Follow up in</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={editFollowUpDays}
+                      onChange={e => {
+                        const days = Math.max(1, Math.min(365, parseInt(e.target.value) || 1))
+                        setEditFollowUpDays(days)
+                        setDetailsForm(prev => ({ ...prev, followUpDate: daysFromNow(days) }))
+                      }}
+                      className="w-16 px-2 py-1 bg-gray-800 border border-gray-600 text-gray-100 rounded text-sm text-center focus:ring-1 focus:ring-purple-500"
+                    />
+                    <span className="text-sm text-gray-300">days</span>
+                    <span className="text-xs text-gray-400">
+                      ({new Date(detailsForm.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Or pick a specific date:</label>
+                    <input
+                      type="date"
+                      value={detailsForm.followUpDate}
+                      onChange={e => {
+                        setDetailsForm(prev => ({ ...prev, followUpDate: e.target.value }))
+                        if (e.target.value) {
+                          const diff = Math.round((new Date(e.target.value + 'T12:00:00') - new Date()) / (1000 * 60 * 60 * 24))
+                          if (diff > 0) setEditFollowUpDays(diff)
+                        }
+                      }}
+                      className="w-full px-3 py-1.5 bg-gray-800 border border-gray-600 text-gray-100 rounded text-sm focus:ring-1 focus:ring-purple-500"
+                    />
+                  </div>
+                </div>
               )}
             </div>
           )}

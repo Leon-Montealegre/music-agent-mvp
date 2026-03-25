@@ -845,17 +845,19 @@ app.get('/releases/:releaseId/', authMiddleware, async (req, res) => {
     const distribution = { release: [], submit: [], promote: [] }
     for (const entry of distResult.rows) {
       distribution[entry.path_type]?.push({
-        id:        entry.id,
-        platform:  entry.platform,
-        label:     entry.label,
-        promoName: entry.promo_name,
-        status:    entry.status,
-        url:       entry.url,
-        liveDate:  entry.live_date,
-        pageNotes: entry.page_notes,
-        timestamp: entry.timestamp,
-        contacts:  [],
-        documents: []
+        id:           entry.id,
+        platform:     entry.platform,
+        label:        entry.label,
+        promoName:    entry.promo_name,
+        status:       entry.status,
+        url:          entry.url,
+        liveDate:     entry.live_date,
+        pageNotes:    entry.page_notes,
+        timestamp:    entry.timestamp,
+        followUpDate: entry.follow_up_date ? entry.follow_up_date.toISOString().split('T')[0] : null,
+        signedDate:   entry.signed_date   ? entry.signed_date.toISOString().split('T')[0]   : null,
+        contacts:     [],
+        documents:    []
       })
     }
 
@@ -1137,7 +1139,9 @@ app.patch('/releases/:releaseId/distribution', authMiddleware, async (req, res) 
       distribution[e.path_type]?.push({
         id: e.id, platform: e.platform, label: e.label, promoName: e.promo_name,
         status: e.status, url: e.url, liveDate: e.live_date, pageNotes: e.page_notes,
-        timestamp: e.timestamp, contacts: [], documents: []
+        timestamp: e.timestamp,
+        followUpDate: e.follow_up_date ? e.follow_up_date.toISOString().split('T')[0] : null,
+        contacts: [], documents: []
       })
     }
 
@@ -2183,7 +2187,10 @@ app.get('/collections/:collectionId', authMiddleware, async (req, res) => {
         id: entry.id, platform: entry.platform, label: entry.label,
         promoName: entry.promo_name, status: entry.status, url: entry.url,
         liveDate: entry.live_date, pageNotes: entry.page_notes,
-        timestamp: entry.timestamp, contacts: [], documents: []
+        timestamp: entry.timestamp,
+        followUpDate: entry.follow_up_date ? entry.follow_up_date.toISOString().split('T')[0] : null,
+        signedDate:   entry.signed_date   ? entry.signed_date.toISOString().split('T')[0]   : null,
+        contacts: [], documents: []
       })
     }
 

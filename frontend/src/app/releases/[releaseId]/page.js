@@ -781,6 +781,12 @@ export default function TrackDetailPage({ params }) {
                               Signed on {new Date(entry.signedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                             </p>
                           )}
+                          {entry.status === 'Submitted' && entry.followUpDate && (
+                            <p className={`text-xs mt-1 ${new Date(entry.followUpDate + 'T23:59:59') < new Date() ? 'text-red-400' : 'text-purple-400'}`}>
+                              📅 Follow-up: {new Date(entry.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {new Date(entry.followUpDate + 'T23:59:59') < new Date() ? ' · Overdue' : ''}
+                            </p>
+                          )}
                           {entry.notes && <p className="text-sm text-gray-500 mt-2 italic">&quot;{entry.notes}&quot;</p>}
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">

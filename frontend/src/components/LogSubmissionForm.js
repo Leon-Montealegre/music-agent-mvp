@@ -23,7 +23,7 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, edit
   })
 
   // Follow-up state — only used when status = Submitted
-  const [followUpEnabled, setFollowUpEnabled] = useState(true)
+  const [followUpEnabled, setFollowUpEnabled] = useState(false)
   const [followUpDays, setFollowUpDays] = useState(10)
   const [followUpDate, setFollowUpDate] = useState(() => calcDateStr(10))
 
