@@ -53,17 +53,15 @@ export default function PromoEntryPage({ params }) {
   async function loadData() {
     try {
       setLoading(true)
-      const [releaseRes, promoRes, contactsData] = await Promise.all([
+      const [releaseRes, promoRes] = await Promise.all([
         fetchRelease(releaseId),
         fetchPromoEntry(releaseId, promoId),
-        fetchAllContacts(),
       ])
       const release = releaseRes.release || releaseRes
       const fetchedEntry = promoRes.entry
 
       setTrack(release)
       setEntry(fetchedEntry)
-      setAllContacts(Array.isArray(contactsData) ? contactsData : [])
       setDetailsForm({
         promoName: fetchedEntry.promoName || '',
         status: fetchedEntry.status || 'Pending',
@@ -78,6 +76,13 @@ export default function PromoEntryPage({ params }) {
       console.error('Error loading promo entry page:', err)
     } finally {
       setLoading(false)
+    }
+    // Load contacts separately so a contacts failure never blocks the page from rendering
+    try {
+      const contactsData = await fetchAllContacts()
+      setAllContacts(Array.isArray(contactsData) ? contactsData : [])
+    } catch (err) {
+      console.error('Could not load contacts list (search will be empty):', err)
     }
   }
 

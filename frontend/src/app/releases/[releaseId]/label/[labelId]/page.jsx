@@ -53,17 +53,15 @@ export default function LabelEntryPage({ params }) {
   async function loadData() {
     try {
       setLoading(true)
-      const [releaseRes, labelRes, contactsData] = await Promise.all([
+      const [releaseRes, labelRes] = await Promise.all([
         fetchRelease(releaseId),
         fetchLabelEntry(releaseId, labelId),
-        fetchAllContacts(),
       ])
       const release = releaseRes.release || releaseRes
       const fetchedEntry = labelRes.entry
 
       setTrack(release)
       setEntry(fetchedEntry)
-      setAllContacts(Array.isArray(contactsData) ? contactsData : [])
       setDetailsForm({
         label: fetchedEntry.label || fetchedEntry.labelName || '',
         platform: fetchedEntry.platform || '',
@@ -78,6 +76,13 @@ export default function LabelEntryPage({ params }) {
       console.error('Error loading label entry page:', err)
     } finally {
       setLoading(false)
+    }
+    // Load contacts separately so a contacts failure never blocks the page from rendering
+    try {
+      const contactsData = await fetchAllContacts()
+      setAllContacts(Array.isArray(contactsData) ? contactsData : [])
+    } catch (err) {
+      console.error('Could not load contacts list (search will be empty):', err)
     }
   }
 
