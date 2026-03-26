@@ -796,8 +796,10 @@ export default function CollectionDetailPage({ params }) {
                             )
                             const data = await res.json().catch(() => ({}))
                             if (!res.ok) throw new Error(data.error || 'Failed to add promo deal')
-                            // Navigate directly to the new promo entry page
-                            const newEntry = data.distribution?.promote?.find(e => e.timestamp === entry.timestamp)
+                            // Navigate directly to the new promo entry page.
+                            // Entries are ordered ASC so the new one is last.
+                            const promoteList = data.distribution?.promote || []
+                            const newEntry = promoteList[promoteList.length - 1]
                             if (newEntry?.id) {
                               router.push(`/collections/${collectionId}/promo/${newEntry.id}`)
                               return
@@ -1110,8 +1112,10 @@ export default function CollectionDetailPage({ params }) {
               })
               const result = await res.json()
               if (!res.ok) throw new Error(result.error || 'Failed to save')
-              // Navigate directly to the new label entry page
-              const newEntry = result.distribution?.submit?.find(e => e.timestamp === entry.timestamp)
+              // Navigate directly to the new label entry page.
+              // Entries are ordered ASC so the new one is last.
+              const submitList = result.distribution?.submit || []
+              const newEntry = submitList[submitList.length - 1]
               if (newEntry?.id) {
                 router.push(`/collections/${collectionId}/label/${newEntry.id}`)
               }

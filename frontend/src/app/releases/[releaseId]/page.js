@@ -299,8 +299,10 @@ export default function TrackDetailPage({ params }) {
       if (formData.notes) entry.notes = formData.notes
       if (formData.followUpDate) entry.followUpDate = formData.followUpDate
       const result = await updateDistribution(trackId, 'submit', entry)
-      // Navigate directly to the new label entry page
-      const newEntry = result.distribution?.submit?.find(e => e.timestamp === entry.timestamp)
+      // Navigate directly to the new label entry page.
+      // Entries are ordered ASC by timestamp so the one we just created is last.
+      const submitList = result.distribution?.submit || []
+      const newEntry = submitList[submitList.length - 1]
       if (newEntry?.id) {
         router.push(`/releases/${trackId}/label/${newEntry.id}`)
       } else {
@@ -956,8 +958,10 @@ export default function TrackDetailPage({ params }) {
                               timestamp: new Date().toISOString()
                             }
                             const result = await updateDistribution(trackId, 'promote', entry)
-                            // Navigate directly to the new promo entry page
-                            const newEntry = result.distribution?.promote?.find(e => e.timestamp === entry.timestamp)
+                            // Navigate directly to the new promo entry page.
+                            // Entries are ordered ASC so the new one is last.
+                            const promoteList = result.distribution?.promote || []
+                            const newEntry = promoteList[promoteList.length - 1]
                             if (newEntry?.id) {
                               router.push(`/releases/${trackId}/promo/${newEntry.id}`)
                               return
