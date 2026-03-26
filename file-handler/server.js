@@ -411,7 +411,8 @@ app.get('/files', authMiddleware, async (req, res) => {
 app.get('/follow-ups', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
-    const today = new Date().toISOString().split('T')[0] // 'YYYY-MM-DD'
+    // Ownership is checked via the joined releases/collections rows (user_id is not
+    // reliably populated on distribution_entries themselves).
     const result = await db.query(
       `SELECT
          de.id,
@@ -429,12 +430,12 @@ app.get('/follow-ups', authMiddleware, async (req, res) => {
        FROM distribution_entries de
        LEFT JOIN releases    r   ON r.id = de.release_id
        LEFT JOIN collections col ON col.id = de.collection_id
-       WHERE de.user_id = $1
+       WHERE (r.user_id = $1 OR col.user_id = $1)
          AND de.follow_up_date IS NOT NULL
-         AND de.follow_up_date <= $2
+         AND de.follow_up_date <= CURRENT_DATE
          AND de.path_type = 'submit'
        ORDER BY de.follow_up_date ASC`,
-      [req.user.id, today]
+      [req.user.id]
     )
     const followUps = result.rows.map(row => {
       const base = row.source_type === 'release' ? 'releases' : 'collections'
