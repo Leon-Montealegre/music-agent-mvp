@@ -36,11 +36,10 @@ export default function LogSubmissionForm({ releaseId, onSuccess, onCancel, edit
         status: existingEntry.status || '',
         notes: existingEntry.notes || ''
       })
+      // Always start with the checkbox OFF — user must explicitly enable it
+      setFollowUpEnabled(false)
       if (existingEntry.followUpDate) {
-        setFollowUpEnabled(true)
         setFollowUpDate(existingEntry.followUpDate.slice(0, 10))
-      } else {
-        setFollowUpEnabled(false)
       }
     }
   }, [editMode, existingEntry])

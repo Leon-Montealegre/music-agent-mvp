@@ -271,7 +271,7 @@ export default function CollectionLabelEntryPage({ params }) {
   else if (status === 'completed') statusClasses = 'bg-gray-600/40 border border-gray-400/60 text-gray-100'
   else if (status === 'pending' || status === 'submitted') statusClasses = 'bg-yellow-500/20 border border-yellow-400/60 text-yellow-200'
 
-  const isOverdue = entry.followUpDate && new Date(entry.followUpDate + 'T23:59:59') < new Date()
+  const isOverdue = entry.followUpDate && new Date(entry.followUpDate.slice(0, 10) + 'T23:59:59') < new Date()
   const showFollowUpPrompt = (entry.status || '').toLowerCase() === 'submitted'
     && !entry.followUpDate
     && !followUpPromptDismissed
@@ -320,7 +320,7 @@ export default function CollectionLabelEntryPage({ params }) {
                       <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Follow-up Date</p>
                       <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
                         {isOverdue ? '⚠️ Overdue · ' : ''}
-                        {new Date(entry.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        {new Date(entry.followUpDate.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                       </p>
                       {isOverdue && (
                         <button onClick={() => handleSetFollowUp(10)} disabled={snoozing} className="mt-1.5 px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 text-xs rounded-md transition-colors">
@@ -686,7 +686,7 @@ export default function CollectionLabelEntryPage({ params }) {
                       className="w-16 px-2 py-1 bg-gray-800 border border-gray-600 text-gray-100 rounded text-sm text-center focus:ring-1 focus:ring-purple-500"
                     />
                     <span className="text-sm text-gray-300">days</span>
-                    <span className="text-xs text-gray-400">({new Date(detailsForm.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})</span>
+                    <span className="text-xs text-gray-400">({new Date((detailsForm.followUpDate || '').slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})</span>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">Or pick a specific date:</label>

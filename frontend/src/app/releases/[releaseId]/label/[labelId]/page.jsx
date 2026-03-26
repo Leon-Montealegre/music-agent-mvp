@@ -318,7 +318,7 @@ export default function LabelEntryPage({ params }) {
   else if (status === 'completed') statusClasses = 'bg-gray-600/40 border border-gray-400/60 text-gray-100'
   else if (status === 'pending' || status === 'submitted') statusClasses = 'bg-yellow-500/20 border border-yellow-400/60 text-yellow-200'
 
-  const isOverdue = entry.followUpDate && new Date(entry.followUpDate + 'T23:59:59') < new Date()
+  const isOverdue = entry.followUpDate && new Date(entry.followUpDate.slice(0, 10) + 'T23:59:59') < new Date()
   const showFollowUpPrompt = (entry.status || '').toLowerCase() === 'submitted'
     && !entry.followUpDate
     && !followUpPromptDismissed
@@ -350,67 +350,50 @@ export default function LabelEntryPage({ params }) {
                   </span>
                 </div>
 
-                {/* Follow-up — only shown when Submitted */}
-                {entry.status?.toLowerCase() === 'submitted' && (<>
-                  {/* Prompt — when no date is set yet */}
-                  {showFollowUpPrompt && (
-                    <div className="bg-purple-900/30 border border-purple-500/40 rounded-lg p-3">
-                      <p className="text-xs text-purple-300 font-medium mb-1">📅 Set a follow-up reminder?</p>
-                      <p className="text-xs text-gray-400 mb-2">Follow up in 10 days ({new Date(daysFromNow(10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})</p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleSetFollowUp(10)}
-                          disabled={snoozing}
-                          className="flex-1 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md transition-colors"
-                        >
-                          {snoozing ? 'Setting…' : 'Yes, set reminder'}
-                        </button>
-                        <button
-                          onClick={() => setFollowUpPromptDismissed(true)}
-                          className="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded-md transition-colors"
-                        >
-                          No thanks
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                {/* Follow-up reminder — unified block, always shown when Submitted */}
+                {entry.status?.toLowerCase() === 'submitted' && (
+                  <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3 space-y-2">
+                    <p className="text-xs text-purple-300 font-medium">📅 Follow-up Reminder</p>
 
-                  {/* Date display — when date is already set */}
-                  {entry.followUpDate && (
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Follow-up Date</p>
+                    {/* Current date or "not set" */}
+                    {entry.followUpDate ? (
                       <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
                         {isOverdue ? '⚠️ Overdue · ' : ''}
-                        {new Date(entry.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        {new Date(entry.followUpDate.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                       </p>
-                      {/* Inline date picker to change the follow-up date directly */}
-                      <div className="mt-2 flex items-center gap-2">
-                        <input
-                          type="date"
-                          value={sidebarFollowUpInput}
-                          onChange={e => setSidebarFollowUpInput(e.target.value)}
-                          className="flex-1 px-2 py-1 bg-gray-900 border border-gray-600 text-gray-100 rounded text-xs focus:ring-1 focus:ring-purple-500"
-                        />
-                        <button
-                          onClick={() => handleSidebarSaveFollowUp(sidebarFollowUpInput)}
-                          disabled={snoozing || !sidebarFollowUpInput || sidebarFollowUpInput === entry.followUpDate}
-                          className="px-2 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white text-xs rounded transition-colors whitespace-nowrap"
-                        >
-                          {snoozing ? '…' : 'Update'}
-                        </button>
-                      </div>
-                      {isOverdue && (
-                        <button
-                          onClick={() => handleSetFollowUp(10)}
-                          disabled={snoozing}
-                          className="mt-1.5 px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 text-xs rounded-md transition-colors"
-                        >
-                          {snoozing ? 'Snoozing…' : '💤 Snooze 10 days'}
-                        </button>
-                      )}
+                    ) : (
+                      <p className="text-xs text-gray-400">No reminder set</p>
+                    )}
+
+                    {/* Inline date picker — always visible */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={sidebarFollowUpInput}
+                        onChange={e => setSidebarFollowUpInput(e.target.value)}
+                        className="flex-1 px-2 py-1 bg-gray-900 border border-gray-600 text-gray-100 rounded text-xs focus:ring-1 focus:ring-purple-500"
+                      />
+                      <button
+                        onClick={() => handleSidebarSaveFollowUp(sidebarFollowUpInput)}
+                        disabled={snoozing || !sidebarFollowUpInput || sidebarFollowUpInput === (entry.followUpDate || '').slice(0, 10)}
+                        className="px-2 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white text-xs rounded transition-colors whitespace-nowrap"
+                      >
+                        {snoozing ? '…' : entry.followUpDate ? 'Update' : 'Set'}
+                      </button>
                     </div>
-                  )}
-                </>)}
+
+                    {/* Snooze shortcut — only when overdue */}
+                    {isOverdue && (
+                      <button
+                        onClick={() => handleSetFollowUp(10)}
+                        disabled={snoozing}
+                        className="w-full px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 text-xs rounded-md transition-colors"
+                      >
+                        {snoozing ? 'Snoozing…' : '💤 Snooze 10 days'}
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {entry.signedDate && (
                   <div>
@@ -811,7 +794,7 @@ export default function LabelEntryPage({ params }) {
                     />
                     <span className="text-sm text-gray-300">days</span>
                     <span className="text-xs text-gray-400">
-                      ({new Date(detailsForm.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
+                      ({new Date((detailsForm.followUpDate || '').slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
                     </span>
                   </div>
                   <div>

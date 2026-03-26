@@ -876,7 +876,7 @@ export default function HomePage() {
                     <a href={fu.href} className="hover:text-amber-300 underline underline-offset-2">
                       {fu.entryName}
                     </a>
-                    <span>— due {new Date(fu.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    <span>— due {new Date(fu.followUpDate.slice(0,10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                     <button
                       onClick={() => handleSnoozeFollowUp(fu)}
                       disabled={snoozingId === fu.id}
