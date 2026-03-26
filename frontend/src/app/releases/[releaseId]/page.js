@@ -297,10 +297,18 @@ export default function TrackDetailPage({ params }) {
     try {
       const entry = { label: formData.label, platform: formData.platform, status: formData.status, timestamp: new Date().toISOString() }
       if (formData.notes) entry.notes = formData.notes
-      await updateDistribution(trackId, 'submit', entry)
-      const updatedData = await fetchRelease(trackId)
-      setTrack(updatedData.release || updatedData)
-      setShowSubmissionModal(false)
+      if (formData.followUpDate) entry.followUpDate = formData.followUpDate
+      const result = await updateDistribution(trackId, 'submit', entry)
+      // Navigate directly to the new label entry page
+      const newEntry = result.distribution?.submit?.find(e => e.timestamp === entry.timestamp)
+      if (newEntry?.id) {
+        router.push(`/releases/${trackId}/label/${newEntry.id}`)
+      } else {
+        // Fallback: stay on page and refresh
+        const updatedData = await fetchRelease(trackId)
+        setTrack(updatedData.release || updatedData)
+        setShowSubmissionModal(false)
+      }
     } catch {
       alert('Failed to log submission. Please try again.')
     } finally {
@@ -947,7 +955,13 @@ export default function TrackDetailPage({ params }) {
                               ...basePayload,
                               timestamp: new Date().toISOString()
                             }
-                            await updateDistribution(trackId, 'promote', entry)
+                            const result = await updateDistribution(trackId, 'promote', entry)
+                            // Navigate directly to the new promo entry page
+                            const newEntry = result.distribution?.promote?.find(e => e.timestamp === entry.timestamp)
+                            if (newEntry?.id) {
+                              router.push(`/releases/${trackId}/promo/${newEntry.id}`)
+                              return
+                            }
                           }
                           await loadTrack()
                           setShowPromoForm(false)

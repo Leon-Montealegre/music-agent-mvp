@@ -794,9 +794,13 @@ export default function CollectionDetailPage({ params }) {
                                 body: JSON.stringify({ path: 'promote', entry })
                               }
                             )
-                            if (!res.ok) {
-                              const data = await res.json().catch(() => ({}))
-                              throw new Error(data.error || 'Failed to add promo deal')
+                            const data = await res.json().catch(() => ({}))
+                            if (!res.ok) throw new Error(data.error || 'Failed to add promo deal')
+                            // Navigate directly to the new promo entry page
+                            const newEntry = data.distribution?.promote?.find(e => e.timestamp === entry.timestamp)
+                            if (newEntry?.id) {
+                              router.push(`/collections/${collectionId}/promo/${newEntry.id}`)
+                              return
                             }
                           }
                           await loadCollection()
@@ -1104,7 +1108,13 @@ export default function CollectionDetailPage({ params }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: 'submit', entry })
               })
-              if (!res.ok) throw new Error('Failed to save')
+              const result = await res.json()
+              if (!res.ok) throw new Error(result.error || 'Failed to save')
+              // Navigate directly to the new label entry page
+              const newEntry = result.distribution?.submit?.find(e => e.timestamp === entry.timestamp)
+              if (newEntry?.id) {
+                router.push(`/collections/${collectionId}/label/${newEntry.id}`)
+              }
             }
           }}
         />
