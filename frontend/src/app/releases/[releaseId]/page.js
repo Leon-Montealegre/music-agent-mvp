@@ -292,32 +292,6 @@ export default function TrackDetailPage({ params }) {
     }
   }
 
-  async function handleSubmissionSubmit(formData) {
-    setSubmitting(true)
-    try {
-      const entry = { label: formData.label, platform: formData.platform, status: formData.status, timestamp: new Date().toISOString() }
-      if (formData.notes) entry.notes = formData.notes
-      if (formData.followUpDate) entry.followUpDate = formData.followUpDate
-      const result = await updateDistribution(trackId, 'submit', entry)
-      // Navigate directly to the new label entry page.
-      // Entries are ordered ASC by timestamp so the one we just created is last.
-      const submitList = result.distribution?.submit || []
-      const newEntry = submitList[submitList.length - 1]
-      if (newEntry?.id) {
-        router.push(`/releases/${trackId}/label/${newEntry.id}`)
-      } else {
-        // Fallback: stay on page and refresh
-        const updatedData = await fetchRelease(trackId)
-        setTrack(updatedData.release || updatedData)
-        setShowSubmissionModal(false)
-      }
-    } catch {
-      alert('Failed to log submission. Please try again.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   const handleMarkAsSigned = async (labelName, submissionId) => {
     try {
       const response = await apiFetch(`/releases/${trackId}/sign`, {
@@ -958,12 +932,8 @@ export default function TrackDetailPage({ params }) {
                               timestamp: new Date().toISOString()
                             }
                             const result = await updateDistribution(trackId, 'promote', entry)
-                            // Navigate directly to the new promo entry page.
-                            // Entries are ordered ASC so the new one is last.
-                            const promoteList = result.distribution?.promote || []
-                            const newEntry = promoteList[promoteList.length - 1]
-                            if (newEntry?.id) {
-                              router.push(`/releases/${trackId}/promo/${newEntry.id}`)
+                            if (result.entryId) {
+                              router.push(`/releases/${trackId}/promo/${result.entryId}`)
                               return
                             }
                           }
@@ -1225,6 +1195,17 @@ export default function TrackDetailPage({ params }) {
           onCancel={() => { setShowSubmissionModal(false); setEditingEntry(null) }}
           editMode={editingEntry?.pathType === 'submit'}
           existingEntry={editingEntry}
+          onSubmit={async (formData) => {
+            if (editingEntry?.pathType === 'submit') {
+              await updateDistributionEntry(trackId, 'submit', editingEntry.timestamp, formData)
+            } else {
+              const entry = { ...formData, timestamp: new Date().toISOString() }
+              const result = await updateDistribution(trackId, 'submit', entry)
+              if (result.entryId) {
+                router.push(`/releases/${trackId}/label/${result.entryId}`)
+              }
+            }
+          }}
         />
       </Modal>
 

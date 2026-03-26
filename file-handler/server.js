@@ -1212,10 +1212,11 @@ app.patch('/releases/:releaseId/distribution', authMiddleware, async (req, res) 
 
     const timestamp = entry.timestamp || new Date().toISOString()
 
-    await db.query(
+    const insertResult = await db.query(
       `INSERT INTO distribution_entries
          (id, release_id, path_type, platform, label, promo_name, status, url, live_date, page_notes, timestamp, follow_up_date)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id`,
       [
         releaseUUID,
         distPath,
@@ -1230,6 +1231,7 @@ app.patch('/releases/:releaseId/distribution', authMiddleware, async (req, res) 
         entry.followUpDate || null,
       ]
     )
+    const newEntryId = insertResult.rows[0].id
 
     // Return the full distribution for this release (same shape as old API)
     const allEntries = await db.query(
@@ -1247,7 +1249,7 @@ app.patch('/releases/:releaseId/distribution', authMiddleware, async (req, res) 
       })
     }
 
-    res.json({ success: true, distribution })
+    res.json({ success: true, entryId: newEntryId, distribution })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
@@ -2506,16 +2508,18 @@ app.patch('/collections/:collectionId/distribution', authMiddleware, async (req,
     const collectionUUID = colResult.rows[0].id
 
     const ts = new Date().toISOString()
-    await db.query(
+    const insertResult = await db.query(
       `INSERT INTO distribution_entries
          (id, collection_id, path_type, platform, label, promo_name, status, url, live_date, page_notes, timestamp)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id`,
       [collectionUUID, distPath,
        entry.platform || null, entry.label || null, entry.promoName || null,
        entry.status || null, entry.url || null,
        entry.liveDate || null, entry.pageNotes || null, ts]
     )
-    res.json({ success: true, message: 'Entry added' })
+    const newEntryId = insertResult.rows[0].id
+    res.json({ success: true, entryId: newEntryId })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
