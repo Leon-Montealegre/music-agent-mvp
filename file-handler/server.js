@@ -574,13 +574,16 @@ async function fetchContactSources(db, contactId) {
  * contact with the same email OR same name already exists for this user.
  * If so, we silently reuse that contact instead of inserting a duplicate.
  *
+ * Pass force: true to skip the name check (email check is always active).
+ * This mirrors the behaviour of the standalone POST /contacts endpoint.
+ *
  * Returns the existing or newly-created contact row from the DB.
  */
-async function findOrCreateContact(db, userId, { name, email, role, phone, location, label, notes }) {
+async function findOrCreateContact(db, userId, { name, email, role, phone, location, label, notes, force }) {
   const emailTrimmed = (email || '').trim().toLowerCase()
   const nameTrimmed  = name.trim().toLowerCase()
 
-  // 1. Email match (strongest signal — same email = same person)
+  // 1. Email match (strongest signal — same email = same person, always active)
   if (emailTrimmed) {
     const emailDup = await db.query(
       `SELECT * FROM contacts WHERE user_id = $1 AND LOWER(TRIM(email)) = $2 LIMIT 1`,
@@ -589,14 +592,16 @@ async function findOrCreateContact(db, userId, { name, email, role, phone, locat
     if (emailDup.rows.length) return emailDup.rows[0]
   }
 
-  // 2. Name match (case-insensitive)
-  const nameDup = await db.query(
-    `SELECT * FROM contacts WHERE user_id = $1 AND LOWER(TRIM(name)) = $2 LIMIT 1`,
-    [userId, nameTrimmed]
-  )
-  if (nameDup.rows.length) return nameDup.rows[0]
+  // 2. Name match (case-insensitive) — skipped when force: true
+  if (!force) {
+    const nameDup = await db.query(
+      `SELECT * FROM contacts WHERE user_id = $1 AND LOWER(TRIM(name)) = $2 LIMIT 1`,
+      [userId, nameTrimmed]
+    )
+    if (nameDup.rows.length) return nameDup.rows[0]
+  }
 
-  // 3. No match — create a fresh contact
+  // 3. No match (or force skip) — create a fresh contact
   const res = await db.query(
     `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
      VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -1551,7 +1556,7 @@ app.post('/releases/:releaseId/promo/:promoId/contacts', authMiddleware, async (
   try {
     const db = require('./db')
     const { releaseId, promoId } = req.params
-    const { contactId, name, label, email, phone, location, role, notes } = req.body
+    const { contactId, name, label, email, phone, location, role, notes, force } = req.body
     const ent = await getReleaseEntry(db, releaseId, promoId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Promo entry not found' })
     let contact
@@ -1563,7 +1568,7 @@ app.post('/releases/:releaseId/promo/:promoId/contacts', authMiddleware, async (
       contact = existing.rows[0]
     } else {
       if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
-      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes })
+      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes, force })
     }
     await db.query(
       `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -1771,7 +1776,7 @@ app.post('/releases/:releaseId/label/:labelId/contacts', authMiddleware, async (
   try {
     const db = require('./db')
     const { releaseId, labelId } = req.params
-    const { contactId, name, label, email, phone, location, role, notes } = req.body
+    const { contactId, name, label, email, phone, location, role, notes, force } = req.body
     const ent = await getReleaseEntry(db, releaseId, labelId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Label submission not found' })
     let contact
@@ -1783,9 +1788,9 @@ app.post('/releases/:releaseId/label/:labelId/contacts', authMiddleware, async (
       if (!existing.rows.length) return res.status(404).json({ success: false, error: 'Contact not found' })
       contact = existing.rows[0]
     } else {
-      // Find existing or create new (de-duplicates by email then name)
+      // Find existing or create new (de-duplicates by email then name; force skips name check)
       if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
-      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes })
+      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes, force })
     }
     // Create the link (ignore if already linked — ON CONFLICT DO NOTHING)
     await db.query(
@@ -2798,7 +2803,7 @@ app.post('/collections/:collectionId/promo/:promoId/contacts', authMiddleware, a
   try {
     const db = require('./db')
     const { collectionId, promoId } = req.params
-    const { contactId, name, label, email, phone, location, role, notes } = req.body
+    const { contactId, name, label, email, phone, location, role, notes, force } = req.body
     const ent = await getCollectionEntry(db, collectionId, promoId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Promo entry not found' })
     let contact
@@ -2810,7 +2815,7 @@ app.post('/collections/:collectionId/promo/:promoId/contacts', authMiddleware, a
       contact = existing.rows[0]
     } else {
       if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
-      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes })
+      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes, force })
     }
     await db.query(
       `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -3015,7 +3020,7 @@ app.post('/collections/:collectionId/label/:labelId/contacts', authMiddleware, a
   try {
     const db = require('./db')
     const { collectionId, labelId } = req.params
-    const { contactId, name, label, email, phone, location, role, notes } = req.body
+    const { contactId, name, label, email, phone, location, role, notes, force } = req.body
     const ent = await getCollectionEntry(db, collectionId, labelId, req.user.id)
     if (!ent) return res.status(404).json({ success: false, error: 'Label submission not found' })
     let contact
@@ -3027,7 +3032,7 @@ app.post('/collections/:collectionId/label/:labelId/contacts', authMiddleware, a
       contact = existing.rows[0]
     } else {
       if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
-      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes })
+      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes, force })
     }
     await db.query(
       `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,

@@ -50,6 +50,8 @@ export default function ContactPicker({ contacts = [], onSelect, onCancel, label
   const [form, setForm] = useState({
     name: '', email: '', role: defaultRole, label: labelName, phone: '', location: '', notes: '',
   })
+  // duplicate: null | { type: 'email' | 'name', existing: contact }
+  const [duplicate, setDuplicate] = useState(null)
   const searchRef = useRef(null)
 
   // Auto-focus the search box when the picker opens
@@ -78,6 +80,27 @@ export default function ContactPicker({ contacts = [], onSelect, onCancel, label
   async function handleCreate(e) {
     e.preventDefault()
     if (!form.name.trim()) return
+
+    // --- Duplicate check (mirrors the /contacts POST logic on the server) ---
+    const emailNorm = form.email.trim().toLowerCase()
+    const nameNorm  = form.name.trim().toLowerCase()
+
+    // 1. Email match (hard — same email = same person, no "create anyway")
+    if (emailNorm) {
+      const emailMatch = contacts.find(c => (c.email || '').trim().toLowerCase() === emailNorm)
+      if (emailMatch) {
+        setDuplicate({ type: 'email', existing: emailMatch })
+        return
+      }
+    }
+
+    // 2. Name match (soft — offer "use existing" OR "create anyway")
+    const nameMatch = contacts.find(c => (c.name || '').trim().toLowerCase() === nameNorm)
+    if (nameMatch) {
+      setDuplicate({ type: 'name', existing: nameMatch })
+      return
+    }
+
     setSubmitting(true)
     try {
       // Pass the form fields directly — the parent will POST them to the entry endpoint
@@ -255,7 +278,55 @@ export default function ContactPicker({ contacts = [], onSelect, onCancel, label
         />
       </div>
 
-      {/* Submit */}
+      {/* Duplicate warning — shown instead of the normal submit row */}
+      {duplicate ? (
+        <div className="rounded-lg border border-yellow-600/50 bg-yellow-900/20 p-3 space-y-2">
+          <p className="text-sm text-yellow-300 font-medium">
+            {duplicate.type === 'email'
+              ? '⚠️ A contact with this email already exists.'
+              : '⚠️ A contact with this name already exists.'}
+          </p>
+          <div className="flex items-center gap-2 bg-gray-800/60 rounded p-2">
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-purple-600/70 flex items-center justify-center text-xs font-semibold text-white">
+              {getInitials(duplicate.existing.name)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">{duplicate.existing.name}</p>
+              {(duplicate.existing.label || duplicate.existing.email) && (
+                <p className="text-xs text-gray-400 truncate">
+                  {duplicate.existing.label || ''}{duplicate.existing.label && duplicate.existing.email ? ' · ' : ''}{duplicate.existing.email || ''}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => { setDuplicate(null); onSelect({ contactId: duplicate.existing.id }) }}
+              className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Use Existing
+            </button>
+            {duplicate.type === 'name' && (
+              <button
+                type="button"
+                onClick={() => { setDuplicate(null); onSelect({ ...form, name: form.name.trim(), force: true }) }}
+                className="flex-1 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Create Anyway
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setDuplicate(null)}
+              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded-lg transition-colors"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      ) : (
+      /* Submit */
       <div className="flex gap-2 pt-1">
         <button
           type="submit"
@@ -272,6 +343,7 @@ export default function ContactPicker({ contacts = [], onSelect, onCancel, label
           Cancel
         </button>
       </div>
+      )}
     </form>
   )
 }
