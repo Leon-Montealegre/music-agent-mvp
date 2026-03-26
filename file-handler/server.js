@@ -566,6 +566,45 @@ async function fetchContactSources(db, contactId) {
   })
 }
 
+/**
+ * findOrCreateContact
+ *
+ * Used by the 4 entry-specific contact endpoints (release/collection × label/promo).
+ * When creating a new contact from a submission page, we first check whether a
+ * contact with the same email OR same name already exists for this user.
+ * If so, we silently reuse that contact instead of inserting a duplicate.
+ *
+ * Returns the existing or newly-created contact row from the DB.
+ */
+async function findOrCreateContact(db, userId, { name, email, role, phone, location, label, notes }) {
+  const emailTrimmed = (email || '').trim().toLowerCase()
+  const nameTrimmed  = name.trim().toLowerCase()
+
+  // 1. Email match (strongest signal — same email = same person)
+  if (emailTrimmed) {
+    const emailDup = await db.query(
+      `SELECT * FROM contacts WHERE user_id = $1 AND LOWER(TRIM(email)) = $2 LIMIT 1`,
+      [userId, emailTrimmed]
+    )
+    if (emailDup.rows.length) return emailDup.rows[0]
+  }
+
+  // 2. Name match (case-insensitive)
+  const nameDup = await db.query(
+    `SELECT * FROM contacts WHERE user_id = $1 AND LOWER(TRIM(name)) = $2 LIMIT 1`,
+    [userId, nameTrimmed]
+  )
+  if (nameDup.rows.length) return nameDup.rows[0]
+
+  // 3. No match — create a fresh contact
+  const res = await db.query(
+    `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
+     VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [userId, name.trim(), email || '', role || '', phone || '', location || '', label || '', notes || '']
+  )
+  return res.rows[0]
+}
+
 // GET /contacts — return all contacts belonging to the authenticated user
 // Each contact now includes a `sources` array of linked entries
 app.get('/contacts', authMiddleware, async (req, res) => {
@@ -1506,6 +1545,8 @@ app.delete('/releases/:releaseId/promo/:promoId', authMiddleware, async (req, re
 
 // -- Promo entry: POST contact ------------------------------------------------
 // Accepts { contactId } to link an existing contact, or full fields to create new.
+// De-duplication: when creating by fields, findOrCreateContact checks for an
+// existing email/name match and reuses that contact instead of inserting a duplicate.
 app.post('/releases/:releaseId/promo/:promoId/contacts', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
@@ -1522,12 +1563,7 @@ app.post('/releases/:releaseId/promo/:promoId/contacts', authMiddleware, async (
       contact = existing.rows[0]
     } else {
       if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
-      const cRes = await db.query(
-        `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
-      )
-      contact = cRes.rows[0]
+      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes })
     }
     await db.query(
       `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -1747,14 +1783,9 @@ app.post('/releases/:releaseId/label/:labelId/contacts', authMiddleware, async (
       if (!existing.rows.length) return res.status(404).json({ success: false, error: 'Contact not found' })
       contact = existing.rows[0]
     } else {
-      // Create a brand-new contact
+      // Find existing or create new (de-duplicates by email then name)
       if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
-      const cRes = await db.query(
-        `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
-      )
-      contact = cRes.rows[0]
+      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes })
     }
     // Create the link (ignore if already linked — ON CONFLICT DO NOTHING)
     await db.query(
@@ -2779,12 +2810,7 @@ app.post('/collections/:collectionId/promo/:promoId/contacts', authMiddleware, a
       contact = existing.rows[0]
     } else {
       if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
-      const cRes = await db.query(
-        `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
-      )
-      contact = cRes.rows[0]
+      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes })
     }
     await db.query(
       `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -3001,12 +3027,7 @@ app.post('/collections/:collectionId/label/:labelId/contacts', authMiddleware, a
       contact = existing.rows[0]
     } else {
       if (!name) return res.status(400).json({ success: false, error: 'Name is required' })
-      const cRes = await db.query(
-        `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [req.user.id, name, email || '', role || '', phone || '', location || '', label || '', notes || '']
-      )
-      contact = cRes.rows[0]
+      contact = await findOrCreateContact(db, req.user.id, { name, email, role, phone, location, label, notes })
     }
     await db.query(
       `INSERT INTO entry_contacts (contact_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
