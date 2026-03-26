@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { fetchAllContacts, createContact, updateContact, deleteContact, DuplicateContactError } from '@/lib/contacts'
+import { fetchAllContacts, createContact, updateContact, deleteContact } from '@/lib/contacts'
 import Modal from '@/components/Modal'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -101,28 +101,29 @@ function ContactFormModal({ isOpen, onClose, onSaved, editingContact }) {
     setDuplicateContact(null)
     setDuplicateType(null)
     try {
-      let saved
       if (isEdit) {
-        saved = await updateContact(editingContact.id, form)
+        const saved = await updateContact(editingContact.id, form)
+        onSaved(saved, true)
+        onClose()
       } else {
-        saved = await createContact(form)
+        const result = await createContact(form)
+        if (result.duplicate) {
+          // Show the inline duplicate warning — stay on the form
+          setDuplicateContact(result.existing)
+          setDuplicateType(result.duplicateType)
+        } else {
+          onSaved(result.contact, false)
+          onClose()
+        }
       }
-      onSaved(saved, isEdit)
-      onClose()
     } catch (err) {
-      if (err instanceof DuplicateContactError) {
-        // Show the duplicate warning inline — don't close the modal
-        setDuplicateContact(err.existing)
-        setDuplicateType(err.duplicateType)
-      } else {
-        setError(err.message)
-      }
+      setError(err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  // User clicked "Use existing contact" — treat it as if they selected it
+  // User clicked "Use existing contact" — treat the existing one as the selection
   function handleUseExisting() {
     onSaved(duplicateContact, false)
     onClose()
@@ -132,10 +133,16 @@ function ContactFormModal({ isOpen, onClose, onSaved, editingContact }) {
   async function handleForceCreate() {
     setSaving(true)
     setDuplicateContact(null)
+    setDuplicateType(null)
     try {
-      const saved = await createContact({ ...form, force: true })
-      onSaved(saved, false)
-      onClose()
+      const result = await createContact({ ...form, force: true })
+      if (result.duplicate) {
+        // Only possible if email now conflicts — show as a plain error
+        setError('A contact with this email already exists.')
+      } else {
+        onSaved(result.contact, false)
+        onClose()
+      }
     } catch (err) {
       setError(err.message)
     } finally {
