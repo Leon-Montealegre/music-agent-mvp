@@ -21,7 +21,8 @@ try {
 
 async function sendFollowUpEmail({ to, entryName, sourceTitle, followUpDate, href }) {
   if (!resend) return
-  const dateStr = new Date(followUpDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const dateOnly = (followUpDate instanceof Date ? followUpDate.toISOString() : String(followUpDate)).slice(0, 10)
+  const dateStr = new Date(dateOnly + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   await resend.emails.send({
     from: 'Music Agent <reminders@musicagentchigui.com>',
     to,
