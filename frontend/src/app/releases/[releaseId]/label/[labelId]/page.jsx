@@ -42,6 +42,10 @@ export default function LabelEntryPage({ params }) {
   const [savingDetails, setSavingDetails] = useState(false)
   // Edit-modal follow-up helpers
   const [editFollowUpDays, setEditFollowUpDays] = useState(10)
+  const [editFollowUpEnabled, setEditFollowUpEnabled] = useState(false)
+
+  // Sidebar follow-up date editing
+  const [sidebarFollowUpInput, setSidebarFollowUpInput] = useState('')
 
   const [showContactPicker, setShowContactPicker] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
@@ -102,6 +106,11 @@ export default function LabelEntryPage({ params }) {
     if (session?.token) loadData()
   }, [releaseId, labelId, session])
 
+  // Keep sidebar date input in sync with entry
+  useEffect(() => {
+    setSidebarFollowUpInput(entry?.followUpDate || '')
+  }, [entry?.followUpDate])
+
   const handleSaveDetails = async () => {
     if (!detailsForm.label.trim()) {
       alert('Label name is required')
@@ -130,14 +139,20 @@ export default function LabelEntryPage({ params }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to save label details')
 
-      setEntry(data.entry)
+      // Normalize dates to YYYY-MM-DD to prevent "Invalid Date" in the sidebar
+      const savedEntry = {
+        ...data.entry,
+        followUpDate: data.entry.followUpDate ? data.entry.followUpDate.slice(0, 10) : null,
+        signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : null,
+      }
+      setEntry(savedEntry)
       setDetailsForm({
-        label: data.entry.label || data.entry.labelName || '',
-        platform: data.entry.platform || '',
-        status: data.entry.status || 'Submitted',
-        signedDate: data.entry.signedDate ? data.entry.signedDate.slice(0, 10) : '',
-        notes: data.entry.notes || '',
-        followUpDate: data.entry.followUpDate ? data.entry.followUpDate.slice(0, 10) : '',
+        label: savedEntry.label || savedEntry.labelName || '',
+        platform: savedEntry.platform || '',
+        status: savedEntry.status || 'Submitted',
+        signedDate: savedEntry.signedDate || '',
+        notes: savedEntry.notes || '',
+        followUpDate: savedEntry.followUpDate || '',
       })
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
@@ -166,6 +181,28 @@ export default function LabelEntryPage({ params }) {
     } catch (err) {
       console.error(err)
       alert(`Could not set follow-up: ${err.message}`)
+    } finally {
+      setSnoozing(false)
+    }
+  }
+
+  // Directly save a new follow-up date chosen from the sidebar date picker
+  const handleSidebarSaveFollowUp = async (newDate) => {
+    if (!newDate) return
+    setSnoozing(true)
+    try {
+      const res = await apiFetch(`${apiBase}/label/${labelId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followUpDate: newDate }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update follow-up date')
+      setEntry(prev => ({ ...prev, followUpDate: newDate }))
+      setDetailsForm(prev => ({ ...prev, followUpDate: newDate }))
+    } catch (err) {
+      console.error(err)
+      alert(`Could not update follow-up date: ${err.message}`)
     } finally {
       setSnoozing(false)
     }
@@ -346,6 +383,22 @@ export default function LabelEntryPage({ params }) {
                         {isOverdue ? '⚠️ Overdue · ' : ''}
                         {new Date(entry.followUpDate + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                       </p>
+                      {/* Inline date picker to change the follow-up date directly */}
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="date"
+                          value={sidebarFollowUpInput}
+                          onChange={e => setSidebarFollowUpInput(e.target.value)}
+                          className="flex-1 px-2 py-1 bg-gray-900 border border-gray-600 text-gray-100 rounded text-xs focus:ring-1 focus:ring-purple-500"
+                        />
+                        <button
+                          onClick={() => handleSidebarSaveFollowUp(sidebarFollowUpInput)}
+                          disabled={snoozing || !sidebarFollowUpInput || sidebarFollowUpInput === entry.followUpDate}
+                          className="px-2 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white text-xs rounded transition-colors whitespace-nowrap"
+                        >
+                          {snoozing ? '…' : 'Update'}
+                        </button>
+                      </div>
                       {isOverdue && (
                         <button
                           onClick={() => handleSetFollowUp(10)}
@@ -554,7 +607,10 @@ export default function LabelEntryPage({ params }) {
         <div className="mt-8 pt-4 border-t border-gray-800 flex flex-col sm:flex-row justify-end gap-3">
           <button
             type="button"
-            onClick={() => setShowEditModal(true)}
+            onClick={() => {
+              setEditFollowUpEnabled(false)
+              setShowEditModal(true)
+            }}
             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all font-medium text-sm"
           >
             ✏️ Edit Entry
@@ -720,11 +776,14 @@ export default function LabelEntryPage({ params }) {
                 <label className="flex items-center gap-1.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
-                    checked={!!detailsForm.followUpDate}
+                    checked={editFollowUpEnabled}
                     onChange={e => {
+                      setEditFollowUpEnabled(e.target.checked)
                       if (e.target.checked) {
-                        const d = daysFromNow(editFollowUpDays)
-                        setDetailsForm(prev => ({ ...prev, followUpDate: d }))
+                        // If there's already a date, keep it; otherwise set a default
+                        if (!detailsForm.followUpDate) {
+                          setDetailsForm(prev => ({ ...prev, followUpDate: daysFromNow(editFollowUpDays) }))
+                        }
                       } else {
                         setDetailsForm(prev => ({ ...prev, followUpDate: '' }))
                       }
@@ -734,7 +793,7 @@ export default function LabelEntryPage({ params }) {
                   <span className="text-xs text-gray-400">Set reminder</span>
                 </label>
               </div>
-              {detailsForm.followUpDate && (
+              {editFollowUpEnabled && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-300 whitespace-nowrap">Follow up in</span>
