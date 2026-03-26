@@ -101,8 +101,26 @@ export async function fetchContact(contactId) {
 }
 
 /**
+ * Custom error thrown when a duplicate contact is detected (HTTP 409).
+ * - `existing`      — the already-stored contact object
+ * - `duplicateType` — 'email' | 'name'
+ *   email: hard duplicate (same person), no "create anyway" offered
+ *   name:  soft duplicate (could be a different person), "create anyway" offered
+ */
+export class DuplicateContactError extends Error {
+  constructor(message, existingContact, duplicateType) {
+    super(message)
+    this.name = 'DuplicateContactError'
+    this.existing = existingContact
+    this.duplicateType = duplicateType || 'email'
+  }
+}
+
+/**
  * Create a standalone contact (not yet linked to any entry).
- * @param {{ name, email, role, phone, location, label, notes }} fields
+ * Throws DuplicateContactError if the name or email already exists.
+ * Pass `force: true` in fields to bypass the name check (not the email check).
+ * @param {{ name, email, role, phone, location, label, notes, force? }} fields
  * @returns {Promise<Object>} The created contact
  */
 export async function createContact(fields) {
@@ -112,6 +130,13 @@ export async function createContact(fields) {
     body: JSON.stringify(fields),
   })
   const data = await res.json()
+  if (res.status === 409 && data.duplicate) {
+    throw new DuplicateContactError(
+      data.error || 'Duplicate contact',
+      data.contact,
+      data.duplicateType
+    )
+  }
   if (!res.ok) throw new Error(data.error || 'Failed to create contact')
   return data.contact
 }

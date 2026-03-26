@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { fetchAllContacts, createContact, updateContact, deleteContact } from '@/lib/contacts'
+import { fetchAllContacts, createContact, updateContact, deleteContact, DuplicateContactError } from '@/lib/contacts'
 import Modal from '@/components/Modal'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -59,6 +59,10 @@ function ContactFormModal({ isOpen, onClose, onSaved, editingContact }) {
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  // When a duplicate is detected, we store the existing contact and what type
+  // of match it was ('email' = hard block, 'name' = soft, allow "create anyway").
+  const [duplicateContact, setDuplicateContact] = useState(null)
+  const [duplicateType, setDuplicateType] = useState(null)
 
   useEffect(() => {
     if (editingContact) {
@@ -75,11 +79,18 @@ function ContactFormModal({ isOpen, onClose, onSaved, editingContact }) {
       setForm(emptyForm())
     }
     setError(null)
+    setDuplicateContact(null)
+    setDuplicateType(null)
   }, [editingContact, isOpen])
 
   const field = (key) => ({
     value: form[key],
-    onChange: e => setForm(f => ({ ...f, [key]: e.target.value })),
+    onChange: e => {
+      setForm(f => ({ ...f, [key]: e.target.value }))
+      // Clear any duplicate warning when the user edits the form
+      if (duplicateContact) { setDuplicateContact(null); setDuplicateType(null) }
+      if (error) setError(null)
+    },
   })
 
   async function handleSubmit(e) {
@@ -87,6 +98,8 @@ function ContactFormModal({ isOpen, onClose, onSaved, editingContact }) {
     if (!form.name.trim()) return
     setSaving(true)
     setError(null)
+    setDuplicateContact(null)
+    setDuplicateType(null)
     try {
       let saved
       if (isEdit) {
@@ -95,6 +108,33 @@ function ContactFormModal({ isOpen, onClose, onSaved, editingContact }) {
         saved = await createContact(form)
       }
       onSaved(saved, isEdit)
+      onClose()
+    } catch (err) {
+      if (err instanceof DuplicateContactError) {
+        // Show the duplicate warning inline — don't close the modal
+        setDuplicateContact(err.existing)
+        setDuplicateType(err.duplicateType)
+      } else {
+        setError(err.message)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // User clicked "Use existing contact" — treat it as if they selected it
+  function handleUseExisting() {
+    onSaved(duplicateContact, false)
+    onClose()
+  }
+
+  // User clicked "Create anyway" (name duplicate only) — re-submit with force flag
+  async function handleForceCreate() {
+    setSaving(true)
+    setDuplicateContact(null)
+    try {
+      const saved = await createContact({ ...form, force: true })
+      onSaved(saved, false)
       onClose()
     } catch (err) {
       setError(err.message)
@@ -109,6 +149,41 @@ function ContactFormModal({ isOpen, onClose, onSaved, editingContact }) {
         {error && (
           <div className="bg-red-900/40 border border-red-500/50 rounded-lg px-4 py-2 text-sm text-red-300">
             {error}
+          </div>
+        )}
+
+        {duplicateContact && (
+          <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-lg px-4 py-3 text-sm">
+            <p className="text-yellow-300 font-medium mb-1">
+              {duplicateType === 'email'
+                ? '⚠️ This email already belongs to a contact'
+                : '⚠️ A contact with this name already exists'}
+            </p>
+            <p className="text-yellow-200/80 mb-3">
+              <span className="font-semibold">{duplicateContact.name}</span>
+              {duplicateContact.label ? ` · ${duplicateContact.label}` : ''}
+              {duplicateContact.email ? ` · ${duplicateContact.email}` : ''}
+              {duplicateContact.role ? ` · ${duplicateContact.role}` : ''}
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleUseExisting}
+                className="w-full py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-semibold rounded-lg transition-colors"
+              >
+                Use existing contact instead
+              </button>
+              {duplicateType === 'name' && (
+                <button
+                  type="button"
+                  onClick={handleForceCreate}
+                  disabled={saving}
+                  className="w-full py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 text-sm rounded-lg transition-colors"
+                >
+                  {saving ? 'Creating…' : 'Create anyway (different person)'}
+                </button>
+              )}
+            </div>
           </div>
         )}
 

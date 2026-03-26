@@ -608,11 +608,57 @@ app.get('/contacts/:contactId', authMiddleware, async (req, res) => {
 })
 
 // POST /contacts — create a standalone contact (not tied to any entry yet)
+// De-duplication: checks email first (hard match), then name (soft match).
+// Returns 409 with duplicateType: 'email' | 'name' so the frontend can offer
+// "use existing" for email matches, or "use existing / create anyway" for names.
 app.post('/contacts', authMiddleware, async (req, res) => {
   try {
     const db = require('./db')
-    const { name, email, role, phone, location, label, notes } = req.body
+    const { name, email, role, phone, location, label, notes, force } = req.body
     if (!name || !name.trim()) return res.status(400).json({ success: false, error: 'Name is required' })
+
+    // --- Duplicate check: email (hard) then name (soft) ---
+    // `force: true` in the request body skips the name check only, allowing
+    // the user to deliberately create two contacts with the same name.
+    const emailTrimmed = (email || '').trim().toLowerCase()
+    const nameTrimmed  = name.trim().toLowerCase()
+
+    if (emailTrimmed) {
+      const dup = await db.query(
+        `SELECT * FROM contacts WHERE user_id = $1 AND LOWER(TRIM(email)) = $2 LIMIT 1`,
+        [req.user.id, emailTrimmed]
+      )
+      if (dup.rows.length) {
+        const existing = dup.rows[0]
+        const sources = await fetchContactSources(db, existing.id)
+        return res.status(409).json({
+          success: false,
+          duplicate: true,
+          duplicateType: 'email',
+          error: 'A contact with this email already exists.',
+          contact: { ...fmtContact(existing), sources }
+        })
+      }
+    }
+
+    if (!force) {
+      const nameDup = await db.query(
+        `SELECT * FROM contacts WHERE user_id = $1 AND LOWER(TRIM(name)) = $2 LIMIT 1`,
+        [req.user.id, nameTrimmed]
+      )
+      if (nameDup.rows.length) {
+        const existing = nameDup.rows[0]
+        const sources = await fetchContactSources(db, existing.id)
+        return res.status(409).json({
+          success: false,
+          duplicate: true,
+          duplicateType: 'name',
+          error: 'A contact with this name already exists.',
+          contact: { ...fmtContact(existing), sources }
+        })
+      }
+    }
+
     const result = await db.query(
       `INSERT INTO contacts (id, user_id, name, email, role, phone, location, label_name, contact_notes)
        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
