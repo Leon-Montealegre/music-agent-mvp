@@ -334,8 +334,7 @@ export default function HomePage() {
   const [collDefaultArtist, setCollDefaultArtist]     = useState('')
   const [collArtwork, setCollArtwork]                 = useState(null)
   const [collArtworkPreview, setCollArtworkPreview]   = useState(null)
-  const [collLink, setCollLink]                       = useState('')
-  const [collLinkLabel, setCollLinkLabel]             = useState('')
+  const [collLinks, setCollLinks]                     = useState([''])
   const [collNotes, setCollNotes]                     = useState('')
   const [collFiles, setCollFiles]                     = useState([])
   const [collSubmitting, setCollSubmitting]           = useState(false)
@@ -408,8 +407,7 @@ export default function HomePage() {
       setCollArtist(collDefaultArtist)
       setCollArtwork(null)
       setCollArtworkPreview(null)
-      setCollLink('')
-      setCollLinkLabel('')
+      setCollLinks([''])
       setCollNotes('')
       setCollFiles([])
       setCollError('')
@@ -466,13 +464,15 @@ export default function HomePage() {
         await apiFetch(`/collections/${collId}/notes/files`, { method: 'POST', body: fd })
       }
 
-      // 5. Save link if provided
-      if (collLink.trim()) {
-        await apiFetch(`/collections/${collId}/song-links`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: collLinkLabel.trim() || collLink.trim(), url: collLink.trim() })
-        })
+      // 5. Save links if provided
+      for (const link of collLinks) {
+        if (link.trim()) {
+          await apiFetch(`/collections/${collId}/song-links`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label: link.trim(), url: link.trim() })
+          })
+        }
       }
 
       // 6. Navigate to the new collection page
@@ -888,15 +888,6 @@ export default function HomePage() {
               <Link href="/stats" className="px-4 py-2 text-sm font-medium rounded-lg flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border border-gray-600/50" style={{ height: '36px' }}>
                 📊 Stats
               </Link>
-              {/* Create EP/Album standalone button */}
-              <button
-                onClick={() => setShowCreateCollModal(true)}
-                className="px-4 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white"
-                style={{ height: '36px' }}
-              >
-                ♫ Create EP/Album
-              </button>
-
               {/* Add Track split-button */}
               <div ref={addTrackDropdownRef} style={{ position: 'relative', display: 'inline-flex', height: '36px' }}>
                 {/* Main part — navigates to /releases/new */}
@@ -1262,7 +1253,7 @@ export default function HomePage() {
               {/* Artist */}
               <div>
                 <label style={{ display: 'block', color: '#d1d5db', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
-                  Artist <span style={{ color: '#6b7280', fontWeight: 400 }}>(defaults to your artist name)</span>
+                  Artist
                 </label>
                 <input
                   type="text"
@@ -1333,38 +1324,45 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Link / URL */}
+              {/* Links */}
               <div>
                 <label style={{ display: 'block', color: '#d1d5db', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
-                  Link <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional — e.g. streaming URL, promo page)</span>
+                  Links
                 </label>
-                <input
-                  type="url"
-                  value={collLink}
-                  onChange={e => setCollLink(e.target.value)}
-                  placeholder="https://…"
-                  style={{
-                    width: '100%', padding: '9px 12px', background: '#111827',
-                    border: '1px solid #4b5563', borderRadius: '8px',
-                    color: '#f3f4f6', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
-                    marginBottom: '6px',
-                  }}
-                  onFocus={e => e.target.style.borderColor = '#7c3aed'}
-                  onBlur={e => e.target.style.borderColor = '#4b5563'}
-                />
-                <input
-                  type="text"
-                  value={collLinkLabel}
-                  onChange={e => setCollLinkLabel(e.target.value)}
-                  placeholder="Label (optional, e.g. Spotify, Promo site…)"
-                  style={{
-                    width: '100%', padding: '9px 12px', background: '#111827',
-                    border: '1px solid #4b5563', borderRadius: '8px',
-                    color: '#f3f4f6', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
-                  }}
-                  onFocus={e => e.target.style.borderColor = '#7c3aed'}
-                  onBlur={e => e.target.style.borderColor = '#4b5563'}
-                />
+                {collLinks.map((link, idx) => (
+                  <input
+                    key={idx}
+                    type="url"
+                    value={link}
+                    onChange={e => {
+                      const updated = [...collLinks]
+                      updated[idx] = e.target.value
+                      setCollLinks(updated)
+                    }}
+                    placeholder="https://…"
+                    style={{
+                      width: '100%', padding: '9px 12px', background: '#111827',
+                      border: '1px solid #4b5563', borderRadius: '8px',
+                      color: '#f3f4f6', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+                      marginBottom: '6px',
+                    }}
+                    onFocus={e => e.target.style.borderColor = '#7c3aed'}
+                    onBlur={e => e.target.style.borderColor = '#4b5563'}
+                  />
+                ))}
+                {collLinks[collLinks.length - 1]?.trim() !== '' && (
+                  <button
+                    type="button"
+                    onClick={() => setCollLinks([...collLinks, ''])}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#7c3aed', fontSize: '13px', fontWeight: 500,
+                      padding: '2px 0', display: 'flex', alignItems: 'center', gap: '4px',
+                    }}
+                  >
+                    + Add another link
+                  </button>
+                )}
               </div>
 
               {/* Notes — same style as TrackNotes component */}

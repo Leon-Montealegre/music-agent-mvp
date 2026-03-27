@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Modal from '@/components/Modal'
 import LogSubmissionForm from '@/components/LogSubmissionForm'
 import TrackNotes from '@/components/TrackNotes'
+import FileAttachments from '@/components/FileAttachments'
 import EditMetadataModal from '@/components/EditMetadataModal'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import { apiFetch, API_BASE_URL } from '@/lib/api'
@@ -96,6 +97,12 @@ export default function CollectionDetailPage({ params }) {
   // Delete collection
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isDeleting, setIsDeleting]           = useState(false)
+
+  // Add Track to collection
+  const [showAddTrackModal, setShowAddTrackModal]   = useState(false)
+  const [availableSingles, setAvailableSingles]     = useState([])
+  const [addingTrack, setAddingTrack]               = useState(false)
+
   const artworkInputRef  = useRef(null)
   const [uploadingArtwork, setUploadingArtwork] = useState(false)
 
@@ -125,6 +132,40 @@ export default function CollectionDetailPage({ params }) {
   }
 
   useEffect(() => { if (session?.token) loadCollection() }, [collectionId, session])
+
+  // Load available singles when add-track modal opens
+  useEffect(() => {
+    if (!showAddTrackModal || !session?.token) return
+    apiFetch('/releases')
+      .then(r => r.json())
+      .then(data => {
+        const singles = (data.releases || []).filter(r => !r.collectionId)
+        setAvailableSingles(singles)
+      })
+      .catch(() => {})
+  }, [showAddTrackModal, session])
+
+  async function handleAddTrackToCollection(trackReleaseId) {
+    setAddingTrack(true)
+    try {
+      const res = await apiFetch(`/collections/${collectionId}/tracks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackReleaseId })
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        alert(d.error || 'Failed to add track')
+      } else {
+        setShowAddTrackModal(false)
+        loadCollection()
+      }
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setAddingTrack(false)
+    }
+  }
 
   // Check artwork exists
   useEffect(() => {
@@ -538,7 +579,16 @@ export default function CollectionDetailPage({ params }) {
 
               {/* ── Track List ── */}
               <div className="pt-6 border-t border-gray-700">
-                <h3 className="font-semibold text-gray-100 mb-3">Tracks</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-100">Tracks</h3>
+                  <button
+                    onClick={() => setShowAddTrackModal(true)}
+                    title="Add track to collection"
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/40 text-purple-300 hover:text-purple-200 transition-colors"
+                  >
+                    + Add Track
+                  </button>
+                </div>
                 {tracks.length === 0 ? (
                   <p className="text-xs text-gray-500">No tracks yet</p>
                 ) : (
@@ -1013,6 +1063,15 @@ export default function CollectionDetailPage({ params }) {
               initialNotes={collection.notes?.text || ''}
               initialDocuments={collection.notes?.documents || []}
               onUpdate={loadCollection}
+              hideFiles={true}
+            />
+
+            <FileAttachments
+              filesUrl={`${API_BASE_URL}/collections/${collectionId}/notes/files`}
+              files={collection.notes?.documents || []}
+              onFilesChange={docs => setCollection(prev => prev ? { ...prev, notes: { ...prev.notes, documents: docs } } : prev)}
+              title="Files"
+              description="Upload any related documents (contracts, artwork files, promo material, etc.)"
             />
 
             {/* Actions */}
@@ -1275,6 +1334,100 @@ export default function CollectionDetailPage({ params }) {
         message={`This removes the collection only. The ${tracks.length} individual track${tracks.length !== 1 ? 's' : ''} will remain in your catalogue as standalone singles.`}
         itemName={collection.title}
       />
+
+      {/* Add Track to Collection Modal */}
+      {showAddTrackModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowAddTrackModal(false) }}
+        >
+          <div
+            style={{
+              background: '#1f2937', border: '1px solid #374151',
+              borderRadius: '16px', width: '100%', maxWidth: '520px',
+              maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+            }}
+          >
+            {/* Header */}
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2 style={{ color: '#f3f4f6', fontSize: '18px', fontWeight: 600, margin: 0 }}>Add Track to Collection</h2>
+              <button
+                onClick={() => setShowAddTrackModal(false)}
+                style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '22px', lineHeight: 1 }}
+              >×</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1 }}>
+              {availableSingles.length === 0 ? (
+                <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center', padding: '24px 0' }}>
+                  No standalone singles available. Create a new track first.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {availableSingles.map(release => (
+                    <button
+                      key={release.releaseId}
+                      disabled={addingTrack}
+                      onClick={() => handleAddTrackToCollection(release.releaseId)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        width: '100%', padding: '10px 12px',
+                        background: 'rgba(17,24,39,0.6)', border: '1px solid #374151',
+                        borderRadius: '10px', cursor: addingTrack ? 'not-allowed' : 'pointer',
+                        textAlign: 'left', transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={e => { if (!addingTrack) e.currentTarget.style.background = 'rgba(124,58,237,0.15)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(17,24,39,0.6)' }}
+                    >
+                      <div style={{ width: '40px', height: '40px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, background: '#111827', border: '1px solid #4b5563' }}>
+                        <img
+                          src={`${API_BASE_URL}/releases/${release.releaseId}/artwork/?t=${Date.now()}`}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={e => { e.target.style.display = 'none' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ color: '#f3f4f6', fontSize: '14px', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {release.title}
+                        </p>
+                        {release.artist && (
+                          <p style={{ color: '#9ca3af', fontSize: '12px', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {release.artist}
+                          </p>
+                        )}
+                      </div>
+                      <span style={{ color: '#7c3aed', fontSize: '12px', fontWeight: 500, flexShrink: 0 }}>Add →</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #374151' }}>
+              <Link
+                href="/releases/new"
+                style={{
+                  display: 'block', textAlign: 'center',
+                  padding: '10px', background: 'rgba(124,58,237,0.15)',
+                  border: '1px solid rgba(124,58,237,0.4)', borderRadius: '8px',
+                  color: '#a78bfa', fontSize: '14px', fontWeight: 500,
+                  textDecoration: 'none',
+                }}
+              >
+                ✚ Create New Track
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

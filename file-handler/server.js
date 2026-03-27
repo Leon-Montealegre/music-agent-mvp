@@ -2318,10 +2318,11 @@ app.get('/collections/:collectionId', authMiddleware, async (req, res) => {
     const c = result.rows[0]
     const collectionUUID = c.id
 
-    const [distResult, notesResult, songLinksResult] = await Promise.all([
+    const [distResult, notesResult, songLinksResult, notesDocsResult] = await Promise.all([
       db.query(`SELECT * FROM distribution_entries WHERE collection_id = $1`, [collectionUUID]),
       db.query(`SELECT text FROM notes WHERE collection_id = $1 AND release_id IS NULL AND entry_id IS NULL LIMIT 1`, [collectionUUID]),
-      db.query(`SELECT id, label, url FROM song_links WHERE collection_id = $1`, [collectionUUID])
+      db.query(`SELECT id, label, url FROM song_links WHERE collection_id = $1`, [collectionUUID]),
+      db.query(`SELECT filename, size_bytes AS size, created_at AS "uploadedAt" FROM files WHERE collection_id = $1 AND category = 'notes' ORDER BY created_at ASC`, [collectionUUID])
     ])
 
     const distribution = { release: [], submit: [], promote: [] }
@@ -2349,7 +2350,7 @@ app.get('/collections/:collectionId', authMiddleware, async (req, res) => {
         releaseDate: c.releaseDate,
         isSigned: c.isSigned, signedLabel: c.signedLabel, signedDate: c.signedDate,
         updatedAt: c.updatedAt, distribution,
-        notes: { text: notesResult.rows[0]?.text || '', documents: [] },
+        notes: { text: notesResult.rows[0]?.text || '', documents: notesDocsResult.rows },
         songLinks: songLinksResult.rows
       }
     })
