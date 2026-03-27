@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { fetchReleases, apiFetch, API_BASE_URL } from '@/lib/api'
 import ReleaseCard from '@/components/ReleaseCard'
 import Link from 'next/link'
@@ -321,6 +322,27 @@ export default function HomePage() {
   const [collectionsOpen, setCollectionsOpen] = useState(true)
   const [singlesOpen, setSinglesOpen] = useState(true)
 
+  // ── Add Track split-button dropdown ──
+  const [showAddTrackDropdown, setShowAddTrackDropdown] = useState(false)
+  const addTrackDropdownRef = useRef(null)
+
+  // ── Create EP/Album modal state ──
+  const [showCreateCollModal, setShowCreateCollModal] = useState(false)
+  const [collType, setCollType]                       = useState('EP')
+  const [collName, setCollName]                       = useState('')
+  const [collArtist, setCollArtist]                   = useState('')
+  const [collDefaultArtist, setCollDefaultArtist]     = useState('')
+  const [collArtwork, setCollArtwork]                 = useState(null)
+  const [collArtworkPreview, setCollArtworkPreview]   = useState(null)
+  const [collLink, setCollLink]                       = useState('')
+  const [collLinkLabel, setCollLinkLabel]             = useState('')
+  const [collNotes, setCollNotes]                     = useState('')
+  const [collFiles, setCollFiles]                     = useState([])
+  const [collSubmitting, setCollSubmitting]           = useState(false)
+  const [collError, setCollError]                     = useState('')
+
+  const router = useRouter()
+
   useEffect(() => {
     // Wait until NextAuth has finished loading the session.
     // Without this, the fetch fires before the token is set → 401 → empty page.
@@ -357,6 +379,109 @@ export default function HomePage() {
       localStorage.setItem('catalogueView', viewMode)
     }
   }, [viewMode])
+
+  // Load default artist name once authenticated (used to pre-fill the Create EP/Album form)
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    apiFetch('/settings').then(r => r.json()).then(data => {
+      if (data.settings?.defaultArtistName) setCollDefaultArtist(data.settings.defaultArtistName)
+    }).catch(() => {})
+  }, [status])
+
+  // Close the Add Track dropdown when clicking outside
+  useEffect(() => {
+    if (!showAddTrackDropdown) return
+    function handleClickOutside(e) {
+      if (addTrackDropdownRef.current && !addTrackDropdownRef.current.contains(e.target)) {
+        setShowAddTrackDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showAddTrackDropdown])
+
+  // Reset modal state whenever it opens
+  useEffect(() => {
+    if (showCreateCollModal) {
+      setCollType('EP')
+      setCollName('')
+      setCollArtist(collDefaultArtist)
+      setCollArtwork(null)
+      setCollArtworkPreview(null)
+      setCollLink('')
+      setCollLinkLabel('')
+      setCollNotes('')
+      setCollFiles([])
+      setCollError('')
+    }
+  }, [showCreateCollModal]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Create EP/Album submit handler ──
+  const handleCreateCollection = async (e) => {
+    e.preventDefault()
+    setCollError('')
+    if (!collName.trim()) { setCollError('EP/Album name is required'); return }
+    const artistVal = collArtist.trim() || collDefaultArtist.trim()
+    if (!artistVal) { setCollError('Artist name is required'); return }
+    setCollSubmitting(true)
+    try {
+      // 1. Create collection
+      const createRes = await apiFetch('/collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: collName.trim(),
+          artist: artistVal,
+          collectionType: collType,
+          releaseDate: new Date().toISOString().split('T')[0],
+        })
+      })
+      if (!createRes.ok) {
+        const errData = await createRes.json()
+        throw new Error(errData.error || 'Failed to create collection')
+      }
+      const { collection } = await createRes.json()
+      const collId = collection.releaseId
+
+      // 2. Upload artwork if selected
+      if (collArtwork) {
+        const fd = new FormData()
+        fd.append('artwork', collArtwork)
+        await apiFetch(`/collections/${collId}/artwork`, { method: 'POST', body: fd })
+      }
+
+      // 3. Save notes if any
+      if (collNotes.trim()) {
+        await apiFetch(`/collections/${collId}/notes`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: collNotes.trim() })
+        })
+      }
+
+      // 4. Upload files if any
+      for (const file of collFiles) {
+        const fd = new FormData()
+        fd.append('file', file)
+        await apiFetch(`/collections/${collId}/notes/files`, { method: 'POST', body: fd })
+      }
+
+      // 5. Save link if provided
+      if (collLink.trim()) {
+        await apiFetch(`/collections/${collId}/song-links`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label: collLinkLabel.trim() || collLink.trim(), url: collLink.trim() })
+        })
+      }
+
+      // 6. Navigate to the new collection page
+      router.push(`/collections/${collId}`)
+    } catch (err) {
+      setCollError(err.message)
+      setCollSubmitting(false)
+    }
+  }
 
   // --- Counts ---
   const countSingles = releases.filter(r => !r.collectionId).length
@@ -763,9 +888,63 @@ export default function HomePage() {
               <Link href="/stats" className="px-4 py-2 text-sm font-medium rounded-lg flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border border-gray-600/50" style={{ height: '36px' }}>
                 📊 Stats
               </Link>
-              <Link href="/releases/new" className="px-4 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white" style={{ height: '36px' }}>
-                ✚ Add Track
-              </Link>
+              {/* Create EP/Album standalone button */}
+              <button
+                onClick={() => setShowCreateCollModal(true)}
+                className="px-4 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white"
+                style={{ height: '36px' }}
+              >
+                ♫ Create EP/Album
+              </button>
+
+              {/* Add Track split-button */}
+              <div ref={addTrackDropdownRef} style={{ position: 'relative', display: 'inline-flex', height: '36px' }}>
+                {/* Main part — navigates to /releases/new */}
+                <Link
+                  href="/releases/new"
+                  className="flex items-center justify-center gap-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
+                  style={{ padding: '0 14px', borderRadius: '8px 0 0 8px', height: '36px', textDecoration: 'none' }}
+                >
+                  ✚ Add Track
+                </Link>
+                {/* Chevron — opens dropdown */}
+                <button
+                  onClick={() => setShowAddTrackDropdown(prev => !prev)}
+                  className="flex items-center justify-center bg-purple-700 hover:bg-purple-800 text-white"
+                  style={{ width: '28px', height: '36px', borderRadius: '0 8px 8px 0', borderLeft: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(255,255,255,0.25)' }}
+                  title="More options"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                    <path d="M6 8L1 3h10z"/>
+                  </svg>
+                </button>
+                {/* Dropdown menu */}
+                {showAddTrackDropdown && (
+                  <div
+                    style={{
+                      position: 'absolute', top: '40px', right: 0,
+                      background: '#1f2937', border: '1px solid #374151',
+                      borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                      zIndex: 50, minWidth: '190px', overflow: 'hidden',
+                    }}
+                  >
+                    <button
+                      onClick={() => { setShowAddTrackDropdown(false); setShowCreateCollModal(true) }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        width: '100%', padding: '10px 14px',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#e5e7eb', fontSize: '13px', fontWeight: 500,
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.18)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      <span style={{ fontSize: '16px' }}>♫</span> Create new EP/Album
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -998,6 +1177,309 @@ export default function HomePage() {
           )
         )}
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          CREATE EP / ALBUM MODAL
+      ══════════════════════════════════════════════════════════════════ */}
+      {showCreateCollModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowCreateCollModal(false) }}
+        >
+          <div
+            style={{
+              background: '#1f2937', border: '1px solid #374151',
+              borderRadius: '16px', width: '100%', maxWidth: '540px',
+              maxHeight: '90vh', overflowY: 'auto',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+            }}
+          >
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2 style={{ color: '#f9fafb', fontSize: '20px', fontWeight: 700, margin: 0 }}>Create New EP / Album</h2>
+              <button
+                onClick={() => setShowCreateCollModal(false)}
+                style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '22px', lineHeight: 1, padding: '2px 6px' }}
+              >×</button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCreateCollection} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+              {/* Type selector */}
+              <div>
+                <label style={{ display: 'block', color: '#d1d5db', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>Type</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['EP', 'Album'].map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setCollType(type)}
+                      style={{
+                        flex: 1, padding: '9px 0', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
+                        cursor: 'pointer', transition: 'all 0.15s', border: '1px solid',
+                        background: collType === type
+                          ? (type === 'EP' ? '#4f46e5' : '#7c3aed')
+                          : '#374151',
+                        borderColor: collType === type
+                          ? (type === 'EP' ? '#6366f1' : '#9333ea')
+                          : '#4b5563',
+                        color: collType === type ? '#fff' : '#9ca3af',
+                      }}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Name */}
+              <div>
+                <label style={{ display: 'block', color: '#d1d5db', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
+                  {collType} Name <span style={{ color: '#f87171' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={collName}
+                  onChange={e => setCollName(e.target.value)}
+                  placeholder={`Enter ${collType} name…`}
+                  required
+                  style={{
+                    width: '100%', padding: '9px 12px', background: '#111827',
+                    border: '1px solid #4b5563', borderRadius: '8px',
+                    color: '#f3f4f6', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#7c3aed'}
+                  onBlur={e => e.target.style.borderColor = '#4b5563'}
+                />
+              </div>
+
+              {/* Artist */}
+              <div>
+                <label style={{ display: 'block', color: '#d1d5db', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
+                  Artist <span style={{ color: '#6b7280', fontWeight: 400 }}>(defaults to your artist name)</span>
+                </label>
+                <input
+                  type="text"
+                  value={collArtist}
+                  onChange={e => setCollArtist(e.target.value)}
+                  placeholder={collDefaultArtist || 'Artist name…'}
+                  style={{
+                    width: '100%', padding: '9px 12px', background: '#111827',
+                    border: '1px solid #4b5563', borderRadius: '8px',
+                    color: '#f3f4f6', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#7c3aed'}
+                  onBlur={e => e.target.style.borderColor = '#4b5563'}
+                />
+              </div>
+
+              {/* Artwork */}
+              <div>
+                <label style={{ display: 'block', color: '#d1d5db', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
+                  Artwork <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {collArtworkPreview ? (
+                    <img
+                      src={collArtworkPreview}
+                      alt="preview"
+                      style={{ width: '64px', height: '64px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #4b5563', flexShrink: 0 }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '64px', height: '64px', borderRadius: '8px',
+                      background: '#111827', border: '1px solid #4b5563',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#6b7280', fontSize: '11px', flexShrink: 0,
+                    }}>No img</div>
+                  )}
+                  <label style={{ flex: 1, cursor: 'pointer' }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const file = e.target.files[0]
+                        if (!file) return
+                        setCollArtwork(file)
+                        setCollArtworkPreview(URL.createObjectURL(file))
+                      }}
+                    />
+                    <div style={{
+                      padding: '9px 12px', background: '#374151', borderRadius: '8px',
+                      border: '1px solid #4b5563', color: '#d1d5db', fontSize: '13px',
+                      textAlign: 'center', cursor: 'pointer', transition: 'background 0.15s',
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#4b5563'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#374151'}
+                    >
+                      {collArtworkPreview ? 'Change Image' : '+ Choose Image'}
+                    </div>
+                  </label>
+                  {collArtworkPreview && (
+                    <button
+                      type="button"
+                      onClick={() => { setCollArtwork(null); setCollArtworkPreview(null) }}
+                      style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '20px' }}
+                      title="Remove artwork"
+                    >×</button>
+                  )}
+                </div>
+              </div>
+
+              {/* Link / URL */}
+              <div>
+                <label style={{ display: 'block', color: '#d1d5db', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
+                  Link <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional — e.g. streaming URL, promo page)</span>
+                </label>
+                <input
+                  type="url"
+                  value={collLink}
+                  onChange={e => setCollLink(e.target.value)}
+                  placeholder="https://…"
+                  style={{
+                    width: '100%', padding: '9px 12px', background: '#111827',
+                    border: '1px solid #4b5563', borderRadius: '8px',
+                    color: '#f3f4f6', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+                    marginBottom: '6px',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#7c3aed'}
+                  onBlur={e => e.target.style.borderColor = '#4b5563'}
+                />
+                <input
+                  type="text"
+                  value={collLinkLabel}
+                  onChange={e => setCollLinkLabel(e.target.value)}
+                  placeholder="Label (optional, e.g. Spotify, Promo site…)"
+                  style={{
+                    width: '100%', padding: '9px 12px', background: '#111827',
+                    border: '1px solid #4b5563', borderRadius: '8px',
+                    color: '#f3f4f6', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#7c3aed'}
+                  onBlur={e => e.target.style.borderColor = '#4b5563'}
+                />
+              </div>
+
+              {/* Notes — same style as TrackNotes component */}
+              <div style={{ background: 'rgba(17,24,39,0.6)', border: '1px solid #374151', borderRadius: '10px', padding: '16px' }}>
+                <div style={{ marginBottom: '8px' }}>
+                  <span style={{ color: '#f3f4f6', fontSize: '15px', fontWeight: 600 }}>Notes</span>
+                  <p style={{ color: '#9ca3af', fontSize: '12px', margin: '2px 0 0' }}>Add any personal notes about this release</p>
+                </div>
+                <textarea
+                  value={collNotes}
+                  onChange={e => setCollNotes(e.target.value)}
+                  placeholder="Add any notes about the EP/Album, e.g. collaborators, concept, timeline…"
+                  rows={4}
+                  style={{
+                    width: '100%', padding: '10px 12px', background: 'rgba(17,24,39,0.5)',
+                    border: '1px solid #4b5563', borderRadius: '8px',
+                    color: '#e5e7eb', fontSize: '13px', outline: 'none',
+                    resize: 'vertical', boxSizing: 'border-box',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#7c3aed'}
+                  onBlur={e => e.target.style.borderColor = '#4b5563'}
+                />
+                <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '4px' }}>{collNotes.length} characters</div>
+              </div>
+
+              {/* File upload — same style as TrackNotes files section */}
+              <div style={{ background: 'rgba(17,24,39,0.6)', border: '1px solid #374151', borderRadius: '10px', padding: '16px' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <span style={{ color: '#f3f4f6', fontSize: '15px', fontWeight: 600 }}>Files</span>
+                  <p style={{ color: '#9ca3af', fontSize: '12px', margin: '2px 0 0' }}>Upload any related documents (contracts, stems info, etc.)</p>
+                </div>
+                {collFiles.length > 0 && (
+                  <div style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {collFiles.map((file, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 12px', background: 'rgba(17,24,39,0.5)', borderRadius: '8px',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                          <span style={{ fontSize: '20px' }}>📄</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ color: '#e5e7eb', fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
+                            <div style={{ color: '#6b7280', fontSize: '11px' }}>{(file.size / 1024).toFixed(1)} KB</div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCollFiles(prev => prev.filter((_, idx) => idx !== i))}
+                          style={{ background: 'rgba(220,38,38,0.15)', border: 'none', color: '#f87171', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', marginLeft: '8px', flexShrink: 0 }}
+                          title="Remove"
+                        >🗑️</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label style={{ display: 'block', cursor: 'pointer' }}>
+                  <input
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const file = e.target.files[0]
+                      if (file) setCollFiles(prev => [...prev, file])
+                      e.target.value = ''
+                    }}
+                  />
+                  <div style={{
+                    width: '100%', padding: '10px', background: '#374151',
+                    border: '2px dashed #4b5563', borderRadius: '8px',
+                    color: '#d1d5db', fontSize: '13px', fontWeight: 500,
+                    textAlign: 'center', cursor: 'pointer', transition: 'background 0.15s', boxSizing: 'border-box',
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#4b5563'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#374151'}
+                  >+ Upload File</div>
+                </label>
+              </div>
+
+              {/* Error */}
+              {collError && (
+                <div style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.4)', color: '#fca5a5', padding: '10px 14px', borderRadius: '8px', fontSize: '13px' }}>
+                  {collError}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '10px', paddingTop: '4px' }}>
+                <button
+                  type="submit"
+                  disabled={collSubmitting}
+                  style={{
+                    flex: 1, padding: '11px', background: collType === 'EP' ? '#4f46e5' : '#7c3aed',
+                    border: 'none', borderRadius: '8px', color: '#fff', fontSize: '14px',
+                    fontWeight: 600, cursor: collSubmitting ? 'not-allowed' : 'pointer',
+                    opacity: collSubmitting ? 0.6 : 1, transition: 'opacity 0.15s',
+                  }}
+                >
+                  {collSubmitting ? `Creating ${collType}…` : `Create ${collType}`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateCollModal(false)}
+                  disabled={collSubmitting}
+                  style={{
+                    padding: '11px 20px', background: '#374151', border: '1px solid #4b5563',
+                    borderRadius: '8px', color: '#d1d5db', fontSize: '14px', fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >Cancel</button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

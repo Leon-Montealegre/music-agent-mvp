@@ -2081,11 +2081,36 @@ app.patch('/releases/:releaseId/notes', authMiddleware, async (req, res) => {
 
 app.post('/releases/:releaseId/notes/files', authMiddleware, releaseNotesUpload.single('file'), async (req, res) => {
   try {
+    const db = require('./db')
     const { releaseId } = req.params
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+
+    // Verify ownership and get UUID
+    const relRes = await db.query(
+      `SELECT id FROM releases WHERE slug = $1 AND user_id = $2`,
+      [releaseId, req.user.id]
+    )
+    if (!relRes.rows.length) return res.status(404).json({ error: 'Release not found' })
+    const releaseUUID = relRes.rows[0].id
+
     const key = `releases/${releaseId}/notes/${req.file.originalname}`
     await r2.uploadFile(key, req.file.buffer, req.file.mimetype)
-    res.json({ success: true, filename: req.file.originalname, size: req.file.size })
+
+    // Track in the files table so it appears on the /files page
+    await db.query(
+      `INSERT INTO files (id, user_id, release_id, category, filename, r2_key, size_bytes)
+       VALUES (gen_random_uuid(), $1, $2, 'notes', $3, $4, $5)
+       ON CONFLICT DO NOTHING`,
+      [req.user.id, releaseUUID, req.file.originalname, key, req.file.size]
+    )
+
+    // Return documents list for TrackNotes component
+    const docs = await db.query(
+      `SELECT filename, size_bytes AS size, created_at AS "uploadedAt"
+       FROM files WHERE release_id = $1 AND category = 'notes' ORDER BY created_at ASC`,
+      [releaseUUID]
+    )
+    res.json({ success: true, documents: docs.rows })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -2106,9 +2131,31 @@ app.get('/releases/:releaseId/notes/files/:filename', async (req, res) => {
 
 app.delete('/releases/:releaseId/notes/files/:filename', authMiddleware, async (req, res) => {
   try {
+    const db = require('./db')
     const { releaseId, filename } = req.params
+
+    // Verify ownership
+    const relRes = await db.query(
+      `SELECT id FROM releases WHERE slug = $1 AND user_id = $2`,
+      [releaseId, req.user.id]
+    )
+    if (!relRes.rows.length) return res.status(404).json({ error: 'Release not found' })
+    const releaseUUID = relRes.rows[0].id
+
     await r2.deleteFile(`releases/${releaseId}/notes/${filename}`)
-    res.json({ success: true, message: `${filename} deleted` })
+
+    // Remove from DB tracking
+    await db.query(
+      `DELETE FROM files WHERE release_id = $1 AND filename = $2 AND category = 'notes'`,
+      [releaseUUID, filename]
+    )
+
+    const docs = await db.query(
+      `SELECT filename, size_bytes AS size, created_at AS "uploadedAt"
+       FROM files WHERE release_id = $1 AND category = 'notes' ORDER BY created_at ASC`,
+      [releaseUUID]
+    )
+    res.json({ success: true, message: `${filename} deleted`, documents: docs.rows })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -2707,11 +2754,36 @@ app.patch('/collections/:collectionId/notes', authMiddleware, async (req, res) =
 
 app.post('/collections/:collectionId/notes/files', authMiddleware, collectionNotesUpload.single('file'), async (req, res) => {
   try {
+    const db = require('./db')
     const { collectionId } = req.params
     if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' })
+
+    // Verify ownership and get UUID
+    const colRes = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (!colRes.rows.length) return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colRes.rows[0].id
+
     const key = `collections/${collectionId}/notes/${req.file.originalname}`
     await r2.uploadFile(key, req.file.buffer, req.file.mimetype)
-    res.json({ success: true, filename: req.file.originalname, size: req.file.size })
+
+    // Track in the files table so it appears on the /files page
+    await db.query(
+      `INSERT INTO files (id, user_id, collection_id, category, filename, r2_key, size_bytes)
+       VALUES (gen_random_uuid(), $1, $2, 'notes', $3, $4, $5)
+       ON CONFLICT DO NOTHING`,
+      [req.user.id, collectionUUID, req.file.originalname, key, req.file.size]
+    )
+
+    // Return documents list for TrackNotes component
+    const docs = await db.query(
+      `SELECT filename, size_bytes AS size, created_at AS "uploadedAt"
+       FROM files WHERE collection_id = $1 AND category = 'notes' ORDER BY created_at ASC`,
+      [collectionUUID]
+    )
+    res.json({ success: true, documents: docs.rows })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
   }
@@ -2731,9 +2803,31 @@ app.get('/collections/:collectionId/notes/files/:filename', authMiddleware, asyn
 
 app.delete('/collections/:collectionId/notes/files/:filename', authMiddleware, async (req, res) => {
   try {
+    const db = require('./db')
     const { collectionId, filename } = req.params
+
+    // Verify ownership and get UUID
+    const colRes = await db.query(
+      `SELECT id FROM collections WHERE slug = $1 AND user_id = $2`,
+      [collectionId, req.user.id]
+    )
+    if (!colRes.rows.length) return res.status(404).json({ success: false, error: 'Collection not found' })
+    const collectionUUID = colRes.rows[0].id
+
     await r2.deleteFile(`collections/${collectionId}/notes/${filename}`)
-    res.json({ success: true, message: `${filename} deleted` })
+
+    // Remove from DB tracking
+    await db.query(
+      `DELETE FROM files WHERE collection_id = $1 AND filename = $2 AND category = 'notes'`,
+      [collectionUUID, filename]
+    )
+
+    const docs = await db.query(
+      `SELECT filename, size_bytes AS size, created_at AS "uploadedAt"
+       FROM files WHERE collection_id = $1 AND category = 'notes' ORDER BY created_at ASC`,
+      [collectionUUID]
+    )
+    res.json({ success: true, message: `${filename} deleted`, documents: docs.rows })
   } catch (err) {
     res.status(500).json({ success: false, error: err.message })
   }
