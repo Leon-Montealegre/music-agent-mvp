@@ -4,12 +4,10 @@
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { API_BASE_URL } from '@/lib/api'
 
 export default function RegisterPage() {
-  const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -60,7 +58,8 @@ export default function RegisterPage() {
         return
       }
 
-      router.push('/')
+      // Hard redirect so Edge middleware sees the fresh session cookie immediately
+      window.location.href = '/'
     } catch (err) {
       setError('Registration failed. Please try again.')
       setLoading(false)
@@ -76,7 +75,7 @@ export default function RegisterPage() {
           <img
             src="/logo.png"
             alt="Music Agent"
-            className="h-20 w-auto mx-auto mb-4 opacity-90"
+            className="h-32 w-auto mx-auto mb-4 opacity-90"
           />
           <h1 className="text-2xl font-bold text-gray-100">Create an account</h1>
           <p className="text-gray-500 text-sm mt-1">Your private music catalogue</p>

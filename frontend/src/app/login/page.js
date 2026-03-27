@@ -48,7 +48,7 @@ export default function LoginPage() {
           <img
             src="/logo.png"
             alt="Music Agent"
-            className="h-20 w-auto mx-auto mb-4 opacity-90"
+            className="h-32 w-auto mx-auto mb-4 opacity-90"
           />
           <h1 className="text-2xl font-bold text-gray-100">Sign in to Music Agent</h1>
           <p className="text-gray-500 text-sm mt-1">Your private music catalogue</p>
