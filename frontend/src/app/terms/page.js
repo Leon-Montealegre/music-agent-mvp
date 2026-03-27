@@ -31,7 +31,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-gray-100 mb-3">4. Acceptable use</h2>
-            <p>You agree not to use Music Agent to store or distribute illegal content, infringe on the rights of others, or attempt to gain unauthorised access to the system or other users' data.</p>
+            <p>You agree not to use Music Agent to store or distribute illegal content, infringe on the rights of others, or attempt to gain unauthorised access to the system or other users&apos; data.</p>
           </section>
 
           <section>

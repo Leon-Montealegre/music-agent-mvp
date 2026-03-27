@@ -19,6 +19,7 @@ const BADGE_STYLES = {
 
 function TrackThumb({ releaseId }) {
   const [error, setError] = useState(false)
+  const [ts] = useState(() => Date.now())
   if (error) return (
     <div className="w-10 h-10 rounded bg-gray-700 border border-gray-600 flex items-center justify-center flex-shrink-0">
       <svg width="24" height="24" viewBox="0 0 120 120" className="opacity-30">
@@ -30,7 +31,7 @@ function TrackThumb({ releaseId }) {
   )
   return (
     <img
-      src={`${API_BASE_URL}/releases/${releaseId}/artwork/?t=${Date.now()}`}
+      src={`${API_BASE_URL}/releases/${releaseId}/artwork/?t=${ts}`}
       alt=""
       className="w-10 h-10 rounded object-cover border border-gray-600 flex-shrink-0"
       onError={() => setError(true)}

@@ -143,7 +143,7 @@ export default function ContactPicker({ contacts = [], onSelect, onCancel, label
           </p>
         ) : filtered.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-2">
-            No contacts match "{query}"
+            No contacts match &quot;{query}&quot;
           </p>
         ) : (
           <ul className="divide-y divide-gray-700/60 rounded-lg border border-gray-700 overflow-hidden max-h-52 overflow-y-auto">
