@@ -20,3 +20,4 @@ out/
 # Real test files
 file-handler/real test files/
 Music Agent/
+.DS_Store
