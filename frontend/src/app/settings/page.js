@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useSession, signIn } from 'next-auth/react'
+import { useSession, signIn, signOut } from 'next-auth/react'
 import { apiFetch } from '@/lib/api'
 
 // ─── Small helper: a labelled input ──────────────────────────────────────────
@@ -76,6 +76,12 @@ export default function SettingsPage() {
   const [defaultArtist,  setDefaultArtist]  = useState('')
   const [artistSaving,   setArtistSaving]   = useState(false)
   const [artistStatus,   setArtistStatus]   = useState(null)
+
+  // ── Delete account section ────────────────────────────────────────────────
+  const [showDeleteModal,   setShowDeleteModal]   = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting,          setDeleting]          = useState(false)
+  const [deleteError,       setDeleteError]       = useState('')
 
   // Seed from session & load settings on mount
   useEffect(() => {
@@ -192,8 +198,28 @@ export default function SettingsPage() {
     }
   }
 
+  // ── Delete account ───────────────────────────────────────────────────────
+  async function handleDeleteAccount() {
+    if (deleteConfirmText !== 'DELETE MY ACCOUNT') return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const res = await apiFetch('/auth/me', { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to delete account')
+      }
+      // Sign out and redirect to home — account is gone
+      await signOut({ callbackUrl: '/' })
+    } catch (err) {
+      setDeleteError(err.message)
+      setDeleting(false)
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black py-8 px-4">
       <div className="max-w-lg mx-auto">
 
@@ -290,7 +316,86 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        {/* ── Danger Zone ───────────────────────────────────────────────── */}
+        <div className="bg-red-950/40 border border-red-800/60 rounded-lg shadow-2xl p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-red-400 text-lg">⚠️</span>
+            <h2 className="text-lg font-semibold text-red-400">Danger Zone</h2>
+          </div>
+          <p className="text-sm text-gray-400 mb-2">
+            <strong className="text-red-300">This action is permanent and cannot be undone.</strong>
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            Deleting your account will permanently remove <strong className="text-gray-400">everything</strong> — your profile, all releases, collections, uploaded files, artwork, notes, and distribution records. There is no recovery option.
+          </p>
+          <button
+            onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError('') }}
+            className="px-4 py-2 bg-red-700/60 hover:bg-red-600 border border-red-600/60 text-red-200 rounded-lg text-sm font-medium transition-colors"
+          >
+            Delete my account and all data
+          </button>
+        </div>
+
       </div>
     </div>
+
+    {/* ── Delete Account Confirmation Modal ─────────────────────────────── */}
+    {showDeleteModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+        <div className="bg-gray-900 border border-red-800/60 rounded-xl shadow-2xl p-8 w-full max-w-md">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">⚠️</span>
+            <h2 className="text-xl font-bold text-red-400">Delete your account?</h2>
+          </div>
+
+          <div className="bg-red-950/50 border border-red-800/40 rounded-lg p-4 mb-6 space-y-2">
+            <p className="text-sm text-red-200 font-medium">This will permanently delete:</p>
+            <ul className="text-sm text-gray-400 space-y-1 list-disc list-inside">
+              <li>Your account and login credentials</li>
+              <li>All releases and collections</li>
+              <li>All uploaded audio, video, and artwork files</li>
+              <li>All notes, documents, and distribution records</li>
+            </ul>
+            <p className="text-sm text-red-300 font-medium pt-1">
+              This cannot be reversed. There is no backup.
+            </p>
+          </div>
+
+          <p className="text-sm text-gray-400 mb-2">
+            To confirm, type <strong className="text-white font-mono">DELETE MY ACCOUNT</strong> below:
+          </p>
+          <input
+            type="text"
+            value={deleteConfirmText}
+            onChange={e => setDeleteConfirmText(e.target.value)}
+            placeholder="DELETE MY ACCOUNT"
+            className="w-full px-3 py-2 mb-4 border border-gray-600 bg-gray-800 text-gray-100 placeholder-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 font-mono text-sm"
+            autoComplete="off"
+          />
+
+          {deleteError && (
+            <p className="text-red-400 text-sm mb-4">{deleteError}</p>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              disabled={deleting}
+              className="flex-1 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmText !== 'DELETE MY ACCOUNT' || deleting}
+              className="flex-1 py-2.5 bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              {deleting ? 'Deleting…' : 'Delete everything'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

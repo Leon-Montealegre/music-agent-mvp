@@ -68,6 +68,12 @@ async function handleDownload(downloadUrl, filename) {
   }
 }
 
+const SORT_OPTIONS = [
+  { field: 'name', label: 'Name' },
+  { field: 'size', label: 'Size' },
+  { field: 'date', label: 'Date' },
+]
+
 export default function FilesPage() {
   const { data: session } = useSession()
   const [files, setFiles] = useState([])
@@ -75,6 +81,8 @@ export default function FilesPage() {
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [sortField, setSortField] = useState('date')
+  const [sortDir, setSortDir] = useState('desc')
 
   useEffect(() => {
     if (!session?.token) return
@@ -95,6 +103,15 @@ export default function FilesPage() {
     load()
   }, [session])
 
+  function handleSortClick(field) {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDir('asc')
+    }
+  }
+
   const filteredFiles = useMemo(() => {
     let list = files
     const q = searchQuery.trim().toLowerCase()
@@ -104,8 +121,20 @@ export default function FilesPage() {
     if (categoryFilter !== 'all') {
       list = list.filter(f => f.category === categoryFilter)
     }
+    list = [...list].sort((a, b) => {
+      let cmp = 0
+      if (sortField === 'name') {
+        cmp = (a.filename || '').toLowerCase().localeCompare((b.filename || '').toLowerCase())
+      } else if (sortField === 'size') {
+        cmp = (a.size || 0) - (b.size || 0)
+      } else {
+        // date
+        cmp = new Date(a.uploadedAt || 0) - new Date(b.uploadedAt || 0)
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
     return list
-  }, [files, searchQuery, categoryFilter])
+  }, [files, searchQuery, categoryFilter, sortField, sortDir])
 
   const totalCount = files.length
 
@@ -166,6 +195,27 @@ export default function FilesPage() {
                   {label}
                 </button>
               ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-gray-500 text-sm font-medium">Sort:</span>
+              {SORT_OPTIONS.map(({ field, label }) => {
+                const active = sortField === field
+                const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+                return (
+                  <button
+                    key={field}
+                    onClick={() => handleSortClick(field)}
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-sm ${
+                      active
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {label}{arrow}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>

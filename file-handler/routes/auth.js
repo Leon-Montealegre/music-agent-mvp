@@ -365,4 +365,21 @@ router.post('/reset-password', async (req, res) => {
 });
 
 
+// DELETE /auth/me
+// Permanently deletes the authenticated user and all their data.
+// All related records are removed via ON DELETE CASCADE in the DB schema.
+router.delete('/me', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId])
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+    res.json({ success: true, message: 'Account and all associated data have been deleted.' })
+  } catch (err) {
+    console.error('DELETE /auth/me error:', err)
+    res.status(500).json({ error: 'Failed to delete account' })
+  }
+})
+
 module.exports = router;

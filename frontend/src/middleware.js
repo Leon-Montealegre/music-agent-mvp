@@ -1,32 +1,33 @@
 // middleware.js — Route protection
 //
-// This file runs before EVERY page load (on the server edge).
-// If the user isn't signed in, it redirects them to /login.
+// Runs on the Next.js Edge Runtime before every protected page load.
+// Uses getToken() directly (rather than withAuth) so we can pass the secret
+// explicitly — this avoids intermittent failures on Vercel's edge network
+// where NEXTAUTH_SECRET is sometimes not picked up automatically by withAuth.
 //
-// How it works:
-//   NextAuth's withAuth() wraps your middleware function.
-//   If no valid session cookie → redirect to the signIn page (/login).
-//   If a valid cookie exists → let the request through.
-//
-// The "matcher" config below excludes routes that should be public:
-//   - /login         → the login page itself (obviously public)
-//   - /api/auth/*    → NextAuth's own API routes (signin/signout/session)
-//   - /_next/*       → Next.js internal assets (JS, CSS, etc.)
-//   - /favicon.ico   → browser icon
-//   - /logo.png      → your logo (shown on the login page before signing in)
-//
-// NOTE: Next.js 16 requires middleware to export an explicit function.
-//       The old `export { default } from 'next-auth/middleware'` no longer works.
+// Public routes excluded by the matcher below:
+//   /login, /register, /forgot-password, /reset-password, /terms, /privacy
+//   /api/auth/*  — NextAuth's own API routes
+//   /_next/*     — Next.js internal assets
+//   /favicon.ico, /logo.png
 
-import { withAuth } from 'next-auth/middleware'
+import { NextResponse } from 'next/server'
+import { getToken } from 'next-auth/jwt'
 
-// withAuth() returns a middleware function that checks for a valid NextAuth session.
-// If the user is NOT signed in, they get redirected to the signIn page (set in auth.js).
-export default withAuth({
-  pages: {
-    signIn: '/login',
-  },
-})
+export async function middleware(req) {
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  })
+
+  if (!token) {
+    const loginUrl = new URL('/login', req.url)
+    loginUrl.searchParams.set('callbackUrl', req.nextUrl.pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [
