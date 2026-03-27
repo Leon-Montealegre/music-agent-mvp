@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { fetchReleases, apiFetch, API_BASE_URL } from '@/lib/api'
 import ReleaseCard from '@/components/ReleaseCard'
+import Image from 'next/image'
 import Link from 'next/link'
 
 const COLLECTION_BADGE_STYLES = {
@@ -160,7 +161,7 @@ function LandingPage() {
           className="mb-8"
           style={{ filter: 'drop-shadow(0 0 48px rgba(139, 92, 246, 0.5)) drop-shadow(0 0 96px rgba(99, 102, 241, 0.25))' }}
         >
-          <img src="/logo.png" alt="Music Agent" style={{ height: '140px', width: 'auto' }} />
+          <Image src="/logo.png" alt="Music Agent" width={280} height={140} priority style={{ height: '140px', width: 'auto' }} />
         </div>
 
         {/* Main headline */}
@@ -670,6 +671,8 @@ export default function HomePage() {
             <img
               src={`${API_BASE_URL}/collections/${item.releaseId}/artwork`}
               alt={item.title}
+              loading="lazy"
+              decoding="async"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
             />
@@ -770,6 +773,8 @@ export default function HomePage() {
             <img
               src={artworkSrc}
               alt=""
+              loading="lazy"
+              decoding="async"
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
               onError={e => {
                 e.target.style.display = 'none'

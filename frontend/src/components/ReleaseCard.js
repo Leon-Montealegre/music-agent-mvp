@@ -23,6 +23,8 @@ export default function ReleaseCard({ release, collectionsMap }) {
           <img
             src={`${API_BASE_URL}/releases/${release.releaseId}/artwork`}
             alt={release.title}
+            loading="lazy"
+            decoding="async"
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             onError={e => {
               e.target.style.display = 'none'

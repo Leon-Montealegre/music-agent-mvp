@@ -52,25 +52,19 @@ export async function fetchReleases() {
     }
     
     const data = await response.json();
-    console.log('Raw API Response:', data);
-    console.log('Type:', typeof data);
-    console.log('Is Array?', Array.isArray(data));
-    
+
     // Handle different response formats
     if (Array.isArray(data)) {
       return data;
     } else if (data && Array.isArray(data.releases)) {
-      console.log('Found releases array in object wrapper');
       return data.releases;
     } else if (data && typeof data === 'object') {
       const firstKey = Object.keys(data)[0];
       if (Array.isArray(data[firstKey])) {
-        console.log(`Found array at key: ${firstKey}`);
         return data[firstKey];
       }
     }
-    
-    console.error('Could not find array in response:', data);
+
     return [];
   } catch (error) {
     console.error('Error fetching releases:', error);

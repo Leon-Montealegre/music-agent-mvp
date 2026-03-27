@@ -6,6 +6,7 @@
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import Image from 'next/image'
 import MobileMenu from './MobileMenu'
 
 export default function ConditionalHeader() {
@@ -20,9 +21,12 @@ export default function ConditionalHeader() {
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link href="/">
-            <img
+            <Image
               src="/logo.png"
               alt="Music Agent Logo"
+              width={160}
+              height={80}
+              priority
               className="h-20 w-auto cursor-pointer hover:opacity-80 transition-opacity"
             />
           </Link>

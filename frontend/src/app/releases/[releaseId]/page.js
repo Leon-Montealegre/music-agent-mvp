@@ -20,8 +20,10 @@ function CollectionThumb({ collectionId }) {
   if (error) return null
   return (
     <img
-      src={`${API_BASE_URL}/collections/${collectionId}/artwork?t=${Date.now()}`}
+      src={`${API_BASE_URL}/collections/${collectionId}/artwork`}
       alt=""
+      loading="lazy"
+      decoding="async"
       className="w-8 h-8 rounded object-cover border border-indigo-500/40 flex-shrink-0"
       onError={() => setError(true)}
     />
