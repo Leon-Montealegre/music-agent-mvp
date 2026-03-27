@@ -342,6 +342,11 @@ export default function HomePage() {
 
   const router = useRouter()
 
+  // Onboarding — shown once to new users who haven't set an artist name
+  const [showOnboarding, setShowOnboarding]           = useState(false)
+  const [onboardingArtist, setOnboardingArtist]       = useState('')
+  const [onboardingSaving, setOnboardingSaving]       = useState(false)
+
   useEffect(() => {
     // Wait until NextAuth has finished loading the session.
     // Without this, the fetch fires before the token is set → 401 → empty page.
@@ -380,10 +385,16 @@ export default function HomePage() {
   }, [viewMode])
 
   // Load default artist name once authenticated (used to pre-fill the Create EP/Album form)
+  // Also detects new users (no artist name + onboarding not done) to show the onboarding prompt
   useEffect(() => {
     if (status !== 'authenticated') return
     apiFetch('/settings').then(r => r.json()).then(data => {
-      if (data.settings?.defaultArtistName) setCollDefaultArtist(data.settings.defaultArtistName)
+      const s = data.settings || {}
+      if (s.defaultArtistName) setCollDefaultArtist(s.defaultArtistName)
+      // Show onboarding modal once for users who haven't set an artist name yet
+      if (!s.defaultArtistName && !s.preferences?.onboardingDone) {
+        setShowOnboarding(true)
+      }
     }).catch(() => {})
   }, [status])
 
@@ -413,6 +424,13 @@ export default function HomePage() {
       setCollError('')
     }
   }, [showCreateCollModal]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // If the default artist name loads AFTER the modal is already open, update the field
+  useEffect(() => {
+    if (showCreateCollModal && collDefaultArtist && !collArtist) {
+      setCollArtist(collDefaultArtist)
+    }
+  }, [collDefaultArtist]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Create EP/Album submit handler ──
   const handleCreateCollection = async (e) => {
@@ -481,6 +499,38 @@ export default function HomePage() {
       setCollError(err.message)
       setCollSubmitting(false)
     }
+  }
+
+  // ── Onboarding handlers ──
+  async function handleOnboardingSave() {
+    setOnboardingSaving(true)
+    try {
+      await apiFetch('/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          defaultArtistName: onboardingArtist.trim() || undefined,
+          preferences: { onboardingDone: true }
+        })
+      })
+      if (onboardingArtist.trim()) {
+        setCollDefaultArtist(onboardingArtist.trim())
+      }
+    } catch (err) {
+      console.error('Failed to save onboarding:', err)
+    } finally {
+      setOnboardingSaving(false)
+      setShowOnboarding(false)
+    }
+  }
+
+  async function handleOnboardingSkip() {
+    setShowOnboarding(false)
+    apiFetch('/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preferences: { onboardingDone: true } })
+    }).catch(() => {})
   }
 
   // --- Counts ---
@@ -1474,6 +1524,78 @@ export default function HomePage() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ONBOARDING MODAL — shown once to new users
+      ══════════════════════════════════════════════════════════════════ */}
+      {showOnboarding && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2000,
+            background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#1f2937', border: '1px solid #374151',
+              borderRadius: '20px', width: '100%', maxWidth: '460px',
+              padding: '36px 32px', boxShadow: '0 32px 80px rgba(0,0,0,0.8)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '40px', marginBottom: '16px' }}>🎵</div>
+            <h2 style={{ color: '#f3f4f6', fontSize: '22px', fontWeight: 700, margin: '0 0 8px' }}>
+              Welcome to Music Agent!
+            </h2>
+            <p style={{ color: '#9ca3af', fontSize: '14px', margin: '0 0 28px', lineHeight: 1.6 }}>
+              What name do you release music under? This will be used to auto-fill artist fields throughout the app. You can change it any time in Settings.
+            </p>
+
+            <input
+              type="text"
+              autoFocus
+              value={onboardingArtist}
+              onChange={e => setOnboardingArtist(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleOnboardingSave() }}
+              placeholder="Your artist name…"
+              style={{
+                width: '100%', padding: '12px 14px', background: '#111827',
+                border: '1px solid #4b5563', borderRadius: '10px',
+                color: '#f3f4f6', fontSize: '15px', outline: 'none',
+                boxSizing: 'border-box', marginBottom: '16px', textAlign: 'center',
+              }}
+              onFocus={e => e.target.style.borderColor = '#7c3aed'}
+              onBlur={e => e.target.style.borderColor = '#4b5563'}
+            />
+
+            <button
+              onClick={handleOnboardingSave}
+              disabled={onboardingSaving}
+              style={{
+                width: '100%', padding: '12px', background: '#7c3aed',
+                border: 'none', borderRadius: '10px', color: '#fff',
+                fontSize: '15px', fontWeight: 600, cursor: onboardingSaving ? 'not-allowed' : 'pointer',
+                opacity: onboardingSaving ? 0.7 : 1, marginBottom: '10px',
+              }}
+            >
+              {onboardingSaving ? 'Saving…' : 'Save & Continue'}
+            </button>
+
+            <button
+              onClick={handleOnboardingSkip}
+              disabled={onboardingSaving}
+              style={{
+                width: '100%', padding: '10px', background: 'none',
+                border: 'none', color: '#6b7280', fontSize: '13px',
+                cursor: 'pointer', textDecoration: 'underline',
+              }}
+            >
+              Skip for now
+            </button>
           </div>
         </div>
       )}

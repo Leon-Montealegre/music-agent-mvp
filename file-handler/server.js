@@ -196,7 +196,11 @@ app.patch('/settings', authMiddleware, async (req, res) => {
        ON CONFLICT (user_id) DO UPDATE SET
          artist_name   = COALESCE($2, settings.artist_name),
          default_genre = COALESCE($3, settings.default_genre),
-         preferences   = COALESCE($4, settings.preferences)`,
+         preferences   = CASE
+           WHEN $4 IS NOT NULL
+           THEN COALESCE(settings.preferences, '{}'::jsonb) || $4::jsonb
+           ELSE settings.preferences
+         END`,
       [req.user.id, defaultArtistName || null, defaultGenre || null,
        preferences ? JSON.stringify(preferences) : null]
     )
@@ -291,9 +295,9 @@ app.get('/files', authMiddleware, async (req, res) => {
            col.slug AS col_slug,     col.title AS col_title,
            de.id   AS entry_id,      de.path_type
          FROM files f
-         LEFT JOIN releases r          ON f.release_id    = r.id
-         LEFT JOIN collections col     ON f.collection_id = col.id
          LEFT JOIN distribution_entries de ON f.entry_id  = de.id
+         LEFT JOIN releases r    ON COALESCE(f.release_id,    de.release_id)    = r.id
+         LEFT JOIN collections col ON COALESCE(f.collection_id, de.collection_id) = col.id
          WHERE f.user_id = $1
          ORDER BY f.created_at DESC`,
         [req.user.id]

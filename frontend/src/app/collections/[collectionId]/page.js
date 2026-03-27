@@ -135,15 +135,18 @@ export default function CollectionDetailPage({ params }) {
 
   // Load available singles when add-track modal opens
   useEffect(() => {
-    if (!showAddTrackModal || !session?.token) return
+    if (!showAddTrackModal) return
     apiFetch('/releases')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('Failed to load releases')
+        return r.json()
+      })
       .then(data => {
         const singles = (data.releases || []).filter(r => !r.collectionId)
         setAvailableSingles(singles)
       })
-      .catch(() => {})
-  }, [showAddTrackModal, session])
+      .catch(err => console.error('Failed to load singles:', err))
+  }, [showAddTrackModal])
 
   async function handleAddTrackToCollection(trackReleaseId) {
     setAddingTrack(true)
@@ -541,10 +544,6 @@ export default function CollectionDetailPage({ params }) {
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider">Tracks</p>
                   <p className="text-sm font-medium text-gray-200">{tracks.length}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Collection ID</p>
-                  <p className="text-xs font-mono text-gray-500 break-all">{collectionId}</p>
                 </div>
               </div>
 
