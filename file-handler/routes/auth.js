@@ -67,6 +67,51 @@ const forgotPasswordLimiter = createRateLimiter({
 // ── Resend helper ─────────────────────────────────────────────────────────────
 // Calls the Resend HTTP API directly using built-in fetch (Node 18+).
 // No npm package needed.
+
+// Sends a notification to the admin whenever a new user registers.
+// Fire-and-forget: errors are logged but never surface to the registering user.
+async function sendAdminRegistrationNotification(newUser) {
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM_EMAIL || 'Music Agent <onboarding@resend.dev>',
+        to: ['mathias.berthelemot@gmail.com'],
+        subject: `🎵 New user registered: ${newUser.name}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1f2937;border-radius:12px;color:#e5e7eb;">
+            <h2 style="color:#fff;margin-top:0;">New user registered 🎉</h2>
+            <table style="width:100%;border-collapse:collapse;">
+              <tr>
+                <td style="padding:8px 0;color:#9ca3af;width:80px;">Name</td>
+                <td style="padding:8px 0;color:#fff;font-weight:600;">${newUser.name}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;color:#9ca3af;">Email</td>
+                <td style="padding:8px 0;color:#fff;">${newUser.email}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;color:#9ca3af;">Signed up</td>
+                <td style="padding:8px 0;color:#fff;">${new Date(newUser.created_at).toUTCString()}</td>
+              </tr>
+            </table>
+          </div>
+        `,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`Admin notification email failed (${res.status}): ${body}`);
+    }
+  } catch (err) {
+    console.error('Admin notification email error:', err);
+  }
+}
+
 async function sendPasswordResetEmail(toEmail, resetUrl) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -137,6 +182,9 @@ router.post('/register', registerLimiter, async (req, res) => {
 
     const user = result.rows[0];
     const token = generateToken(user);
+
+    // Notify admin of new registration — fire-and-forget, never blocks the response
+    sendAdminRegistrationNotification(user);
 
     res.status(201).json({ token, user: { id: user.id, email: user.email, name: user.name } });
   } catch (err) {
