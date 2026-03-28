@@ -40,6 +40,10 @@ export default function CollectionLabelEntryPage({ params }) {
   const [snoozing, setSnoozing] = useState(false)
   const [editFollowUpDays, setEditFollowUpDays] = useState(10)
 
+  // Sidebar follow-up date editing
+  const [sidebarFollowUpInput, setSidebarFollowUpInput] = useState('')
+  const [sidebarReminderEnabled, setSidebarReminderEnabled] = useState(false)
+
   const [showContactPicker, setShowContactPicker] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
   const [editContactForm, setEditContactForm] = useState({})
@@ -98,6 +102,12 @@ export default function CollectionLabelEntryPage({ params }) {
   useEffect(() => {
     if (session?.token) loadData()
   }, [collectionId, labelId, session])
+
+  // Keep sidebar date input and checkbox in sync with entry
+  useEffect(() => {
+    setSidebarFollowUpInput(entry?.followUpDate || '')
+    setSidebarReminderEnabled(!!entry?.followUpDate)
+  }, [entry?.followUpDate])
 
   const handleSaveDetails = async () => {
     if (!detailsForm.label.trim()) {
@@ -162,6 +172,52 @@ export default function CollectionLabelEntryPage({ params }) {
     } catch (err) {
       console.error(err)
       alert(`Could not set follow-up: ${err.message}`)
+    } finally {
+      setSnoozing(false)
+    }
+  }
+
+  // Directly save a new follow-up date chosen from the sidebar date picker
+  const handleSidebarSaveFollowUp = async (newDate) => {
+    if (!newDate) return
+    setSnoozing(true)
+    try {
+      const res = await apiFetch(`${apiBase}/label/${labelId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followUpDate: newDate }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update follow-up date')
+      setEntry(prev => ({ ...prev, followUpDate: newDate }))
+      setDetailsForm(prev => ({ ...prev, followUpDate: newDate }))
+    } catch (err) {
+      console.error(err)
+      alert(`Could not update follow-up date: ${err.message}`)
+    } finally {
+      setSnoozing(false)
+    }
+  }
+
+  // Clear the follow-up date entirely (called when unchecking the sidebar checkbox)
+  const handleSidebarClearFollowUp = async () => {
+    setSnoozing(true)
+    try {
+      const res = await apiFetch(`${apiBase}/label/${labelId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followUpDate: null }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to clear follow-up date')
+      setEntry(prev => ({ ...prev, followUpDate: null }))
+      setDetailsForm(prev => ({ ...prev, followUpDate: '' }))
+      setSidebarFollowUpInput('')
+      setSidebarReminderEnabled(false)
+    } catch (err) {
+      console.error(err)
+      alert(`Could not clear follow-up date: ${err.message}`)
+      setSidebarReminderEnabled(true) // revert checkbox on failure
     } finally {
       setSnoozing(false)
     }
@@ -299,37 +355,74 @@ export default function CollectionLabelEntryPage({ params }) {
                     {entry.status || 'Submitted'}
                   </span>
                 </div>
-                {/* Follow-up — only shown when Submitted */}
-                {entry.status?.toLowerCase() === 'submitted' && (<>
-                  {showFollowUpPrompt && (
-                    <div className="bg-purple-900/30 border border-purple-500/40 rounded-lg p-3">
-                      <p className="text-xs text-purple-300 font-medium mb-1">📅 Set a follow-up reminder?</p>
-                      <p className="text-xs text-gray-400 mb-2">Follow up in 10 days ({new Date(daysFromNow(10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})</p>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleSetFollowUp(10)} disabled={snoozing} className="flex-1 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-semibold rounded-md transition-colors">
-                          {snoozing ? 'Setting…' : 'Yes, set reminder'}
-                        </button>
-                        <button onClick={() => setFollowUpPromptDismissed(true)} className="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded-md transition-colors">
-                          No thanks
-                        </button>
-                      </div>
+                {/* Follow-up reminder — unified block, always shown when Submitted */}
+                {entry.status?.toLowerCase() === 'submitted' && (
+                  <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3 space-y-2">
+                    {/* Header row: label + checkbox */}
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-purple-300 font-medium">📅 Follow-up Reminder</p>
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={sidebarReminderEnabled}
+                          disabled={snoozing}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSidebarReminderEnabled(true)
+                              if (!sidebarFollowUpInput) setSidebarFollowUpInput(daysFromNow(10))
+                            } else {
+                              handleSidebarClearFollowUp()
+                            }
+                          }}
+                          className="accent-purple-500 w-4 h-4"
+                        />
+                        <span className="text-xs text-gray-400">Set reminder</span>
+                      </label>
                     </div>
-                  )}
-                  {entry.followUpDate && (
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Follow-up Date</p>
-                      <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
-                        {isOverdue ? '⚠️ Overdue · ' : ''}
-                        {new Date(entry.followUpDate.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                      </p>
-                      {isOverdue && (
-                        <button onClick={() => handleSetFollowUp(10)} disabled={snoozing} className="mt-1.5 px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 text-xs rounded-md transition-colors">
-                          {snoozing ? 'Snoozing…' : '💤 Snooze 10 days'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </>)}
+
+                    {sidebarReminderEnabled ? (
+                      <>
+                        {/* Current saved date */}
+                        {entry.followUpDate && (
+                          <p className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-gray-200'}`}>
+                            {isOverdue ? '⚠️ Overdue · ' : ''}
+                            {new Date(entry.followUpDate.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
+                        )}
+
+                        {/* Inline date picker */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="date"
+                            value={sidebarFollowUpInput}
+                            onChange={e => setSidebarFollowUpInput(e.target.value)}
+                            className="flex-1 px-2 py-1 bg-gray-900 border border-gray-600 text-gray-100 rounded text-xs focus:ring-1 focus:ring-purple-500"
+                          />
+                          <button
+                            onClick={() => handleSidebarSaveFollowUp(sidebarFollowUpInput)}
+                            disabled={snoozing || !sidebarFollowUpInput || sidebarFollowUpInput === (entry.followUpDate || '').slice(0, 10)}
+                            className="px-2 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white text-xs rounded transition-colors whitespace-nowrap"
+                          >
+                            {snoozing ? '…' : entry.followUpDate ? 'Update' : 'Set'}
+                          </button>
+                        </div>
+
+                        {/* Snooze shortcut — only when overdue */}
+                        {isOverdue && (
+                          <button
+                            onClick={() => handleSetFollowUp(10)}
+                            disabled={snoozing}
+                            className="w-full px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 text-xs rounded-md transition-colors"
+                          >
+                            {snoozing ? 'Snoozing…' : '💤 Snooze 10 days'}
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-400">No reminder set</p>
+                    )}
+                  </div>
+                )}
                 {entry.signedDate && (
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Signature Date</p>

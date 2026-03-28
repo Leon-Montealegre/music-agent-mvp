@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { fetchReleases } from '@/lib/api'
+import { fetchReleases, apiFetch } from '@/lib/api'
 import Link from 'next/link'
 import BackButton from '@/components/BackButton'
 
@@ -26,9 +26,13 @@ export default function StatsPage() {
     if (!session?.token) return
     async function loadData() {
       try {
-        const data = await fetchReleases()
-        setReleases(data)
-        calculateStats(data)
+        const [releasesData, collectionsRes] = await Promise.all([
+          fetchReleases(),
+          apiFetch('/collections').then(r => r.json()),
+        ])
+        const collectionsData = collectionsRes.collections || []
+        setReleases(releasesData)
+        calculateStats(releasesData, collectionsData)
       } catch (err) {
         console.error('Error loading stats:', err)
       } finally {
@@ -38,11 +42,14 @@ export default function StatsPage() {
     loadData()
   }, [session])
 
-  function calculateStats(data) {
-    if (data.length === 0) return
+  function calculateStats(data, collections = []) {
+    // Count individual tracks from collections (an EP with 4 tracks = 4 tracks)
+    const collectionTrackCount = collections.reduce((sum, c) => sum + (c.trackCount || 0), 0)
+
+    if (data.length === 0 && collectionTrackCount === 0) return
 
     const newStats = {
-      total: data.length,
+      total: data.length + collectionTrackCount,
       notSubmitted: 0,
       submitted: 0,
       signed: 0,
@@ -58,10 +65,11 @@ export default function StatsPage() {
     let bpmSum = 0
     let bpmCount = 0
 
+    // ── Single releases ──────────────────────────────────────────────────────
     data.forEach(release => {
       // Safety check: skip invalid releases
       if (!release) return
-      
+
       // Metadata is either at release.metadata OR release itself (flat structure)
       const metadata = release.metadata || release
 
@@ -76,11 +84,11 @@ export default function StatsPage() {
       const hasNonSignedSubmissions = metadata.distribution?.submit?.some(
         entry => entry.status?.toLowerCase() !== 'signed'
       )
-      
+
       // Count categories (track can be in multiple)
       if (hasSignedSubmission) {
         newStats.signed++
-        
+
         // Label breakdown - get label from the signed submission
         const signedSubmission = metadata.distribution.submit.find(
           entry => entry.status?.toLowerCase() === 'signed'
@@ -89,16 +97,16 @@ export default function StatsPage() {
           newStats.byLabel[signedSubmission.label] = (newStats.byLabel[signedSubmission.label] || 0) + 1
         }
       }
-      
+
       if (isReleased) {
         newStats.released++
       }
-      
+
       if (hasNonSignedSubmissions && !hasSignedSubmission && !isReleased) {
         // Submitted = has non-signed submissions but NOT signed and NOT released
         newStats.submitted++
       }
-      
+
       if (!hasSubmissions) {
         newStats.notSubmitted++
       }
@@ -131,6 +139,62 @@ export default function StatsPage() {
         const dateStr = metadata.releaseDate || metadata.trackDate
         const year = dateStr.split('-')[0]
         newStats.byYear[year] = (newStats.byYear[year] || 0) + 1
+      }
+    })
+
+    // ── Collections (EPs / Albums) ───────────────────────────────────────────
+    // An EP/Album's status applies to ALL its tracks.
+    // e.g. a signed EP with 4 tracks = 4 signed tracks.
+    collections.forEach(collection => {
+      if (!collection) return
+      const trackCount = collection.trackCount || 0
+      if (trackCount === 0) return
+
+      const dist = collection.distribution || {}
+      const hasSignedSubmission = dist.submit?.some(
+        entry => entry.status?.toLowerCase() === 'signed'
+      )
+      const isReleased = dist.release?.some(
+        entry => entry.status?.toLowerCase() === 'live'
+      )
+      const hasSubmissions = dist.submit?.length > 0
+      const hasNonSignedSubmissions = dist.submit?.some(
+        entry => entry.status?.toLowerCase() !== 'signed'
+      )
+
+      if (hasSignedSubmission) {
+        newStats.signed += trackCount
+
+        const signedSubmission = dist.submit.find(
+          entry => entry.status?.toLowerCase() === 'signed'
+        )
+        const label = signedSubmission?.label || collection.signedLabel
+        if (label) {
+          newStats.byLabel[label] = (newStats.byLabel[label] || 0) + trackCount
+        }
+      }
+
+      if (isReleased) {
+        newStats.released += trackCount
+      }
+
+      if (hasNonSignedSubmissions && !hasSignedSubmission && !isReleased) {
+        newStats.submitted += trackCount
+      }
+
+      if (!hasSubmissions) {
+        newStats.notSubmitted += trackCount
+      }
+
+      // Genre breakdown — count each track in the EP toward its genre
+      if (collection.genre) {
+        newStats.byGenre[collection.genre] = (newStats.byGenre[collection.genre] || 0) + trackCount
+      }
+
+      // Year breakdown
+      if (collection.releaseDate) {
+        const year = collection.releaseDate.split('-')[0]
+        newStats.byYear[year] = (newStats.byYear[year] || 0) + trackCount
       }
     })
 
@@ -174,12 +238,12 @@ export default function StatsPage() {
             <h1 className="text-4xl font-bold text-gray-100 mb-2">
               📊 Catalogue Statistics
             </h1>
-            <p className="text-gray-400">Analytics for {stats.total} tracks</p>
+            <p className="text-gray-400">Analytics for {stats.total} tracks (including EP &amp; album songs)</p>
           </div>
           <BackButton />  
         </div>
 
-        {releases.length === 0 ? (
+        {stats.total === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">📈</div>
             <h2 className="text-2xl font-bold text-gray-300 mb-2">
