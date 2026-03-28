@@ -365,6 +365,42 @@ router.post('/reset-password', async (req, res) => {
 });
 
 
+// GET /auth/me/notifications
+// Returns the current email_notifications_enabled value for the authenticated user.
+router.get('/me/notifications', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT email_notifications_enabled FROM users WHERE id = $1',
+      [req.user.id]
+    )
+    if (result.rowCount === 0) return res.status(404).json({ error: 'User not found' })
+    res.json({ emailNotificationsEnabled: result.rows[0].email_notifications_enabled })
+  } catch (err) {
+    console.error('GET /auth/me/notifications error:', err)
+    res.status(500).json({ error: 'Failed to fetch notification preference' })
+  }
+})
+
+// PATCH /auth/me/notifications
+// Body: { emailNotificationsEnabled: boolean }
+// Lets a user opt in or out of follow-up reminder emails from within the app.
+router.patch('/me/notifications', authMiddleware, async (req, res) => {
+  const { emailNotificationsEnabled } = req.body
+  if (typeof emailNotificationsEnabled !== 'boolean') {
+    return res.status(400).json({ error: 'emailNotificationsEnabled must be a boolean' })
+  }
+  try {
+    await pool.query(
+      'UPDATE users SET email_notifications_enabled = $1 WHERE id = $2',
+      [emailNotificationsEnabled, req.user.id]
+    )
+    res.json({ success: true, emailNotificationsEnabled })
+  } catch (err) {
+    console.error('PATCH /auth/me/notifications error:', err)
+    res.status(500).json({ error: 'Failed to update notification preference' })
+  }
+})
+
 // DELETE /auth/me
 // Permanently deletes the authenticated user and all their data.
 // All related records are removed via ON DELETE CASCADE in the DB schema.

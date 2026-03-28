@@ -19,10 +19,13 @@ try {
   }
 } catch (e) { /* resend not installed yet — run: npm install resend */ }
 
-async function sendFollowUpEmail({ to, entryName, sourceTitle, followUpDate, href }) {
+async function sendFollowUpEmail({ to, entryName, sourceTitle, followUpDate, href, unsubscribeToken, entryId }) {
   if (!resend) return
   const dateOnly = (followUpDate instanceof Date ? followUpDate.toISOString() : String(followUpDate)).slice(0, 10)
   const dateStr = new Date(dateOnly + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const baseUrl = 'https://music-agent-mvp-production.up.railway.app'
+  const unsubscribeUrl = `${baseUrl}/unsubscribe?token=${unsubscribeToken}`
+  const snoozeUrl      = `${baseUrl}/snooze?entryId=${entryId}&days=10&token=${unsubscribeToken}`
   await resend.emails.send({
     from: 'Music Agent <reminders@musicagentchigui.com>',
     to,
@@ -37,7 +40,13 @@ async function sendFollowUpEmail({ to, entryName, sourceTitle, followUpDate, hre
           <tr><td style="color:#6b7280;padding:4px 8px">Follow-up date</td><td style="padding:4px 8px">${dateStr}</td></tr>
         </table>
         <a href="https://musicagentchigui.com${href}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Open entry →</a>
-        <p style="color:#9ca3af;font-size:12px;margin-top:24px">You're receiving this because you set a follow-up reminder in Music Agent. Open the entry and click "Snooze 10 days" if you need more time.</p>
+        <div style="margin-top:20px">
+          <a href="${snoozeUrl}" style="display:inline-block;background:#f3f4f6;color:#374151;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">⏸ Snooze 10 days</a>
+        </div>
+        <p style="color:#9ca3af;font-size:11px;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:16px">
+          You're receiving this because you set a follow-up reminder in Music Agent.<br>
+          <a href="${unsubscribeUrl}" style="color:#9ca3af">Unsubscribe from all reminder emails</a>
+        </p>
       </div>
     `,
   })
@@ -476,10 +485,11 @@ async function handleSendReminders(req, res) {
     const today = new Date().toISOString().split('T')[0]
     const result = await db.query(
       `SELECT de.id, de.follow_up_date, de.label AS entry_name,
-              COALESCE(r.title, col.title)  AS source_title,
-              COALESCE(r.slug,  col.slug)   AS slug,
+              COALESCE(r.title, col.title)        AS source_title,
+              COALESCE(r.slug,  col.slug)         AS slug,
               CASE WHEN de.release_id IS NOT NULL THEN 'release' ELSE 'collection' END AS source_type,
-              COALESCE(ur.email, uc.email)  AS user_email
+              COALESCE(ur.email, uc.email)        AS user_email,
+              COALESCE(ur.unsubscribe_token, uc.unsubscribe_token) AS unsubscribe_token
        FROM distribution_entries de
        LEFT JOIN releases    r   ON r.id   = de.release_id
        LEFT JOIN collections col ON col.id = de.collection_id
@@ -488,7 +498,8 @@ async function handleSendReminders(req, res) {
        WHERE de.path_type = 'submit'
          AND de.follow_up_date IS NOT NULL
          AND de.follow_up_date <= $1
-         AND (de.last_reminded_at IS NULL OR de.last_reminded_at::date < $1::date)`,
+         AND (de.last_reminded_at IS NULL OR de.last_reminded_at::date < $1::date)
+         AND COALESCE(ur.email_notifications_enabled, uc.email_notifications_enabled, TRUE) = TRUE`,
       [today]
     )
     let sent = 0
@@ -496,11 +507,13 @@ async function handleSendReminders(req, res) {
       const href = `/${row.source_type === 'release' ? 'releases' : 'collections'}/${row.slug}/label/${row.id}`
       try {
         await sendFollowUpEmail({
-          to:          row.user_email,
-          entryName:   row.entry_name || 'Label submission',
-          sourceTitle: row.source_title || '',
-          followUpDate: row.follow_up_date,
+          to:               row.user_email,
+          entryName:        row.entry_name || 'Label submission',
+          sourceTitle:      row.source_title || '',
+          followUpDate:     row.follow_up_date,
           href,
+          unsubscribeToken: row.unsubscribe_token,
+          entryId:          row.id,
         })
         await db.query(`UPDATE distribution_entries SET last_reminded_at = NOW() WHERE id = $1`, [row.id])
         sent++
@@ -517,6 +530,91 @@ async function handleSendReminders(req, res) {
 }
 app.get('/api/send-reminders', handleSendReminders)
 app.get('/cron/follow-up-emails', handleSendReminders)
+
+// ─── GET /unsubscribe?token=<unsubscribe_token> ───────────────────────────────
+// One-click unsubscribe. No login required.
+// Sets email_notifications_enabled = FALSE for the matching user.
+// Called from the footer link in every follow-up reminder email.
+app.get('/unsubscribe', async (req, res) => {
+  const { token } = req.query
+  if (!token) return res.status(400).send('<p>Missing unsubscribe token.</p>')
+  try {
+    const db = require('./db')
+    const result = await db.query(
+      `UPDATE users
+         SET email_notifications_enabled = FALSE
+       WHERE unsubscribe_token = $1
+       RETURNING email`,
+      [token]
+    )
+    if (result.rowCount === 0) {
+      return res.status(404).send(`
+        <html><body style="font-family:sans-serif;max-width:480px;margin:60px auto;padding:24px;text-align:center">
+          <h2>Link not found</h2>
+          <p>This unsubscribe link is no longer valid.</p>
+        </body></html>
+      `)
+    }
+    res.send(`
+      <html><body style="font-family:sans-serif;max-width:480px;margin:60px auto;padding:24px;text-align:center">
+        <h2 style="color:#7c3aed">Unsubscribed ✓</h2>
+        <p>You've been removed from Music Agent reminder emails.</p>
+        <p style="color:#6b7280;font-size:13px">You can re-enable reminders anytime from your account settings.</p>
+        <a href="https://musicagentchigui.com/settings" style="display:inline-block;margin-top:16px;background:#7c3aed;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none">Go to settings</a>
+      </body></html>
+    `)
+  } catch (err) {
+    console.error('[UNSUBSCRIBE] Error:', err.message)
+    res.status(500).send('<p>Something went wrong. Please try again later.</p>')
+  }
+})
+
+// ─── GET /snooze?entryId=<id>&days=<n>&token=<unsubscribe_token> ─────────────
+// Pushes the follow_up_date forward by N days (default 10).
+// Uses the unsubscribe_token to verify the request came from the email recipient.
+// No login required.
+app.get('/snooze', async (req, res) => {
+  const { entryId, days, token } = req.query
+  if (!entryId || !token) return res.status(400).send('<p>Missing required parameters.</p>')
+  const snoozeDays = Math.min(parseInt(days, 10) || 10, 90) // cap at 90 days
+  try {
+    const db = require('./db')
+    // Verify the token belongs to the owner of this entry
+    const verify = await db.query(
+      `SELECT de.id
+       FROM distribution_entries de
+       LEFT JOIN releases    r   ON r.id   = de.release_id
+       LEFT JOIN collections col ON col.id = de.collection_id
+       LEFT JOIN users       ur  ON ur.id  = r.user_id
+       LEFT JOIN users       uc  ON uc.id  = col.user_id
+       WHERE de.id = $1
+         AND COALESCE(ur.unsubscribe_token, uc.unsubscribe_token) = $2
+       LIMIT 1`,
+      [entryId, token]
+    )
+    if (verify.rowCount === 0) {
+      return res.status(403).send('<p>Invalid or expired snooze link.</p>')
+    }
+    await db.query(
+      `UPDATE distribution_entries
+         SET follow_up_date   = follow_up_date + ($1 || ' days')::INTERVAL,
+             last_reminded_at = NULL
+       WHERE id = $2`,
+      [snoozeDays, entryId]
+    )
+    res.send(`
+      <html><body style="font-family:sans-serif;max-width:480px;margin:60px auto;padding:24px;text-align:center">
+        <h2 style="color:#7c3aed">Snoozed ✓</h2>
+        <p>Your follow-up reminder has been pushed back ${snoozeDays} days.</p>
+        <a href="https://musicagentchigui.com" style="display:inline-block;margin-top:16px;background:#7c3aed;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none">Open Music Agent</a>
+      </body></html>
+    `)
+  } catch (err) {
+    console.error('[SNOOZE] Error:', err.message)
+    res.status(500).send('<p>Something went wrong. Please try again later.</p>')
+  }
+})
+
 
 // =============================================================================
 // CONTACTS — CRM (Phase 3)

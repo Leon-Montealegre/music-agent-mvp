@@ -77,6 +77,11 @@ export default function SettingsPage() {
   const [artistSaving,   setArtistSaving]   = useState(false)
   const [artistStatus,   setArtistStatus]   = useState(null)
 
+  // ── Email notifications section ──────────────────────────────────────────
+  const [emailNotifs,       setEmailNotifs]       = useState(true)
+  const [notifSaving,       setNotifSaving]       = useState(false)
+  const [notifStatus,       setNotifStatus]       = useState(null)
+
   // ── Delete account section ────────────────────────────────────────────────
   const [showDeleteModal,   setShowDeleteModal]   = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -91,12 +96,21 @@ export default function SettingsPage() {
     if (session.user?.name)  setName(session.user.name)
     if (session.user?.email) setEmail(session.user.email)
 
-    // Load default artist name from the /settings endpoint
+    // Load default artist name and notification preference
     apiFetch('/settings')
       .then(r => r.json())
       .then(data => {
         if (data.settings?.defaultArtistName) {
           setDefaultArtist(data.settings.defaultArtistName)
+        }
+      })
+      .catch(() => {})
+
+    apiFetch('/auth/me/notifications')
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data.emailNotificationsEnabled === 'boolean') {
+          setEmailNotifs(data.emailNotificationsEnabled)
         }
       })
       .catch(() => {})
@@ -195,6 +209,26 @@ export default function SettingsPage() {
     } finally {
       setArtistSaving(false)
       setTimeout(() => setArtistStatus(null), 3000)
+    }
+  }
+
+  // ── Save email notification preference ──────────────────────────────────
+  async function saveNotifs(newValue) {
+    setNotifSaving(true); setNotifStatus(null)
+    setEmailNotifs(newValue)
+    try {
+      await apiFetch('/auth/me/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailNotificationsEnabled: newValue }),
+      })
+      setNotifStatus('ok')
+    } catch {
+      setEmailNotifs(!newValue) // revert on failure
+      setNotifStatus('err')
+    } finally {
+      setNotifSaving(false)
+      setTimeout(() => setNotifStatus(null), 3000)
     }
   }
 
@@ -298,6 +332,37 @@ export default function SettingsPage() {
             placeholder="Your Artist Name"
           />
           <SaveButton onClick={saveArtist} saving={artistSaving} status={artistStatus} />
+        </Card>
+
+        {/* ── Email Notifications ───────────────────────────────────────── */}
+        <Card title="Email Notifications">
+          <p className="text-xs text-gray-500 mb-4">
+            When enabled, Music Agent sends you a reminder email on the day a follow-up is due. You can also unsubscribe directly from any reminder email.
+          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-200">Follow-up reminder emails</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {emailNotifs ? 'Currently enabled' : 'Currently disabled'}
+              </p>
+            </div>
+            <button
+              onClick={() => saveNotifs(!emailNotifs)}
+              disabled={notifSaving}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                emailNotifs ? 'bg-purple-600' : 'bg-gray-600'
+              }`}
+              aria-label="Toggle email notifications"
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  emailNotifs ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+          {notifStatus === 'ok'  && <p className="text-green-400 text-xs mt-3">✅ Preference saved</p>}
+          {notifStatus === 'err' && <p className="text-red-400   text-xs mt-3">❌ Failed to save — please try again</p>}
         </Card>
 
         {/* ── Legal ────────────────────────────────────────────────────── */}
