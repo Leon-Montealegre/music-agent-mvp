@@ -112,10 +112,11 @@ export default function AdminPage() {
 
           {/* Table header */}
           <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-gray-700 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            <div className="col-span-3">Name</div>
+            <div className="col-span-2">Name</div>
             <div className="col-span-3">Email</div>
             <div className="col-span-2">Storage</div>
-            <div className="col-span-2">Joined</div>
+            <div className="col-span-2">Uploads</div>
+            <div className="col-span-1">Joined</div>
             <div className="col-span-1">Role</div>
             <div className="col-span-1"></div>
           </div>
@@ -138,7 +139,7 @@ export default function AdminPage() {
                   }`}
                 >
                   {/* Name */}
-                  <div className="col-span-3 flex items-center gap-2">
+                  <div className="col-span-2 flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-sm font-semibold text-gray-300 flex-shrink-0">
                       {user.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
@@ -159,8 +160,28 @@ export default function AdminPage() {
                     )}
                   </div>
 
+                  {/* Uploads (releases + collections) */}
+                  <div className="col-span-2 text-sm">
+                    {user.release_count > 0 || user.collection_count > 0 ? (
+                      <div className="flex flex-col gap-0.5">
+                        {user.release_count > 0 && (
+                          <span className="text-gray-300">
+                            {user.release_count} {user.release_count === 1 ? 'release' : 'releases'}
+                          </span>
+                        )}
+                        {user.collection_count > 0 && (
+                          <span className="text-gray-400 text-xs">
+                            {user.collection_count} {user.collection_count === 1 ? 'collection' : 'collections'}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-600">—</span>
+                    )}
+                  </div>
+
                   {/* Joined */}
-                  <div className="col-span-2 text-gray-400 text-sm">{formatDate(user.created_at)}</div>
+                  <div className="col-span-1 text-gray-400 text-sm">{formatDate(user.created_at)}</div>
 
                   {/* Role badge */}
                   <div className="col-span-1">

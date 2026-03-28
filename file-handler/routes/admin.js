@@ -24,9 +24,13 @@ router.get('/users', async (req, res) => {
       `SELECT
          u.id, u.name, u.email, u.created_at, u.is_admin,
          COALESCE(SUM(f.size_bytes), 0)::BIGINT AS storage_bytes,
-         COUNT(f.id)::INTEGER                   AS file_count
+         COUNT(DISTINCT f.id)::INTEGER           AS file_count,
+         COUNT(DISTINCT r.id)::INTEGER           AS release_count,
+         COUNT(DISTINCT c.id)::INTEGER           AS collection_count
        FROM users u
-       LEFT JOIN files f ON f.user_id = u.id
+       LEFT JOIN files       f ON f.user_id = u.id
+       LEFT JOIN releases    r ON r.user_id = u.id
+       LEFT JOIN collections c ON c.user_id = u.id
        GROUP BY u.id, u.name, u.email, u.created_at, u.is_admin
        ORDER BY u.created_at DESC`
     );
