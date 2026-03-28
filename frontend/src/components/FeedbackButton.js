@@ -43,7 +43,7 @@ export default function FeedbackButton() {
       ];
 
 
-      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYaeTuB5IaNBRZx0i8GX4ZMu8Xcv7xUbAOI07bFagX7kYecsypS3hvLOjS-_SYLs-e/exec';
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyOj0ShJJ8F5u_CzufQbKXyWQ1Ty9GV1X2USOULhGbN_y3dKs63SCklRcAkpwrP6eiu/exec';
       
       await fetch(SCRIPT_URL, {
         method: 'POST',
