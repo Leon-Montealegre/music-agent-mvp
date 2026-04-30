@@ -1,35 +1,88 @@
 'use client'
 import { usePathname } from 'next/navigation'
-import BackButton from './BackButton'
+import Breadcrumb from './Breadcrumb'
+
+// IDs look like '2024-03-01 Artist Title' — strip the date prefix for clean labels
+function formatId(id) {
+  return decodeURIComponent(id).replace(/^\d{4}-\d{2}-\d{2}\s*/, '')
+}
 
 export default function HeaderNav() {
   const pathname = usePathname()
 
-  // Home page — no back button
+  // Home page — no breadcrumb needed
   if (pathname === '/') return null
 
-  // Release detail: /releases/[releaseId]
-  if (/^\/releases\/[^/]+$/.test(pathname)) {
-    return <BackButton href="/" label="Back to Catalogue" />
+  // Level 2: Release detail → Catalogue › Track Title
+  const releaseMatch = pathname.match(/^\/releases\/([^/]+)$/)
+  if (releaseMatch) {
+    return (
+      <Breadcrumb crumbs={[
+        { label: 'Catalogue', href: '/' },
+        { label: formatId(releaseMatch[1]) },
+      ]} />
+    )
   }
 
-  // Release label or promo entry: /releases/[releaseId]/label/[labelId] or /promo/[promoId]
+  // Level 3: Release label or promo entry → Catalogue › Track Title › Label/Promo Entry
   const releaseEntryMatch = pathname.match(/^\/releases\/([^/]+)\/(label|promo)\/[^/]+$/)
   if (releaseEntryMatch) {
-    return <BackButton href={`/releases/${releaseEntryMatch[1]}`} label="Back to Track" />
+    const [, releaseId, type] = releaseEntryMatch
+    return (
+      <Breadcrumb crumbs={[
+        { label: 'Catalogue', href: '/' },
+        { label: formatId(releaseId), href: `/releases/${releaseId}` },
+        { label: type === 'label' ? 'Label Entry' : 'Promo Entry' },
+      ]} />
+    )
   }
 
-  // Collection detail: /collections/[collectionId]
-  if (/^\/collections\/[^/]+$/.test(pathname)) {
-    return <BackButton href="/" label="Back to Catalogue" />
+  // Level 2: Collection detail → Catalogue › Collection Title
+  const collectionMatch = pathname.match(/^\/collections\/([^/]+)$/)
+  if (collectionMatch) {
+    return (
+      <Breadcrumb crumbs={[
+        { label: 'Catalogue', href: '/' },
+        { label: formatId(collectionMatch[1]) },
+      ]} />
+    )
   }
 
-  // Collection label or promo entry
+  // Level 3: Collection label or promo entry → Catalogue › Collection Title › Label/Promo Entry
   const collectionEntryMatch = pathname.match(/^\/collections\/([^/]+)\/(label|promo)\/[^/]+$/)
   if (collectionEntryMatch) {
-    return <BackButton href={`/collections/${collectionEntryMatch[1]}`} label="Back to Collection" />
+    const [, collectionId, type] = collectionEntryMatch
+    return (
+      <Breadcrumb crumbs={[
+        { label: 'Catalogue', href: '/' },
+        { label: formatId(collectionId), href: `/collections/${collectionId}` },
+        { label: type === 'label' ? 'Label Entry' : 'Promo Entry' },
+      ]} />
+    )
   }
 
-  // Any other page
-  return <BackButton href="/" label="Back" />
+  // Flat named pages
+  const flatPages = {
+    '/stats':    'Statistics',
+    '/settings': 'Settings',
+    '/contacts': 'Contacts',
+    '/files':    'Files',
+    '/admin':    'Admin',
+  }
+  if (flatPages[pathname]) {
+    return (
+      <Breadcrumb crumbs={[
+        { label: 'Catalogue', href: '/' },
+        { label: flatPages[pathname] },
+      ]} />
+    )
+  }
+
+  // Fallback
+  return (
+    <Breadcrumb crumbs={[
+      { label: 'Catalogue', href: '/' },
+      { label: 'Back' },
+    ]} />
+  )
 }
