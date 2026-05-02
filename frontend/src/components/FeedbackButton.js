@@ -41,7 +41,7 @@ export default function FeedbackButton() {
       ];
 
       const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyOj0ShJJ8F5u_CzufQbKXyWQ1Ty9GV1X2USOULhGbN_y3dKs63SCklRcAkpwrP6eiu/exec';
-      
+
       await fetch(SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -64,8 +64,6 @@ export default function FeedbackButton() {
     }
   };
 
-
-
   const modalContent = isOpen && (
     <div
       className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 overflow-y-auto"
@@ -76,7 +74,6 @@ export default function FeedbackButton() {
         className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-600 shadow-2xl my-8"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold text-gray-100">💬 Send Feedback</h2>
           <button
@@ -163,7 +160,6 @@ export default function FeedbackButton() {
     </div>
   );
 
-
   return (
     <>
       <button
@@ -173,7 +169,6 @@ export default function FeedbackButton() {
       >
         💬 Feedback
       </button>
-
 
       {mounted && modalContent && createPortal(modalContent, document.body)}
     </>
