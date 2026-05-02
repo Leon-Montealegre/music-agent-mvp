@@ -1,11 +1,11 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { createPortal } from 'react-dom';
 
-
 export default function FeedbackButton() {
+  const {  session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -15,20 +15,16 @@ export default function FeedbackButton() {
     priority: 'Medium'
   });
 
-
   const currentPage = typeof window !== 'undefined' ? window.location.pathname : '';
   const displayPage = currentPage === '/' ? 'Home / Catalogue' : currentPage;
-
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-
 
     try {
       const timestamp = new Date().toLocaleString();
@@ -39,9 +35,10 @@ export default function FeedbackButton() {
         formData.description,
         formData.priority,
         'New',
-        ''
+        '',
+        session?.user?.name || '',
+        session?.user?.email || ''
       ];
-
 
       const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyOj0ShJJ8F5u_CzufQbKXyWQ1Ty9GV1X2USOULhGbN_y3dKs63SCklRcAkpwrP6eiu/exec';
       
@@ -52,10 +49,9 @@ export default function FeedbackButton() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          data: rowData
+           rowData
         })
       });
-
 
       alert('Feedback submitted! Thank you!');
       setFormData({ type: 'Bug', description: '', priority: 'Medium' });
@@ -67,6 +63,7 @@ export default function FeedbackButton() {
       setIsSubmitting(false);
     }
   };
+
 
 
   const modalContent = isOpen && (
