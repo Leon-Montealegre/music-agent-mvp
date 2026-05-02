@@ -244,7 +244,7 @@ export default function PromoEntryPage({ params }) {
         <Breadcrumb crumbs={[
           { label: 'Catalogue', href: '/' },
           { label: track?.title || releaseId, href: `/releases/${releaseId}` },
-          { label: labelTitle },
+          { label: entry?.promoName || entry?.platform || 'Promo Entry' },
         ]} />
         <h2 className="text-2xl font-bold text-gray-100">
           {labelTitle} Promo Details
