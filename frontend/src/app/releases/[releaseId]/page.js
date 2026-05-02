@@ -1,6 +1,4 @@
 'use client'
-import Breadcrumb from '@/components/Breadcrumb'
-import Breadcrumb from '@/components/Breadcrumb'
 
 import { use, useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
@@ -437,14 +435,6 @@ export default function TrackDetailPage({ params }) {
       <input ref={videoInputRef}   type="file" accept=".mp4,.mov,.avi,.mkv,.webm"   className="hidden" onChange={handleUploadVideo}   />
 
       {/* ── Header ── */}
-      <Breadcrumb crumbs={[
-        { label: 'Catalogue', href: '/' },
-        { label: metadata.title },
-      ]} />
-      <Breadcrumb crumbs={[
-        { label: 'Catalogue', href: '/' },
-        { label: metadata.title },
-      ]} />
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-start justify-between mb-4 gap-4">

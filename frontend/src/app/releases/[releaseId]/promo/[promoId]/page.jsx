@@ -1,6 +1,4 @@
 'use client'
-import Breadcrumb from '@/components/Breadcrumb'
-import Breadcrumb from '@/components/Breadcrumb'
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -242,16 +240,6 @@ export default function PromoEntryPage({ params }) {
     <div className="min-h-screen bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold text-gray-100 mb-6">
-        <Breadcrumb crumbs={[
-          { label: 'Catalogue', href: '/' },
-          { label: track?.metadata?.title || track?.title || 'Track', href: `/releases/${releaseId}` },
-          { label: entry.promoName || entry.platform || 'Promo Entry' },
-        ]} />
-        <Breadcrumb crumbs={[
-          { label: 'Catalogue', href: '/' },
-          { label: track?.metadata?.title || track?.title || 'Track', href: `/releases/${releaseId}` },
-          { label: entry.promoName || entry.platform || 'Promo Entry' },
-        ]} />
           {entry.promoName || entry.platform || ''} Promo Details
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
