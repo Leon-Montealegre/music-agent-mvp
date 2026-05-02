@@ -11,6 +11,7 @@ import FileAttachments from '@/components/FileAttachments'
 import EditMetadataModal from '@/components/EditMetadataModal'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import { apiFetch, API_BASE_URL } from '@/lib/api'
+import Breadcrumb from '@/components/Breadcrumb'
 
 const BADGE_STYLES = {
   EP:    'bg-indigo-600/90 border-indigo-400/50 text-white',
@@ -436,6 +437,10 @@ export default function CollectionDetailPage({ params }) {
       {/* ── Header ── */}
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-6">
+          <Breadcrumb crumbs={[
+            { label: 'Catalogue', href: '/' },
+            { label: collection?.title || collectionId },
+          ]} />
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 flex-wrap mb-2">
