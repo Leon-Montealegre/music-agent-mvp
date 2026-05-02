@@ -239,7 +239,7 @@ export default function CollectionPromoEntryPage({ params }) {
         <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700 -mx-4 px-4 pt-4 pb-5 mb-6">
           <Breadcrumb crumbs={[
             { label: 'Catalogue', href: '/' },
-            { label: metadata?.title || collectionId, href: `/collections/${collectionId}` },
+            { label: track?.title || collectionId, href: `/collections/${collectionId}` },
             { label: entry.promoName || entry.platform || 'Promo Entry' },
           ]} />
           <h2 className="text-2xl font-bold text-gray-100">
