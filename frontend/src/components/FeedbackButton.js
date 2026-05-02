@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { createPortal } from 'react-dom';
 
 export default function FeedbackButton() {
-  const {  session } = useSession();
+  const {  data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
