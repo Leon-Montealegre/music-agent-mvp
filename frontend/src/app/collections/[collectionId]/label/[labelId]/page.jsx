@@ -9,6 +9,7 @@ import Modal from '@/components/Modal'
 import ContactPicker from '@/components/ContactPicker'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import FileAttachments from '@/components/FileAttachments'
+import Breadcrumb from '@/components/Breadcrumb'
 
 function todayStr() { return new Date().toISOString().split('T')[0] }
 function daysFromNow(n) {
@@ -336,9 +337,16 @@ export default function CollectionLabelEntryPage({ params }) {
   return (
     <div className="min-h-screen bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold text-gray-100 mb-6">
-          {labelTitle} Label Details
-        </h2>
+        <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700 -mx-4 px-4 pt-4 pb-5 mb-6">
+          <Breadcrumb crumbs={[
+            { label: 'Catalogue', href: '/' },
+            { label: metadata?.title || collectionId, href: `/collections/${collectionId}` },
+            { label: labelTitle },
+          ]} />
+          <h2 className="text-2xl font-bold text-gray-100">
+            {labelTitle} Label Details
+          </h2>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column: Label Details */}
           <div className="lg:col-span-1 space-y-6">

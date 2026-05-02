@@ -1,4 +1,5 @@
 'use client'
+import Breadcrumb from '@/components/Breadcrumb'
 
 import { use, useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
@@ -436,6 +437,10 @@ export default function TrackDetailPage({ params }) {
 
       {/* ── Header ── */}
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700">
+        <Breadcrumb crumbs={[
+          { label: 'Catalogue', href: '/' },
+          { label: metadata.title },
+        ]} />
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-start justify-between mb-4 gap-4">
             <div className="flex-1">

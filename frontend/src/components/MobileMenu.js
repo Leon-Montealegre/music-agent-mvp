@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import FeedbackButton from './FeedbackButton'
-import HeaderNav from './HeaderNav'
 
 /**
  * MobileMenu
@@ -85,13 +84,11 @@ export default function MobileMenu() {
           <span>Buy me a coffee</span>
         </a>
 
-        <HeaderNav />
       </div>
 
       {/* ── Mobile: back button + hamburger button (below md) ──────────────── */}
       <div className="flex md:hidden items-center gap-2">
         {/* Back button still shows on mobile so you can navigate back */}
-        <HeaderNav />
 
         <button
           onClick={() => setIsOpen(o => !o)}

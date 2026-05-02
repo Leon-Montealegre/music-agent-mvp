@@ -1,4 +1,5 @@
 'use client'
+import Breadcrumb from '@/components/Breadcrumb'
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -354,9 +355,16 @@ export default function LabelEntryPage({ params }) {
     <div className="min-h-screen bg-gray-900">
       {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold text-gray-100 mb-6">
+      <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700 -mx-4 px-4 pt-4 pb-5 mb-6">
+        <Breadcrumb crumbs={[
+          { label: 'Catalogue', href: '/' },
+          { label: metadata.title, href: `/releases/${releaseId}` },
+          { label: labelTitle },
+        ]} />
+        <h2 className="text-2xl font-bold text-gray-100">
           {labelTitle} Label Details
         </h2>
+      </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column: Label Details (read-only) */}
           <div className="lg:col-span-1 space-y-6">
