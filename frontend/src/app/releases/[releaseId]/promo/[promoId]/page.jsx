@@ -247,7 +247,7 @@ export default function PromoEntryPage({ params }) {
           { label: entry?.promoName || entry?.platform || 'Promo Entry' },
         ]} />
         <h2 className="text-2xl font-bold text-gray-100">
-          {labelTitle} Promo Details
+          {entry?.promoName || entry?.platform || 'Promo Entry'} Promo Details
         </h2>
       </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
