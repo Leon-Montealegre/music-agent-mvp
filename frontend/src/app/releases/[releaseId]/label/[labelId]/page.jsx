@@ -358,7 +358,7 @@ export default function LabelEntryPage({ params }) {
       <div className="bg-gray-800/90 backdrop-blur-md border-b border-gray-700 -mx-4 px-4 pt-4 pb-5 mb-6">
         <Breadcrumb crumbs={[
           { label: 'Catalogue', href: '/' },
-          { label: metadata.title, href: `/releases/${releaseId}` },
+          { label: track?.title || releaseId, href: `/releases/${releaseId}` },
           { label: labelTitle },
         ]} />
         <h2 className="text-2xl font-bold text-gray-100">
